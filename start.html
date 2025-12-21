@@ -4,11 +4,58 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Släktträdet – Start</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; padding: 24px; max-width: 900px; margin: 0 auto; }
+    h1 { margin: 0 0 8px; }
+    .muted { color:#555; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+    a.card {
+      display:block; padding:16px; border:1px solid #ddd; border-radius:12px;
+      text-decoration:none; color:inherit;
+    }
+    a.card:hover { border-color:#aaa; }
+    .title { font-weight:800; margin-bottom:6px; }
+    .topbar { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+    .btn {
+      display:inline-block; padding:10px 12px; border:1px solid #ddd; border-radius:10px;
+      text-decoration:none; color:inherit; background:#fff;
+    }
+    .btn:hover { border-color:#aaa; }
+    @media (max-width: 700px) {
+      .grid { grid-template-columns: 1fr; }
+      .topbar { flex-direction:column; }
+    }
+  </style>
 </head>
 <body>
-  <h1>Start funkar ✅</h1>
-  <p>Du kom vidare från login.</p>
-  <p><a href="./index.html">Logga ut</a></p>
+  <div class="topbar">
+    <div>
+      <h1>Släktträdet</h1>
+      <p class="muted">Välj vy. (Vi kopplar in funktionerna stegvis.)</p>
+    </div>
+    <a class="btn" href="./index.html">Logga ut</a>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="title">Släktkort</div>
+      <div class="muted">Kopplas in nästa steg.</div>
+    </div>
+
+    <div class="card">
+      <div class="title">Karta-vy</div>
+      <div class="muted">Kopplas in nästa steg.</div>
+    </div>
+
+    <div class="card">
+      <div class="title">Släktträd-vy</div>
+      <div class="muted">Kopplas in nästa steg.</div>
+    </div>
+
+    <div class="card">
+      <div class="title">Skapa relation</div>
+      <div class="muted">Kopplas in nästa steg.</div>
+    </div>
+  </div>
 </body>
 </html>
-
