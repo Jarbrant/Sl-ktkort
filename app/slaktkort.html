@@ -10,42 +10,43 @@
     a { display:inline-block; margin-bottom: 16px; margin-right: 12px; }
     h1 { margin-bottom: 6px; }
     .muted { color:#555; }
-    .card { border:1px solid #ddd; border-radius:10px; padding:16px; margin-top: 16px; }
-    label { display:block; margin-top: 12px; font-weight: 700; }
+    .card { border:1px solid #ddd; border-radius:12px; padding:16px; margin-top: 16px; }
+    label { display:block; margin-top: 12px; font-weight: 800; }
     input, select, textarea, button { width:100%; padding:10px; margin-top:6px; font-size:1rem; }
     textarea { min-height: 90px; resize: vertical; }
-    button { border:1px solid #333; background:#fff; cursor:pointer; margin-top: 16px; }
+    button { border:1px solid #333; background:#fff; cursor:pointer; margin-top: 16px; border-radius: 10px; }
     .error { color:#b00020; font-weight: 800; }
     .ok { font-weight: 800; }
     code { background:#f4f4f4; padding:2px 6px; border-radius:6px; }
     .row { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     @media (max-width: 700px) { .row { grid-template-columns: 1fr; } }
     .actionsRow { display:flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-    .actionsRow button { width: auto; padding: 10px 14px; }
+    .actionsRow button { width: auto; padding: 10px 14px; margin-top: 0; }
     .actionsRow a { margin: 0; }
+    pre { white-space:pre-wrap; background:#f4f4f4; padding:12px; border-radius:10px; overflow:auto; }
   </style>
 </head>
 
 <body>
-  <a href="../index.html">← Tillbaka</a>
-  <a href="./map.html">Öppna karta-vy</a>
-  <a href="./tree.html">Öppna släktträd-vy</a>
+  <a href="./index.html">← Adminpanel</a>
+  <a href="./trees.html">Skapa/Välj träd</a>
+  <a href="./place-picker.html">Välj plats (karta)</a>
 
   <h1>Släktkort</h1>
   <p class="muted">
-    Skapar ett släktkort i ett valt <code>tree</code>.
-    Kräver att du är inloggad (om du använder backend).
+    LocalStorage-first (funkar på GitHub Pages). Backend kan kopplas på senare.
   </p>
 
   <div class="card">
     <h2>1) Välj släktträd</h2>
-    <p class="muted">Listan hämtas från <code>GET /trees</code> (backend).</p>
+    <p class="muted">Läses från <code>localStorage</code> (skapas i <code>trees.html</code>).</p>
 
     <label for="treeSelect">Ditt släktträd</label>
     <select id="treeSelect"></select>
 
     <div class="actionsRow">
       <button id="reloadTreesBtn" type="button">Ladda om träd</button>
+      <a href="./trees.html">+ Skapa träd</a>
     </div>
 
     <p id="treeMsg" class="muted" aria-live="polite"></p>
@@ -53,7 +54,7 @@
 
   <div class="card">
     <h2>2) Skapa släktkort</h2>
-    <p class="muted">Skapar via <code>POST /trees/:treeId/slaktkort</code> (backend).</p>
+    <p class="muted">Sparas i <code>localStorage</code> under valt träd.</p>
 
     <div class="row">
       <div>
@@ -91,7 +92,7 @@
     <input id="coords" placeholder="t.ex. 59.3293, 18.0686" />
 
     <div class="actionsRow">
-      <a href="./map.html">Välj koordinater i karta-vyn</a>
+      <a href="./place-picker.html">Välj koordinater i karta-vyn</a>
       <button type="button" id="clearCoordsBtn">Rensa koordinater</button>
     </div>
 
@@ -107,27 +108,28 @@
 
   <div class="card">
     <h2>3) Lista släktkort i valt träd</h2>
-    <p class="muted">Hämtar via <code>GET /trees/:treeId/slaktkort</code> (backend).</p>
+    <p class="muted">Visas som JSON (demo).</p>
 
     <div class="actionsRow">
       <button id="listBtn" type="button">Hämta släktkort</button>
       <button id="clearOutBtn" type="button">Töm listan</button>
     </div>
 
-    <pre id="out" style="white-space:pre-wrap; background:#f4f4f4; padding:12px; border-radius:10px; overflow:auto;">[]</pre>
+    <pre id="out">[]</pre>
   </div>
 
 <script>
-  // ============================
-  // KONFIG (backend)
-  // OBS: GitHub Pages kan inte nå localhost.
-  // Detta fungerar bara när du kör backend (t.ex. i Codespaces).
-  // ============================
-  const API = "http://localhost:3001";
+  // ============================================================
+  // LocalStorage keys (måste matcha trees.html + place-picker.html)
+  // ============================================================
+  const KEY_TREES = "slakttradet_trees";
+  const KEY_ACTIVE = "slakttradet_active_tree_id";
+  const KEY_LAST_LOC = "slakttradet_last_location";
 
-  // ============================
+  // Per träd: slaktkort lagras under nyckeln "slakttradet_slaktkort_<treeId>"
+  function cardsKey(treeId) { return "slakttradet_slaktkort_" + String(treeId); }
+
   // DOM
-  // ============================
   const treeSelect = document.getElementById("treeSelect");
   const reloadTreesBtn = document.getElementById("reloadTreesBtn");
   const treeMsg = document.getElementById("treeMsg");
@@ -149,12 +151,35 @@
   const clearOutBtn = document.getElementById("clearOutBtn");
   const out = document.getElementById("out");
 
+  // UI helpers
   function setMsg(el, type, text) {
     el.innerHTML = type === "error"
       ? "<span class='error'>" + text + "</span>"
       : type === "ok"
         ? "<span class='ok'>" + text + "</span>"
         : text;
+  }
+
+  function loadJson(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return fallback;
+      return JSON.parse(raw);
+    } catch {
+      return fallback;
+    }
+  }
+
+  function saveJson(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  function getActiveTreeId() {
+    return localStorage.getItem(KEY_ACTIVE) || "";
+  }
+
+  function setActiveTreeId(id) {
+    localStorage.setItem(KEY_ACTIVE, String(id));
   }
 
   function getSelectedTreeId() {
@@ -194,18 +219,13 @@
     return { lat, lon };
   }
 
-  // ============================
-  // Prefill coords från karta-vyn (localStorage)
-  // ============================
+  // ============================================================
+  // Prefill coords från place-picker.html (localStorage)
+  // ============================================================
   (function prefillCoordsFromLocalStorage() {
-    const KEY = "slakttradet_last_location";
-    try {
-      const raw = localStorage.getItem(KEY);
-      if (!raw) return;
-      const data = JSON.parse(raw);
-      if (!data || typeof data.lat !== "number" || typeof data.lon !== "number") return;
-      coordsEl.value = `${data.lat}, ${data.lon}`;
-    } catch {}
+    const data = loadJson(KEY_LAST_LOC, null);
+    if (!data || typeof data.lat !== "number" || typeof data.lon !== "number") return;
+    coordsEl.value = `${data.lat}, ${data.lon}`;
   })();
 
   clearCoordsBtn.addEventListener("click", () => {
@@ -213,46 +233,63 @@
     setMsg(createMsg, "", "Koordinater rensade.");
   });
 
-  // ============================
-  // Backend calls
-  // ============================
-  async function loadTrees() {
+  // ============================================================
+  // Trees (localStorage)
+  // ============================================================
+  function loadTrees() {
     setMsg(treeMsg, "", "Laddar…");
-    treeSelect.innerHTML = "<option value=''>Laddar…</option>";
+    const trees = loadJson(KEY_TREES, []);
+    const activeId = getActiveTreeId();
 
-    try {
-      const res = await fetch(API + "/trees", { credentials: "include" });
-      const data = await res.json().catch(() => ({}));
+    treeSelect.innerHTML = "";
 
-      if (!res.ok) {
-        treeSelect.innerHTML = "<option value=''>—</option>";
-        setMsg(treeMsg, "error", "Kan inte hämta träd (kräver backend + inloggning).");
-        return;
-      }
-
-      const trees = Array.isArray(data.trees) ? data.trees : [];
-      if (trees.length === 0) {
-        treeSelect.innerHTML = "<option value=''>Inga träd ännu</option>";
-        setMsg(treeMsg, "", "Skapa ett träd först.");
-        return;
-      }
-
-      treeSelect.innerHTML = "<option value=''>Välj…</option>";
-      for (const t of trees) {
-        const opt = document.createElement("option");
-        opt.value = String(t.id);
-        opt.textContent = `${t.name} (roll: ${t.role || "?"})`;
-        treeSelect.appendChild(opt);
-      }
-
-      setMsg(treeMsg, "ok", "Träd laddade.");
-    } catch {
-      treeSelect.innerHTML = "<option value=''>—</option>";
-      setMsg(treeMsg, "error", "Kunde inte nå backend.");
+    if (!Array.isArray(trees) || trees.length === 0) {
+      treeSelect.innerHTML = "<option value=''>Inga träd ännu</option>";
+      setMsg(treeMsg, "error", "Inga träd sparade. Gå till 'Skapa/Välj träd' och skapa ett träd.");
+      return;
     }
+
+    treeSelect.innerHTML = "<option value=''>Välj…</option>";
+    for (const t of trees) {
+      const opt = document.createElement("option");
+      opt.value = String(t.id);
+      opt.textContent = `${t.name}${String(t.id) === activeId ? " (aktivt)" : ""}`;
+      treeSelect.appendChild(opt);
+    }
+
+    if (activeId) {
+      treeSelect.value = activeId;
+    } else {
+      const firstId = String(trees[0].id);
+      treeSelect.value = firstId;
+      setActiveTreeId(firstId);
+    }
+
+    setMsg(treeMsg, "ok", "Träd laddade (localStorage).");
   }
 
-  async function createSlaktkort() {
+  treeSelect.addEventListener("change", () => {
+    if (treeSelect.value) setActiveTreeId(treeSelect.value);
+  });
+
+  reloadTreesBtn.addEventListener("click", loadTrees);
+
+  // ============================================================
+  // Släktkort (localStorage per tree)
+  // ============================================================
+  function makeCardId() {
+    return "p" + Date.now().toString().slice(-10);
+  }
+
+  function loadCards(treeId) {
+    return loadJson(cardsKey(treeId), []);
+  }
+
+  function saveCards(treeId, cards) {
+    saveJson(cardsKey(treeId), cards);
+  }
+
+  function createSlaktkort() {
     createMsg.textContent = "";
 
     const treeId = getSelectedTreeId();
@@ -261,14 +298,16 @@
     const coords = parseCoords(coordsEl.value);
 
     const payload = {
+      id: makeCardId(),
       fornamn: String(fornamnEl.value || "").trim(),
       efternamn: String(efternamnEl.value || "").trim(),
       kon: konEl.value,
       fodelsear: parseOptionalInt(fodelsearEl),
       dodsar: parseOptionalInt(dodsarEl),
       plats: String(platsEl.value || "").trim(),
-      coords,
-      anteckning: String(anteckningEl.value || "").trim()
+      coords: coords,
+      anteckning: String(anteckningEl.value || "").trim(),
+      createdAt: new Date().toISOString()
     };
 
     if (!payload.fornamn && !payload.efternamn) {
@@ -278,49 +317,30 @@
       return setMsg(createMsg, "error", "Koordinater måste vara 'lat, lon' (ex: 59.3293, 18.0686).");
     }
 
-    try {
-      const res = await fetch(`${API}/trees/${encodeURIComponent(treeId)}/slaktkort`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload)
-      });
+    const cards = loadCards(treeId);
+    cards.push(payload);
+    saveCards(treeId, cards);
 
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) return setMsg(createMsg, "error", "Fel: " + (data.error || "UNKNOWN"));
-
-      setMsg(createMsg, "ok", "Släktkort sparat (id: " + (data.slaktkort?.id || "?") + ").");
-    } catch {
-      setMsg(createMsg, "error", "Kunde inte nå backend.");
-    }
+    setMsg(createMsg, "ok", `Släktkort sparat lokalt (id: ${payload.id}).`);
   }
 
-  async function listSlaktkort() {
+  function listSlaktkort() {
     const treeId = getSelectedTreeId();
     if (!treeId) {
       out.textContent = "[]";
       return setMsg(treeMsg, "error", "Välj ett träd först.");
     }
 
-    try {
-      const res = await fetch(`${API}/trees/${encodeURIComponent(treeId)}/slaktkort`, { credentials: "include" });
-      const data = await res.json().catch(() => ({}));
-      out.textContent = JSON.stringify(data, null, 2);
-
-      if (!res.ok) setMsg(treeMsg, "error", "Fel: " + (data.error || "UNKNOWN"));
-      else setMsg(treeMsg, "ok", "Släktkort hämtade.");
-    } catch {
-      out.textContent = "[]";
-      setMsg(treeMsg, "error", "Kunde inte nå backend.");
-    }
+    const cards = loadCards(treeId);
+    out.textContent = JSON.stringify({ slaktkort: cards }, null, 2);
+    setMsg(treeMsg, "ok", `Hämtade ${cards.length} släktkort (localStorage).`);
   }
 
-  reloadTreesBtn.addEventListener("click", loadTrees);
   createBtn.addEventListener("click", createSlaktkort);
   listBtn.addEventListener("click", listSlaktkort);
   clearOutBtn.addEventListener("click", () => { out.textContent = "[]"; });
 
-  // I GitHub Pages kommer backend inte svara — men sidan ska ändå fungera som formulär.
+  // Start
   loadTrees();
 </script>
 </body>
