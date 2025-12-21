@@ -1,1 +1,237 @@
+<!doctype html>
+<html lang="sv">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Skapa släktkort</title>
+    <meta name="description" content="Skapa ett släktkort (person) för släktträdet." />
+    <style>
+      :root { color-scheme: light; }
+      body {
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        line-height: 1.5;
+        margin: 0;
+        padding: 24px;
+        max-width: 900px;
+      }
+      a { color: inherit; }
+      header { margin-bottom: 18px; }
+      h1 { margin: 0 0 6px; }
+      p { margin: 0 0 12px; }
+      .muted { color: #555; }
+      .card {
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        padding: 16px;
+        margin: 14px 0;
+      }
+      label { display: block; margin: 10px 0 6px; font-weight: 600; }
+      input, select, textarea {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 10px 10px;
+        border: 1px solid #bbb;
+        border-radius: 8px;
+        font: inherit;
+        background: #fff;
+      }
+      textarea { min-height: 120px; resize: vertical; }
+      .row {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: 1fr;
+      }
+      @media (min-width: 720px) {
+        .row.two { grid-template-columns: 1fr 1fr; }
+      }
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+      }
+      button, .button-link {
+        display: inline-block;
+        padding: 10px 12px;
+        border: 1px solid #333;
+        border-radius: 8px;
+        background: #fff;
+        font: inherit;
+        cursor: pointer;
+        text-decoration: none;
+      }
+      button:focus, .button-link:focus { outline: 2px solid #000; outline-offset: 2px; }
+      pre {
+        background: #f4f4f4;
+        padding: 12px;
+        border-radius: 10px;
+        overflow: auto;
+      }
+      code { background: #f4f4f4; padding: 2px 6px; border-radius: 6px; }
+      .hint { margin-top: 10px; }
+      .error { color: #b00020; font-weight: 600; }
+      .ok { font-weight: 700; }
+    </style>
+  </head>
+
+  <body>
+    <header>
+      <a href="./index.html">← Tillbaka</a>
+      <h1>Skapa släktkort</h1>
+      <p class="muted">Skapar ett släktkort (person). Inga relationer här.</p>
+    </header>
+
+    <section class="card" aria-label="Formulär">
+      <form id="form">
+        <div class="row two">
+          <div>
+            <label for="fornamn">Förnamn *</label>
+            <input id="fornamn" name="fornamn" required maxlength="80" autocomplete="given-name" />
+          </div>
+          <div>
+            <label for="efternamn">Efternamn *</label>
+            <input id="efternamn" name="efternamn" required maxlength="80" autocomplete="family-name" />
+          </div>
+        </div>
+
+        <div class="row two">
+          <div>
+            <label for="kon">Kön</label>
+            <select id="kon" name="kon">
+              <option value="Okänt" selected>Okänt</option>
+              <option value="Kvinna">Kvinna</option>
+              <option value="Man">Man</option>
+            </select>
+          </div>
+          <div>
+            <label for="plats">Plats</label>
+            <input id="plats" name="plats" maxlength="120" placeholder="t.ex. Småland" />
+          </div>
+        </div>
+
+        <div class="row two">
+          <div>
+            <label for="fodelsear">Födelseår</label>
+            <input id="fodelsear" name="fodelsear" inputmode="numeric" placeholder="t.ex. 1874" />
+          </div>
+          <div>
+            <label for="dodsar">Dödsår</label>
+            <input id="dodsar" name="dodsar" inputmode="numeric" placeholder="t.ex. 1932 (eller tomt)" />
+          </div>
+        </div>
+
+        <div>
+          <label for="anteckning">Anteckning</label>
+          <textarea id="anteckning" name="anteckning" maxlength="2000" placeholder="Fri text…"></textarea>
+        </div>
+
+        <div class="actions">
+          <button type="submit">Skapa (generera JSON)</button>
+          <button type="button" id="resetBtn">Rensa</button>
+          <a class="button-link" href="./index.html">Avbryt</a>
+        </div>
+
+        <p id="msg" class="hint muted" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <section class="card" aria-label="JSON output">
+      <h2 style="margin:0 0 8px;">JSON (kopiera in i <code>data/slaktkort.json</code>)</h2>
+      <p class="muted" style="margin-top:0;">
+        Eftersom detta är ett rent HTML-projekt sparas inte filer automatiskt. Du kopierar objektet nedan och lägger in det i listan <code>"slaktkort"</code>.
+      </p>
+      <pre><code id="out">{}</code></pre>
+      <div class="actions">
+        <button type="button" id="copyBtn">Kopiera JSON</button>
+      </div>
+      <p class="muted" style="margin-top:10px;">
+        Tips: ge varje person ett unikt <code>id</code> (p1, p2, …). Detta används senare för relationer.
+      </p>
+    </section>
+
+    <script>
+      const form = document.getElementById("form");
+      const out = document.getElementById("out");
+      const msg = document.getElementById("msg");
+      const resetBtn = document.getElementById("resetBtn");
+      const copyBtn = document.getElementById("copyBtn");
+
+      function toYearOrNull(value) {
+        const v = String(value || "").trim();
+        if (!v) return null;
+        if (!/^\d{3,4}$/.test(v)) return "__INVALID_YEAR__";
+        const n = Number(v);
+        if (n < 0 || n > 9999) return "__INVALID_YEAR__";
+        return n;
+      }
+
+      function makeId() {
+        // Enkel, pedagogisk ID-generator: p + tidens sista 6 siffror
+        const s = String(Date.now());
+        return "p" + s.slice(-6);
+      }
+
+      function escapeForDisplay(obj) {
+        return JSON.stringify(obj, null, 2);
+      }
+
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        msg.textContent = "";
+
+        const fornamn = form.fornamn.value.trim();
+        const efternamn = form.efternamn.value.trim();
+
+        if (!fornamn || !efternamn) {
+          msg.innerHTML = '<span class="error">Förnamn och efternamn krävs.</span>';
+          out.textContent = "{}";
+          return;
+        }
+
+        const fodelsear = toYearOrNull(form.fodelsear.value);
+        const dodsar = toYearOrNull(form.dodsar.value);
+
+        if (fodelsear === "__INVALID_YEAR__" || dodsar === "__INVALID_YEAR__") {
+          msg.innerHTML = '<span class="error">Födelseår/Dödsår måste vara tomt eller 3–4 siffror (t.ex. 1874).</span>';
+          out.textContent = "{}";
+          return;
+        }
+
+        const obj = {
+          id: makeId(),
+          fornamn,
+          efternamn,
+          kon: form.kon.value,
+          fodelsear,
+          dodsar,
+          plats: form.plats.value.trim(),
+          anteckning: form.anteckning.value.trim()
+        };
+
+        out.textContent = escapeForDisplay(obj);
+        msg.innerHTML = '<span class="ok">Klart.</span> Kopiera JSON och lägg in i <code>data/slaktkort.json</code>.';
+      });
+
+      resetBtn.addEventListener("click", () => {
+        form.reset();
+        out.textContent = "{}";
+        msg.textContent = "";
+      });
+
+      copyBtn.addEventListener("click", async () => {
+        const text = out.textContent.trim();
+        if (!text || text === "{}") {
+          msg.innerHTML = '<span class="error">Inget att kopiera. Skapa ett släktkort först.</span>';
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(text);
+          msg.innerHTML = '<span class="ok">Kopierat.</span>';
+        } catch {
+          msg.innerHTML = '<span class="error">Kunde inte kopiera automatiskt. Markera JSON manuellt och kopiera.</span>';
+        }
+      });
+    </script>
+  </body>
+</html>
 
