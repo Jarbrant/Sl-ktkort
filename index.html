@@ -1,1 +1,100 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Släktkort – Start</title>
+
+  <style>
+    body {
+      font-family: system-ui, Arial, sans-serif;
+      padding: 28px;
+      max-width: 900px;
+      margin: auto;
+      background: #fff;
+    }
+
+    h1 {
+      margin-bottom: 6px;
+    }
+
+    .muted {
+      color: #555;
+      margin-bottom: 20px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 14px;
+      padding: 18px;
+      text-decoration: none;
+      color: #111;
+      background: #fafafa;
+      transition: background 0.15s ease;
+    }
+
+    .card:hover {
+      background: #f2f2f2;
+    }
+
+    .card h2 {
+      margin: 0 0 8px;
+      font-size: 1.1rem;
+    }
+
+    .card p {
+      margin: 0;
+      color: #555;
+      font-size: 0.95rem;
+    }
+
+    footer {
+      margin-top: 40px;
+      font-size: 0.85rem;
+      color: #777;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Släktkort</h1>
+  <p class="muted">
+    En enkel prototyp för släktträd, personer och relationer.
+    <br />
+    (GitHub Pages – statisk demo)
+  </p>
+
+  <div class="grid">
+    <a class="card" href="./app/slaktkort.html">
+      <h2>Skapa släktkort</h2>
+      <p>Lägg in personer med namn, årtal, plats och anteckning.</p>
+    </a>
+
+    <a class="card" href="./app/place-picker.html">
+      <h2>Karta – välj punkt</h2>
+      <p>Klicka på en Sverige-karta och dra/släpp en prick för lat/lon.</p>
+    </a>
+
+    <a class="card" href="./app/create-relation.html">
+      <h2>Skapa relation</h2>
+      <p>Koppla ihop personer (förälder → barn).</p>
+    </a>
+
+    <a class="card" href="./app/tree.html">
+      <h2>Trädvy</h2>
+      <p>Visa släktträdet grafiskt (pågående / framtida).</p>
+    </a>
+  </div>
+
+  <footer>
+    Släktkort · statisk demo · GitHub Pages
+  </footer>
+</body>
+</html>
 
