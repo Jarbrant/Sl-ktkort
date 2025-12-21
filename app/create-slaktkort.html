@@ -69,17 +69,32 @@
       }
       code { background: #f4f4f4; padding: 2px 6px; border-radius: 6px; }
       .hint { margin-top: 10px; }
-      .error { color: #b00020; font-weight: 600; }
-      .ok { font-weight: 700; }
+      .error { color: #b00020; font-weight: 700; }
+      .ok { font-weight: 800; }
+      .pill {
+        display: inline-block;
+        padding: 2px 8px;
+        border: 1px solid #bbb;
+        border-radius: 999px;
+        font-size: 0.9rem;
+        margin-left: 6px;
+      }
+      .danger { border-color: #b00020; }
     </style>
   </head>
 
   <body>
     <header>
       <a href="./index.html">← Tillbaka</a>
-      <h1>Skapa släktkort</h1>
+      <h1>Skapa släktkort <span class="pill">LocalStorage</span></h1>
       <p class="muted">Skapar ett släktkort (person). Inga relationer här.</p>
     </header>
+
+    <section class="card" aria-label="Status">
+      <p class="muted" style="margin:0;">
+        Sparade släktkort i webbläsaren: <strong id="count">0</strong>
+      </p>
+    </section>
 
     <section class="card" aria-label="Formulär">
       <form id="form">
@@ -126,35 +141,54 @@
         </div>
 
         <div class="actions">
-          <button type="submit">Skapa (generera JSON)</button>
+          <button type="submit">Spara släktkort</button>
           <button type="button" id="resetBtn">Rensa</button>
-          <a class="button-link" href="./index.html">Avbryt</a>
+          <button type="button" id="exportBtn">Exportera JSON</button>
+          <button type="button" id="clearBtn" class="danger" title="Tar bort allt sparat i webbläsaren">Rensa all sparad data</button>
+          <a class="button-link" href="./index.html">Tillbaka</a>
         </div>
 
         <p id="msg" class="hint muted" aria-live="polite"></p>
       </form>
     </section>
 
-    <section class="card" aria-label="JSON output">
-      <h2 style="margin:0 0 8px;">JSON (kopiera in i <code>data/slaktkort.json</code>)</h2>
-      <p class="muted" style="margin-top:0;">
-        Eftersom detta är ett rent HTML-projekt sparas inte filer automatiskt. Du kopierar objektet nedan och lägger in det i listan <code>"slaktkort"</code>.
-      </p>
+    <section class="card" aria-label="Senast sparat">
+      <h2 style="margin:0 0 8px;">Senast sparat släktkort</h2>
       <pre><code id="out">{}</code></pre>
-      <div class="actions">
-        <button type="button" id="copyBtn">Kopiera JSON</button>
-      </div>
-      <p class="muted" style="margin-top:10px;">
-        Tips: ge varje person ett unikt <code>id</code> (p1, p2, …). Detta används senare för relationer.
+      <p class="muted" style="margin:10px 0 0;">
+        Relationer skapas i <code>create-relation.html</code> och kan använda dessa sparade personer.
       </p>
     </section>
 
     <script>
+      const KEY_PERSONS = "slakttradet_slaktkort";
+      const KEY_RELATIONS = "slakttradet_relationer";
+
       const form = document.getElementById("form");
       const out = document.getElementById("out");
       const msg = document.getElementById("msg");
       const resetBtn = document.getElementById("resetBtn");
-      const copyBtn = document.getElementById("copyBtn");
+      const exportBtn = document.getElementById("exportBtn");
+      const clearBtn = document.getElementById("clearBtn");
+      const countEl = document.getElementById("count");
+
+      function safeParse(json, fallback) {
+        try { return JSON.parse(json); } catch { return fallback; }
+      }
+
+      function loadPersons() {
+        const raw = localStorage.getItem(KEY_PERSONS);
+        const arr = safeParse(raw, []);
+        return Array.isArray(arr) ? arr : [];
+      }
+
+      function savePersons(arr) {
+        localStorage.setItem(KEY_PERSONS, JSON.stringify(arr));
+      }
+
+      function setCount() {
+        countEl.textContent = String(loadPersons().length);
+      }
 
       function toYearOrNull(value) {
         const v = String(value || "").trim();
@@ -166,7 +200,6 @@
       }
 
       function makeId() {
-        // Enkel, pedagogisk ID-generator: p + tidens sista 6 siffror
         const s = String(Date.now());
         return "p" + s.slice(-6);
       }
@@ -181,10 +214,8 @@
 
         const fornamn = form.fornamn.value.trim();
         const efternamn = form.efternamn.value.trim();
-
         if (!fornamn || !efternamn) {
           msg.innerHTML = '<span class="error">Förnamn och efternamn krävs.</span>';
-          out.textContent = "{}";
           return;
         }
 
@@ -193,11 +224,10 @@
 
         if (fodelsear === "__INVALID_YEAR__" || dodsar === "__INVALID_YEAR__") {
           msg.innerHTML = '<span class="error">Födelseår/Dödsår måste vara tomt eller 3–4 siffror (t.ex. 1874).</span>';
-          out.textContent = "{}";
           return;
         }
 
-        const obj = {
+        const person = {
           id: makeId(),
           fornamn,
           efternamn,
@@ -208,30 +238,52 @@
           anteckning: form.anteckning.value.trim()
         };
 
-        out.textContent = escapeForDisplay(obj);
-        msg.innerHTML = '<span class="ok">Klart.</span> Kopiera JSON och lägg in i <code>data/slaktkort.json</code>.';
+        const persons = loadPersons();
+        persons.push(person);
+        savePersons(persons);
+
+        out.textContent = escapeForDisplay(person);
+        msg.innerHTML = '<span class="ok">Sparat.</span> Släktkortet sparades i webbläsaren (LocalStorage).';
+        setCount();
+        form.reset();
       });
 
       resetBtn.addEventListener("click", () => {
         form.reset();
-        out.textContent = "{}";
         msg.textContent = "";
       });
 
-      copyBtn.addEventListener("click", async () => {
-        const text = out.textContent.trim();
-        if (!text || text === "{}") {
-          msg.innerHTML = '<span class="error">Inget att kopiera. Skapa ett släktkort först.</span>';
-          return;
-        }
-        try {
-          await navigator.clipboard.writeText(text);
-          msg.innerHTML = '<span class="ok">Kopierat.</span>';
-        } catch {
-          msg.innerHTML = '<span class="error">Kunde inte kopiera automatiskt. Markera JSON manuellt och kopiera.</span>';
-        }
+      exportBtn.addEventListener("click", () => {
+        const persons = loadPersons();
+        const payload = { slaktkort: persons };
+
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "slaktkort.export.json";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        URL.revokeObjectURL(url);
+        msg.innerHTML = '<span class="ok">Export klar.</span> En JSON-fil laddades ner.';
       });
+
+      clearBtn.addEventListener("click", () => {
+        const yes = confirm("Rensa all sparad data för Släktträdet i webbläsaren?\n\nDetta tar bort sparade släktkort och relationer.");
+        if (!yes) return;
+
+        localStorage.removeItem(KEY_PERSONS);
+        localStorage.removeItem(KEY_RELATIONS);
+        out.textContent = "{}";
+        msg.innerHTML = '<span class="ok">Rensat.</span> All lokal data är borttagen.';
+        setCount();
+      });
+
+      // init
+      setCount();
     </script>
   </body>
 </html>
-
