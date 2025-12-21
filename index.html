@@ -4,268 +4,76 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Släktträdet – Adminpanel</title>
-
   <style>
-    body {
-      font-family: system-ui, Arial, sans-serif;
-      margin: 0;
-      padding: 32px 20px;
-      background: #fafafa;
-      color: #111;
-    }
-
-    .container {
-      max-width: 880px;
-      margin: 0 auto;
-    }
-
-    h1 {
-      margin: 0 0 6px;
-      font-size: 1.6rem;
-    }
-
-    .muted {
-      color: #555;
-      margin-bottom: 24px;
-      line-height: 1.5;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 16px;
-    }
-
-    .card {
-      background: #fff;
-      border: 1px solid #ddd;
-      border-radius: 14px;
-      padding: 18px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      min-height: 170px;
-    }
-
-    .card h2 {
-      margin: 0;
-      font-size: 1.1rem;
-    }
-
-    .card p {
-      margin: 0;
-      color: #555;
-      font-size: 0.95rem;
-      line-height: 1.4;
-    }
-
-    .card a {
-      margin-top: auto;
-      display: inline-block;
-      text-decoration: none;
-      border: 1px solid #333;
-      border-radius: 10px;
-      padding: 10px 14px;
-      color: #111;
-      font-weight: 600;
-      background: #fff;
-      width: fit-content;
-    }
-
-    .card a:hover { background: #f0f0f0; }
-
-    /* Statusruta (första rutan) */
-    .card.status {
-      border-left: 6px solid #999;
-    }
-    .card.status.is-error {
-      border-left-color: #b00020;
-    }
-    .card.status.is-ok {
-      border-left-color: #1b5e20;
-    }
-
-    .pill {
-      display: inline-block;
-      padding: 4px 10px;
-      border-radius: 999px;
-      border: 1px solid #ddd;
-      font-size: 0.85rem;
-      color: #333;
-      width: fit-content;
-      background: #fff;
-    }
-    .pill.err { border-color: #b00020; color: #b00020; }
-    .pill.ok { border-color: #1b5e20; color: #1b5e20; }
-
-    footer {
-      margin-top: 40px;
-      font-size: 0.9rem;
-      color: #666;
-      line-height: 1.5;
-    }
-
-    code {
-      background: #eee;
-      padding: 2px 6px;
-      border-radius: 6px;
-    }
+    body { font-family: system-ui, Arial, sans-serif; margin: 0; padding: 32px 20px; background:#fafafa; color:#111; }
+    .container { max-width: 880px; margin: 0 auto; }
+    h1 { margin: 0 0 6px; font-size: 1.6rem; }
+    .muted { color:#555; margin-bottom: 24px; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:16px; }
+    .card { background:#fff; border:1px solid #ddd; border-radius:14px; padding:18px; display:flex; flex-direction:column; gap:12px; }
+    .card h2 { margin:0; font-size:1.1rem; }
+    .card p { margin:0; color:#555; font-size:0.95rem; line-height:1.4; }
+    .card a { margin-top:auto; display:inline-block; text-decoration:none; border:1px solid #333; border-radius:10px; padding:10px 14px; color:#111; font-weight:600; background:#fff; width:fit-content; }
+    .card a:hover { background:#f0f0f0; }
+    .card.status { border-left: 6px solid #b00020; }
+    .card.status a { border-color:#b00020; }
+    footer { margin-top: 40px; font-size:0.9rem; color:#666; }
+    code { background:#eee; padding:2px 6px; border-radius:6px; }
   </style>
 </head>
-
 <body>
   <div class="container">
     <h1>Släktträdet – Adminpanel</h1>
     <p class="muted">
-      Intern kontrollpanel för att hantera träd, personer, relationer och platser.<br/>
-      Allt sparas lokalt i <code>localStorage</code> (GitHub Pages-läge).
+      Intern kontrollpanel. I GitHub Pages-läge kör vi lokalt i <code>localStorage</code>.
+      (Backend/Codespaces kan kopplas på senare.)
     </p>
 
     <div class="grid">
-      <!-- STATUS / START (första rutan, nu dynamisk) -->
-      <div class="card status" id="statusCard">
-        <div class="pill" id="statusPill">Status</div>
-        <h2 id="statusTitle">Laddar…</h2>
-        <p id="statusText">Kontrollerar om du har några träd sparade…</p>
-        <a href="./trees.html">Skapa / välj släktträd</a>
+      <!-- STATUS / START -->
+      <div class="card status">
+        <h2>🚩 Inga träd sparade?</h2>
+        <p>
+          Gå till <strong>Skapa/Välj träd</strong> och skapa ett träd först.
+          Det är grunden för personer, relationer och vyer.
+        </p>
+        <a href="./app/trees.html">Skapa / välj släktträd</a>
       </div>
 
-      <!-- Träd -->
       <div class="card">
         <h2>🌳 Släktträd</h2>
-        <p>
-          Skapa, välj och byt aktivt släktträd.
-          Ett träd är grunden för allt annat.
-        </p>
-        <a href="./trees.html">Öppna träd</a>
+        <p>Skapa, välj och byt aktivt släktträd.</p>
+        <a href="./app/trees.html">Öppna träd</a>
       </div>
 
-      <!-- Släktkort -->
       <div class="card">
         <h2>👤 Släktkort</h2>
-        <p>
-          Skapa personer i valt träd.
-          Namn, årtal, plats, anteckningar och koordinater.
-        </p>
-        <a href="./slaktkort.html">Öppna släktkort</a>
+        <p>Skapa personer i valt träd (namn, årtal, plats, anteckning, koordinater).</p>
+        <a href="./app/slaktkort.html">Öppna släktkort</a>
       </div>
 
-      <!-- Relationer -->
       <div class="card">
         <h2>🔗 Relationer</h2>
-        <p>
-          Koppla personer till varandra
-          (förälder → barn, m.m.).
-        </p>
-        <a href="./create-relation.html">Skapa relation</a>
+        <p>Koppla personer (förälder → barn, m.m.).</p>
+        <a href="./app/create-relation.html">Skapa relation</a>
       </div>
 
-      <!-- Karta -->
       <div class="card">
         <h2>🗺️ Karta (platsväljare)</h2>
-        <p>
-          Välj exakt plats via karta.
-          Sparar lat/lon som kan användas i släktkort.
-        </p>
-        <a href="./place-picker.html">Öppna karta</a>
+        <p>Välj plats i karta och spara lat/lon till släktkort.</p>
+        <a href="./app/place-picker.html">Öppna karta</a>
       </div>
 
-      <!-- Trädvy -->
       <div class="card">
         <h2>🧬 Trädvy</h2>
-        <p>
-          Visuell vy av släktträdet.
-          (Nu: grund / demo. Senare: riktig visualisering.)
-        </p>
-        <a href="./tree.html">Öppna trädvy</a>
+        <p>Visuell vy av släktträdet (demo nu, byggs ut senare).</p>
+        <a href="./app/tree.html">Öppna trädvy</a>
       </div>
     </div>
 
     <footer>
-      <p>
-        Status: <strong>LocalStorage-läge</strong> • Backend kan kopplas på senare.<br/>
-        Tips: börja alltid med <strong>Släktträd</strong>, annars finns inget att lägga personer i.
-      </p>
+      <p>Status: <strong>GitHub Pages</strong> (statisk) • Backend körs separat (t.ex. Codespaces).</p>
     </footer>
   </div>
-
-  <script>
-    // =========================================
-    // Statusbox – dynamisk utifrån localStorage
-    // =========================================
-    const KEY_TREES = "slakttradet_trees";
-    const KEY_ACTIVE = "slakttradet_active_tree_id";
-
-    const statusCard = document.getElementById("statusCard");
-    const statusPill = document.getElementById("statusPill");
-    const statusTitle = document.getElementById("statusTitle");
-    const statusText = document.getElementById("statusText");
-
-    function safeParse(raw, fallback) {
-      try { return JSON.parse(raw); } catch { return fallback; }
-    }
-
-    function getTrees() {
-      const raw = localStorage.getItem(KEY_TREES);
-      const trees = safeParse(raw, []);
-      return Array.isArray(trees) ? trees : [];
-    }
-
-    function getActiveId() {
-      return localStorage.getItem(KEY_ACTIVE) || "";
-    }
-
-    function setStatus(type, title, text) {
-      statusCard.classList.remove("is-error", "is-ok");
-      statusPill.classList.remove("err", "ok");
-
-      if (type === "error") {
-        statusCard.classList.add("is-error");
-        statusPill.classList.add("err");
-        statusPill.textContent = "Behöver åtgärd";
-      } else if (type === "ok") {
-        statusCard.classList.add("is-ok");
-        statusPill.classList.add("ok");
-        statusPill.textContent = "Redo";
-      } else {
-        statusPill.textContent = "Status";
-      }
-
-      statusTitle.textContent = title;
-      statusText.textContent = text;
-    }
-
-    function refreshStatus() {
-      const trees = getTrees();
-      const activeId = getActiveId();
-      const active = trees.find(t => t && t.id === activeId);
-
-      if (trees.length === 0) {
-        setStatus(
-          "error",
-          "🚩 Inga träd sparade",
-          "Gå till 'Skapa/Välj träd' och skapa ett träd först. Det är grunden för personer, relationer och visning."
-        );
-        return;
-      }
-
-      if (!active) {
-        setStatus(
-          "error",
-          "⚠️ Inget aktivt träd valt",
-          "Du har träd sparade, men inget är aktivt. Gå till 'Skapa/Välj träd' och välj ett aktivt träd."
-        );
-        return;
-      }
-
-      setStatus(
-        "ok",
-        "✅ Aktivt träd är valt",
-        `Aktivt träd: ${String(active.name || active.id)}. Du kan nu skapa släktkort och relationer.`
-      );
-    }
-
-    refreshStatus();
-  </script>
 </body>
 </html>
