@@ -1,1 +1,136 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Karta – Släktträd</title>
+
+  <!-- Leaflet (karta) -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    crossorigin=""
+  />
+
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin: 0; }
+    header { padding: 16px 20px; border-bottom: 1px solid #ddd; }
+    h1 { margin: 0 0 6px; font-size: 1.2rem; }
+    .muted { color:#555; margin:0; }
+
+    .wrap { padding: 12px 20px; }
+    label { font-weight: 700; display:block; margin-top: 8px; }
+    select { padding: 10px; width: 100%; max-width: 420px; }
+
+    #map {
+      height: 65vh;
+      margin-top: 14px;
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Släktträd – karta</h1>
+  <p class="muted">Visar släktkort med koordinater (lat/lon).</p>
+</header>
+
+<div class="wrap">
+  <label for="treeSelect">Välj träd</label>
+  <select id="treeSelect"></select>
+
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+<script>
+  // ============================
+  // Grundinställningar
+  // ============================
+  const API = "http://localhost:3001"; // ändra om backend körs annorstädes
+
+  const treeSelect = document.getElementById("treeSelect");
+
+  // ============================
+  // Initiera karta (Sverige)
+  // ============================
+  const map = L.map("map").setView([62.0, 15.0], 5);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap contributors"
+  }).addTo(map);
+
+  const markersLayer = L.layerGroup().addTo(map);
+
+  // ============================
+  // Hjälpfunktioner
+  // ============================
+  function clearMarkers() {
+    markersLayer.clearLayers();
+  }
+
+  function addMarker(p) {
+    const name = `${p.fornamn} ${p.efternamn}`;
+    const popup = `
+      <strong>${name}</strong><br/>
+      ${p.plats || "Ingen plats angiven"}
+    `;
+    L.marker([p.lat, p.lon]).addTo(markersLayer).bindPopup(popup);
+  }
+
+  // ============================
+  // API-anrop
+  // ============================
+  async function loadTrees() {
+    const res = await fetch(API + "/trees", { credentials: "include" });
+    const data = await res.json();
+
+    treeSelect.innerHTML = "";
+    for (const t of data.trees || []) {
+      const opt = document.createElement("option");
+      opt.value = t.id;
+      opt.textContent = t.name;
+      treeSelect.appendChild(opt);
+    }
+
+    if (treeSelect.value) {
+      loadSlaktkort(treeSelect.value);
+    }
+  }
+
+  async function loadSlaktkort(treeId) {
+    clearMarkers();
+
+    const res = await fetch(`${API}/trees/${treeId}/slaktkort`, {
+      credentials: "include"
+    });
+    const data = await res.json();
+
+    for (const p of data.slaktkort || []) {
+      if (typeof p.lat === "number" && typeof p.lon === "number") {
+        addMarker(p);
+      }
+    }
+  }
+
+  // ============================
+  // Events
+  // ============================
+  treeSelect.addEventListener("change", () => {
+    loadSlaktkort(treeSelect.value);
+  });
+
+  // ============================
+  // Start
+  // ============================
+  loadTrees();
+</script>
+
+</body>
+</html>
 
