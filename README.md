@@ -90,3 +90,32 @@ slakttradet/
 └── data/
 ├── slaktkort.json
 └── relationer.json
+
+---
+
+## 🚫 Vad projektet INTE är (än)
+Detta projekt innehåller **inte**:
+- backend
+- databas
+- autentisering
+- roller / admin
+- ramverk (React, Vue etc.)
+
+Allt detta är medvetet bortvalt i detta skede.
+
+---
+
+## 📘 Arbetsprincip
+
+- En sak i taget
+- Beslut låses innan nästa steg
+- Arkitektur → UX → kod (inte tvärtom)
+- Om något känns “för stort” är det för tidigt
+
+---
+
+## 📍 Status
+- Släktkort: 🔒 LÅST
+- Relationer: 🔒 LÅST
+- Skaparläge: 🟨 PÅGÅR
+- Visualisering: ⏳ EJ PÅBÖRJAD
