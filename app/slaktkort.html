@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Släktkort</title>
   <style>
+    /* =========================================================
+       Minimal styling för en enkel, läsbar demo-sida.
+       Hålls medvetet "tyst" (ingen UI-overdesign).
+       ========================================================= */
     body { font-family: system-ui, Arial, sans-serif; padding: 24px; max-width: 900px; }
     a { display:inline-block; margin-bottom: 16px; }
     h1 { margin-bottom: 6px; }
@@ -19,8 +23,46 @@
     code { background:#f4f4f4; padding:2px 6px; border-radius:6px; }
     .row { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     @media (max-width: 700px) { .row { grid-template-columns: 1fr; } }
+
+    /* =========================================================
+       "Karta" (minimal, utan externa bibliotek).
+       Detta är inte en riktig kartmotor, utan en klick-yta som
+       sätter lat/lon baserat på klickposition.
+       ========================================================= */
+    .mapWrap { margin-top: 12px; }
+    .mapHint { font-size: 0.95rem; margin-top: 6px; }
+    .mapBox {
+      height: 260px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      background: #f7f7f7;
+      position: relative;
+      overflow: hidden;
+      user-select: none;
+    }
+    .pin {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      border: 2px solid #111;
+      background: #fff;
+      position: absolute;
+      transform: translate(-50%, -50%);
+      display: none;
+    }
+    .mapLabel {
+      position: absolute;
+      left: 10px;
+      top: 10px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid #ddd;
+      background: #fff;
+      font-size: 0.95rem;
+    }
   </style>
 </head>
+
 <body>
   <a href="./index.html">← Tillbaka</a>
 
@@ -30,6 +72,11 @@
     Kräver att du är inloggad.
   </p>
 
+  <!-- =========================================================
+       1) TRÄDVAL
+       - Hämtar trädlistan från backend (GET /trees)
+       - Visar roll per träd (om backend skickar den)
+       ========================================================= -->
   <div class="card">
     <h2>1) Välj släktträd</h2>
     <p class="muted">Listan hämtas från <code>GET /trees</code>.</p>
@@ -41,6 +88,13 @@
     <p id="treeMsg" class="muted" aria-live="polite"></p>
   </div>
 
+  <!-- =========================================================
+       2) SKAPA SLÄKTKORT
+       - Skickar payload till POST /trees/:treeId/slaktkort
+       - Koordinater:
+         * Manuell input i fältet coords (lat, lon)
+         * Eller välj via "karta" (minimal klick-yta)
+       ========================================================= -->
   <div class="card">
     <h2>2) Skapa släktkort</h2>
     <p class="muted">Skapar via <code>POST /trees/:treeId/slaktkort</code>.</p>
@@ -76,11 +130,23 @@
 
     <label for="plats">Plats (valfritt)</label>
     <input id="plats" placeholder="t.ex. Uppsala" />
-    
-<label for="coords">Koordinater (lat, lon) (valfritt)</label>
-<input id="coords" placeholder="t.ex. 59.3293, 18.0686" />
 
-<button type="button" id="pickPlaceBtn">Välj plats på karta</button>
+    <label for="coords">Koordinater (lat, lon) (valfritt)</label>
+    <input id="coords" placeholder="t.ex. 59.3293, 18.0686" />
+
+    <button type="button" id="pickPlaceBtn">Välj plats på karta</button>
+
+    <!-- Minimal "karta": visas först när användaren klickar på knappen -->
+    <div id="mapWrap" class="mapWrap" hidden>
+      <div class="mapBox" id="mapBox" role="application" aria-label="Minimal karta (klicka för att välja punkt)">
+        <div class="mapLabel">Klicka för att välja punkt</div>
+        <div class="pin" id="pin"></div>
+      </div>
+      <div class="mapHint muted">
+        Detta är en minimal klick-yta (inte Leaflet). Den sätter lat/lon ungefärligt.
+        För riktig kartvy: Leaflet + OpenStreetMap senare.
+      </div>
+    </div>
 
     <label for="anteckning">Anteckning (valfritt)</label>
     <textarea id="anteckning" placeholder="fri text"></textarea>
@@ -89,6 +155,11 @@
     <p id="createMsg" class="muted" aria-live="polite"></p>
   </div>
 
+  <!-- =========================================================
+       3) LISTA SLÄKTKORT
+       - Hämtar alla kort för valt träd (GET /trees/:treeId/slaktkort)
+       - Visas som rå JSON i <pre> (demo)
+       ========================================================= -->
   <div class="card">
     <h2>3) Lista släktkort i valt träd</h2>
     <p class="muted">Hämtar via <code>GET /trees/:treeId/slaktkort</code>.</p>
@@ -97,10 +168,28 @@
   </div>
 
 <script>
-  // OBS: Den här pekar på en backend-URL.
-  // Om ni kör backend i GitHub Codespaces senare byter ni denna till er Codespaces-URL.
+  /**
+   * ============================================================
+   * FRONTEND-DEMO – Släktkort
+   *
+   * Målet här är en enkel test-UI för backend routes:
+   * - GET  /trees
+   * - POST /trees/:treeId/slaktkort
+   * - GET  /trees/:treeId/slaktkort
+   *
+   * Auth:
+   * - credentials: "include" för cookie-baserad inloggning
+   *
+   * OBS:
+   * - Om backend kör på annan host/port (t.ex. Codespaces),
+   *   byt API-strängen nedan.
+   * ============================================================
+   */
+
+  // Backend-bas (lokalt). Byt om du kör via Codespaces/annan host.
   const API = "http://localhost:3001";
 
+  // UI-element
   const treeSelect = document.getElementById("treeSelect");
   const reloadTreesBtn = document.getElementById("reloadTreesBtn");
   const treeMsg = document.getElementById("treeMsg");
@@ -111,6 +200,16 @@
   const listBtn = document.getElementById("listBtn");
   const out = document.getElementById("out");
 
+  const coordsEl = document.getElementById("coords");
+  const pickPlaceBtn = document.getElementById("pickPlaceBtn");
+  const mapWrap = document.getElementById("mapWrap");
+  const mapBox = document.getElementById("mapBox");
+  const pin = document.getElementById("pin");
+
+  /**
+   * Standardiserad statusrad (ok / error / neutral)
+   * - Håll detta enkelt, så UI:t inte blir "smartare" än det är.
+   */
   function setMsg(el, type, text) {
     el.innerHTML = type === "error"
       ? "<span class='error'>" + text + "</span>"
@@ -119,11 +218,51 @@
         : text;
   }
 
+  /**
+   * Hämtar valt treeId från dropdown
+   */
   function getSelectedTreeId() {
     const v = treeSelect.value;
     return v ? v : null;
   }
 
+  /**
+   * Parse av "lat, lon" från inputfält.
+   * Returnerar { lat, lon } eller null om input är tom/ogiltig.
+   */
+  function parseCoords(text) {
+    const raw = String(text || "").trim();
+    if (!raw) return null;
+
+    // Tillåt "59.3,18.0" eller "59.3 18.0"
+    const normalized = raw.replace(/\s+/g, " ");
+    const parts = normalized.split(",").map(s => s.trim());
+    let a, b;
+
+    if (parts.length === 2) {
+      a = parts[0];
+      b = parts[1];
+    } else {
+      const p2 = normalized.split(" ").filter(Boolean);
+      if (p2.length !== 2) return null;
+      a = p2[0];
+      b = p2[1];
+    }
+
+    const lat = Number(a);
+    const lon = Number(b);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    if (lat < -90 || lat > 90) return null;
+    if (lon < -180 || lon > 180) return null;
+
+    return { lat, lon };
+  }
+
+  /**
+   * Laddar användarens träd (kräver auth)
+   * Förväntar sig shape ungefär:
+   *   { trees: [ { id, name, role } ] }
+   */
   async function loadTrees() {
     setMsg(treeMsg, "", "Laddar…");
     treeSelect.innerHTML = "<option value=''>Laddar…</option>";
@@ -149,7 +288,7 @@
       for (const t of trees) {
         const opt = document.createElement("option");
         opt.value = String(t.id);
-        opt.textContent = `${t.name} (roll: ${t.role})`;
+        opt.textContent = `${t.name} (roll: ${t.role || "?"})`;
         treeSelect.appendChild(opt);
       }
 
@@ -160,13 +299,22 @@
     }
   }
 
+  /**
+   * Skapar släktkort i valt träd.
+   * OBS: coords skickas som ett objekt { lat, lon } om input är giltig.
+   * Om backend inte stödjer coords ännu kommer den sannolikt ignorera fältet
+   * eller returnera valideringsfel (det är OK – då vet vi vad som saknas).
+   */
   async function createSlaktkort() {
     createMsg.textContent = "";
     const treeId = getSelectedTreeId();
+
     if (!treeId) {
       setMsg(createMsg, "error", "Välj ett träd först.");
       return;
     }
+
+    const coords = parseCoords(coordsEl.value);
 
     const payload = {
       fornamn: document.getElementById("fornamn").value.trim(),
@@ -175,8 +323,19 @@
       fodelsear: document.getElementById("fodelsear").value ? Number(document.getElementById("fodelsear").value) : null,
       dodsar: document.getElementById("dodsar").value ? Number(document.getElementById("dodsar").value) : null,
       plats: document.getElementById("plats").value.trim(),
+      coords: coords, // <-- NYTT: skickar koordinater om de är giltiga, annars null
       anteckning: document.getElementById("anteckning").value.trim()
     };
+
+    // Minimal input-validering i UI (backend ska fortfarande validera på riktigt)
+    if (!payload.fornamn && !payload.efternamn) {
+      setMsg(createMsg, "error", "Fyll i minst förnamn eller efternamn.");
+      return;
+    }
+    if (coordsEl.value.trim() && !coords) {
+      setMsg(createMsg, "error", "Koordinater måste vara i formatet 'lat, lon' (ex: 59.3293, 18.0686).");
+      return;
+    }
 
     try {
       const res = await fetch(`${API}/trees/${encodeURIComponent(treeId)}/slaktkort`, {
@@ -198,6 +357,9 @@
     }
   }
 
+  /**
+   * Listar släktkort för valt träd och visar rå JSON (demo).
+   */
   async function listSlaktkort() {
     const treeId = getSelectedTreeId();
     if (!treeId) {
@@ -222,13 +384,64 @@
     }
   }
 
-  reloadTreesBtn.addEventListener("click", loadTrees);
-  createBtn.addEventListener("click", createSlaktkort);
-  listBtn.addEventListener("click", listSlaktkort);
+  /**
+   * Minimal "karta": togglar visning och låter användaren klicka en punkt.
+   * För demo: vi mappar klick till ungefärliga lat/lon-intervall.
+   * - Lat ~ 55..69 (Sverige-ish)
+   * - Lon ~ 11..24
+   */
+  function toggleMap() {
+    mapWrap.hidden = !mapWrap.hidden;
+    if (!mapWrap.hidden) {
+      setMsg(createMsg, "", "Klicka i rutan för att sätta koordinater.");
+    }
+  }
 
-  // Auto-load
+  function mapClickToLatLon(ev) {
+    const rect = mapBox.getBoundingClientRect();
+    const x = (ev.clientX - rect.left) / rect.width;   // 0..1
+    const y = (ev.clientY - rect.top) / rect.height;   // 0..1
+
+    // "Sverige-ish" bounding box (grov)
+    const latMin = 55.0, latMax = 69.0;
+    const lonMin = 11.0, lonMax = 24.0;
+
+    const lon = lonMin + x * (lonMax - lonMin);
+    const lat = latMax - y * (latMax - latMin);
+
+    return {
+      lat: Math.round(lat * 10000) / 10000,
+      lon: Math.round(lon * 10000) / 10000
+    };
+  }
+
+  function placePin(ev) {
+    const rect = mapBox.getBoundingClientRect();
+    const x = ev.clientX - rect.left;
+    const y = ev.clientY - rect.top;
+
+    pin.style.left = `${x}px`;
+    pin.style.top = `${y}px`;
+    pin.style.display = "block";
+  }
+
+  function setCoordsFromMap(ev) {
+    const ll = mapClickToLatLon(ev);
+    coordsEl.value = `${ll.lat}, ${ll.lon}`;
+    placePin(ev);
+    setMsg(createMsg, "ok", `Koordinater satta: ${ll.lat}, ${ll.lon}`);
+  }
+
+  // Events
+  reloadTreesBtn.addEventListener("click", (e) => { e.preventDefault(); loadTrees(); });
+  createBtn.addEventListener("click", (e) => { e.preventDefault(); createSlaktkort(); });
+  listBtn.addEventListener("click", (e) => { e.preventDefault(); listSlaktkort(); });
+
+  pickPlaceBtn.addEventListener("click", (e) => { e.preventDefault(); toggleMap(); });
+  mapBox.addEventListener("click", (e) => { setCoordsFromMap(e); });
+
+  // Auto-load vid sidstart
   loadTrees();
 </script>
 </body>
 </html>
-
