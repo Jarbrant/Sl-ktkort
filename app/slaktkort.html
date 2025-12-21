@@ -234,6 +234,14 @@
         ? "<span class='ok'>" + text + "</span>"
         : text;
   }
+/**
+ * Läser valt treeId från dropdown.
+ * Returnerar: string eller null
+ */
+function getSelectedTreeId() {
+  const v = treeSelect.value;
+  return v ? v : null;
+}
 
   /**
    * Läser valt treeId från dropdown
