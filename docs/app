@@ -1,4 +1,1 @@
-git rm -r docs/app
-git commit -m "Remove docs/app folder"
-git push
 
