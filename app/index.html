@@ -3,22 +3,45 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Släktkort – Start</title>
+  <title>Släktträdet – Start</title>
   <style>
-    body { font-family: system-ui, Arial, sans-serif; padding: 24px; max-width: 900px; }
-    h1 { margin: 0 0 10px; }
+    body { font-family: system-ui, Arial, sans-serif; padding: 24px; max-width: 900px; margin: 0 auto; }
+    h1 { margin: 0 0 8px; }
     .muted { color:#555; }
-    a { display:block; padding: 10px 12px; border:1px solid #ddd; border-radius:10px; margin: 10px 0; text-decoration:none; color:#111; }
-    a:hover { background:#f7f7f7; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+    a.card {
+      display:block; padding:16px; border:1px solid #ddd; border-radius:12px;
+      text-decoration:none; color:inherit;
+    }
+    a.card:hover { border-color:#aaa; }
+    .title { font-weight:800; margin-bottom:6px; }
+    @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
-  <h1>Släktkort</h1>
-  <p class="muted">Välj vad du vill göra:</p>
+  <h1>Släktträdet</h1>
+  <p class="muted">Välj vy. (Karta och träd är separata vyer.)</p>
 
-  <a href="./app/slaktkort.html">Skapa släktkort</a>
-  <a href="./app/place-picker.html">Karta: välj lat/lon</a>
-  <a href="./app/create-relation.html">Skapa relation (förälder → barn)</a>
-  <a href="./app/tree.html">Trädvy</a>
+  <div class="grid">
+    <a class="card" href="./slaktkort.html">
+      <div class="title">Släktkort</div>
+      <div class="muted">Skapa/lista personer. Koordinater kan fyllas från kartan.</div>
+    </a>
+
+    <a class="card" href="./place-picker.html">
+      <div class="title">Karta-vy</div>
+      <div class="muted">Välj lat/lon och spara till släktkortet.</div>
+    </a>
+
+    <a class="card" href="./tree.html">
+      <div class="title">Släktträd-vy</div>
+      <div class="muted">Visa relationer (kommande/under bygg).</div>
+    </a>
+
+    <a class="card" href="./create-relation.html">
+      <div class="title">Skapa relation</div>
+      <div class="muted">Förälder → barn (demo).</div>
+    </a>
+  </div>
 </body>
 </html>
