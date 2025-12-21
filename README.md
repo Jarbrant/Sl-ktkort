@@ -74,4 +74,19 @@ Syftet är enbart att kunna mata in data för att testa modellen.
 ---
 
 ## 📁 Projektstruktur
-
+slakttradet/
+│
+├── README.md
+│
+├── docs/
+│ ├── architecture.md
+│ └── decisions.md
+│
+├── app/
+│ ├── index.html
+│ ├── create-slaktkort.html
+│ └── create-relation.html
+│
+└── data/
+├── slaktkort.json
+└── relationer.json
