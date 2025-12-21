@@ -3,51 +3,77 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Träd (localStorage)</title>
+  <title>Släktträd – skapa & välj</title>
   <style>
     body { font-family: system-ui, Arial, sans-serif; padding: 24px; max-width: 900px; margin: 0 auto; }
     a { display:inline-block; margin-bottom: 16px; }
-    .card { border:1px solid #ddd; border-radius:12px; padding:16px; margin-top: 16px; }
-    label { display:block; margin-top: 12px; font-weight: 700; }
-    input, button { width:100%; padding:10px; margin-top:6px; font-size:1rem; }
-    button { border:1px solid #333; background:#fff; cursor:pointer; }
+    h1 { margin: 0 0 6px; }
     .muted { color:#555; }
-    .ok { font-weight:800; }
-    .error { color:#b00020; font-weight:800; }
+    .card { border:1px solid #ddd; border-radius:12px; padding:16px; margin-top: 16px; }
+    label { display:block; margin-top: 12px; font-weight: 800; }
+    input, select, button { width:100%; padding:10px; margin-top:6px; font-size:1rem; }
+    button { border:1px solid #333; background:#fff; cursor:pointer; }
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 700px) { .row { grid-template-columns: 1fr; } }
+    .ok { font-weight: 800; }
+    .error { color:#b00020; font-weight: 800; }
     code { background:#f4f4f4; padding:2px 6px; border-radius:6px; }
   </style>
 </head>
 <body>
   <a href="./index.html">← Adminpanel</a>
 
-  <h1>Släktträd (lokalt)</h1>
-  <p class="muted">Detta sparar i webbläsaren via <code>localStorage</code>. Inget backend krävs.</p>
+  <h1>Släktträd</h1>
+  <p class="muted">Skapa och välj träd. Sparas i <code>localStorage</code> (ingen backend behövs).</p>
 
   <div class="card">
-    <h2>Skapa träd</h2>
-    <label for="name">Trädnamn</label>
+    <h2>1) Skapa nytt träd</h2>
+
+    <label for="name">Namn</label>
     <input id="name" placeholder="t.ex. Jarbrant-släkten" />
-    <button id="createBtn" type="button">Spara träd</button>
-    <p id="msg" class="muted" aria-live="polite"></p>
+
+    <button id="createBtn" type="button">Skapa träd</button>
+    <p id="createMsg" class="muted" aria-live="polite"></p>
   </div>
 
   <div class="card">
-    <h2>Lista träd</h2>
-    <button id="listBtn" type="button">Uppdatera lista</button>
-    <pre id="out" style="white-space:pre-wrap; background:#f4f4f4; padding:12px; border-radius:10px; overflow:auto;">[]</pre>
+    <h2>2) Välj aktivt träd</h2>
+    <p class="muted">Det valda trädet används av andra sidor (t.ex. släktkort).</p>
+
+    <label for="treeSelect">Dina träd</label>
+    <select id="treeSelect"></select>
+
+    <button id="setActiveBtn" type="button">Sätt som aktivt</button>
+    <p id="activeMsg" class="muted" aria-live="polite"></p>
+  </div>
+
+  <div class="card">
+    <h2>3) Debug (valfritt)</h2>
+    <button id="refreshBtn" type="button">Visa rådata</button>
+    <pre id="out" style="white-space:pre-wrap; background:#f4f4f4; padding:12px; border-radius:10px; overflow:auto;">{}</pre>
   </div>
 
 <script>
+  // ============================================================
+  // LocalStorage keys (håll dessa konsekventa i hela projektet)
+  // ============================================================
   const KEY_TREES = "slakttradet_trees";
+  const KEY_ACTIVE = "slakttradet_active_tree_id";
 
+  // DOM
   const nameEl = document.getElementById("name");
-  const msg = document.getElementById("msg");
-  const out = document.getElementById("out");
   const createBtn = document.getElementById("createBtn");
-  const listBtn = document.getElementById("listBtn");
+  const createMsg = document.getElementById("createMsg");
 
-  function setMsg(type, text) {
-    msg.innerHTML = type === "error"
+  const treeSelect = document.getElementById("treeSelect");
+  const setActiveBtn = document.getElementById("setActiveBtn");
+  const activeMsg = document.getElementById("activeMsg");
+
+  const refreshBtn = document.getElementById("refreshBtn");
+  const out = document.getElementById("out");
+
+  function setMsg(el, type, text) {
+    el.innerHTML = type === "error"
       ? "<span class='error'>" + text + "</span>"
       : type === "ok"
         ? "<span class='ok'>" + text + "</span>"
@@ -63,33 +89,78 @@
     localStorage.setItem(KEY_TREES, JSON.stringify(trees));
   }
 
+  function getActiveTreeId() {
+    return localStorage.getItem(KEY_ACTIVE) || "";
+  }
+
+  function setActiveTreeId(id) {
+    localStorage.setItem(KEY_ACTIVE, String(id));
+  }
+
   function makeId() {
     return "t" + Date.now().toString().slice(-8);
   }
 
-  function refreshList() {
+  function renderTreeSelect() {
     const trees = loadTrees();
-    out.textContent = JSON.stringify({ trees }, null, 2);
+    const activeId = getActiveTreeId();
+
+    if (!trees.length) {
+      treeSelect.innerHTML = "<option value=''>Inga träd ännu</option>";
+      return;
+    }
+
+    treeSelect.innerHTML = "<option value=''>Välj…</option>";
+    for (const t of trees) {
+      const opt = document.createElement("option");
+      opt.value = String(t.id);
+      opt.textContent = t.name + (String(t.id) === activeId ? " (aktivt)" : "");
+      treeSelect.appendChild(opt);
+    }
   }
 
+  function renderDebug() {
+    const trees = loadTrees();
+    const activeTreeId = getActiveTreeId();
+    out.textContent = JSON.stringify({ trees, activeTreeId }, null, 2);
+  }
+
+  // Create tree
   createBtn.addEventListener("click", () => {
     const name = String(nameEl.value || "").trim();
-    if (!name) return setMsg("error", "Skriv ett namn.");
+    if (!name) return setMsg(createMsg, "error", "Skriv ett namn på trädet.");
 
     const trees = loadTrees();
-    const tree = { id: makeId(), name, role: "OWNER", createdAt: new Date().toISOString() };
+    const tree = { id: makeId(), name, createdAt: new Date().toISOString(), role: "OWNER" };
+
     trees.push(tree);
     saveTrees(trees);
 
+    // Sätt första trädet som aktivt automatiskt
+    if (!getActiveTreeId()) setActiveTreeId(tree.id);
+
     nameEl.value = "";
-    setMsg("ok", "Träd sparat.");
-    refreshList();
+    setMsg(createMsg, "ok", "Träd skapat.");
+    renderTreeSelect();
+    renderDebug();
   });
 
-  listBtn.addEventListener("click", refreshList);
+  // Set active
+  setActiveBtn.addEventListener("click", () => {
+    const id = treeSelect.value;
+    if (!id) return setMsg(activeMsg, "error", "Välj ett träd i listan.");
 
-  refreshList();
+    setActiveTreeId(id);
+    setMsg(activeMsg, "ok", "Aktivt träd uppdaterat.");
+    renderTreeSelect();
+    renderDebug();
+  });
+
+  refreshBtn.addEventListener("click", renderDebug);
+
+  // Init
+  renderTreeSelect();
+  renderDebug();
 </script>
 </body>
 </html>
-
