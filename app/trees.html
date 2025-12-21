@@ -1,1 +1,95 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Träd (localStorage)</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; padding: 24px; max-width: 900px; margin: 0 auto; }
+    a { display:inline-block; margin-bottom: 16px; }
+    .card { border:1px solid #ddd; border-radius:12px; padding:16px; margin-top: 16px; }
+    label { display:block; margin-top: 12px; font-weight: 700; }
+    input, button { width:100%; padding:10px; margin-top:6px; font-size:1rem; }
+    button { border:1px solid #333; background:#fff; cursor:pointer; }
+    .muted { color:#555; }
+    .ok { font-weight:800; }
+    .error { color:#b00020; font-weight:800; }
+    code { background:#f4f4f4; padding:2px 6px; border-radius:6px; }
+  </style>
+</head>
+<body>
+  <a href="./index.html">← Adminpanel</a>
+
+  <h1>Släktträd (lokalt)</h1>
+  <p class="muted">Detta sparar i webbläsaren via <code>localStorage</code>. Inget backend krävs.</p>
+
+  <div class="card">
+    <h2>Skapa träd</h2>
+    <label for="name">Trädnamn</label>
+    <input id="name" placeholder="t.ex. Jarbrant-släkten" />
+    <button id="createBtn" type="button">Spara träd</button>
+    <p id="msg" class="muted" aria-live="polite"></p>
+  </div>
+
+  <div class="card">
+    <h2>Lista träd</h2>
+    <button id="listBtn" type="button">Uppdatera lista</button>
+    <pre id="out" style="white-space:pre-wrap; background:#f4f4f4; padding:12px; border-radius:10px; overflow:auto;">[]</pre>
+  </div>
+
+<script>
+  const KEY_TREES = "slakttradet_trees";
+
+  const nameEl = document.getElementById("name");
+  const msg = document.getElementById("msg");
+  const out = document.getElementById("out");
+  const createBtn = document.getElementById("createBtn");
+  const listBtn = document.getElementById("listBtn");
+
+  function setMsg(type, text) {
+    msg.innerHTML = type === "error"
+      ? "<span class='error'>" + text + "</span>"
+      : type === "ok"
+        ? "<span class='ok'>" + text + "</span>"
+        : text;
+  }
+
+  function loadTrees() {
+    try { return JSON.parse(localStorage.getItem(KEY_TREES)) || []; }
+    catch { return []; }
+  }
+
+  function saveTrees(trees) {
+    localStorage.setItem(KEY_TREES, JSON.stringify(trees));
+  }
+
+  function makeId() {
+    return "t" + Date.now().toString().slice(-8);
+  }
+
+  function refreshList() {
+    const trees = loadTrees();
+    out.textContent = JSON.stringify({ trees }, null, 2);
+  }
+
+  createBtn.addEventListener("click", () => {
+    const name = String(nameEl.value || "").trim();
+    if (!name) return setMsg("error", "Skriv ett namn.");
+
+    const trees = loadTrees();
+    const tree = { id: makeId(), name, role: "OWNER", createdAt: new Date().toISOString() };
+    trees.push(tree);
+    saveTrees(trees);
+
+    nameEl.value = "";
+    setMsg("ok", "Träd sparat.");
+    refreshList();
+  });
+
+  listBtn.addEventListener("click", refreshList);
+
+  refreshList();
+</script>
+</body>
+</html>
 
