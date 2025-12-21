@@ -1,1 +1,63 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Släktträdet – Start</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; padding: 24px; max-width: 900px; margin: 0 auto; }
+    h1 { margin: 0 0 8px; }
+    .muted { color:#555; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+    a.card {
+      display:block; padding:16px; border:1px solid #ddd; border-radius:12px;
+      text-decoration:none; color:inherit;
+    }
+    a.card:hover { border-color:#aaa; }
+    .title { font-weight:800; margin-bottom:6px; }
+    .topbar { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .btn {
+      display:inline-block; padding:10px 12px; border:1px solid #ddd; border-radius:10px;
+      text-decoration:none; color:inherit; background:#fff;
+    }
+    .btn:hover { border-color:#aaa; }
+    @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } .topbar{flex-direction:column; align-items:flex-start;} }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div>
+      <h1>Släktträdet</h1>
+      <p class="muted">Välj vy. (Karta och träd är separata vyer.)</p>
+    </div>
+    <a class="btn" href="../index.html">Logga ut</a>
+  </div>
+
+  <div class="grid">
+    <a class="card" href="./slaktkort.html">
+      <div class="title">Släktkort</div>
+      <div class="muted">Skapa/lista personer. Koordinater kan fyllas från kartan.</div>
+    </a>
+
+    <a class="card" href="./place-picker.html">
+      <div class="title">Karta-vy</div>
+      <div class="muted">Välj lat/lon och spara till släktkortet.</div>
+    </a>
+
+    <a class="card" href="./trees.html">
+      <div class="title">Släktträd-vy</div>
+      <div class="muted">Visa relationer (kommande/under bygg).</div>
+    </a>
+
+    <a class="card" href="./create-relation.html">
+      <div class="title">Skapa relation</div>
+      <div class="muted">Förälder → barn (demo).</div>
+    </a>
+  </div>
+
+  <p class="muted" style="margin-top:18px;">
+    Obs: länkarna fungerar först när motsvarande filer också finns i <code>docs/app/</code>.
+  </p>
+</body>
+</html>
 
