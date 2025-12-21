@@ -17,6 +17,7 @@
       font-size:.95rem;cursor:pointer}
     button:hover{background:#244fd6}
     .note{margin-top:1rem;text-align:center;font-size:.75rem;color:#777}
+    code{background:#f1f3f5;padding:.12rem .3rem;border-radius:6px}
   </style>
 </head>
 <body>
@@ -34,14 +35,35 @@
       <button type="submit">Logga in</button>
     </form>
 
-    <div class="note">Demo-läge. Ingen riktig autentisering än.</div>
+    <div class="note">
+      Demo-läge. Ingen riktig autentisering än.<br/>
+      Går vidare till: <code id="targetText">…</code>
+    </div>
   </div>
 
   <script>
+    function getBasePath() {
+      // Ex: https://jarbrant.github.io/Sl-ktkort/  => basePath = "/Sl-ktkort/"
+      // Ex: https://jarbrant.github.io/Sl-ktkort/index.html => basePath = "/Sl-ktkort/"
+      const parts = window.location.pathname.split("/").filter(Boolean);
+      // För projektsidor är första segmentet repo-namnet.
+      // Om du kör user-site (jarbrant.github.io) finns inget repo-segment, men då ska du ändå inte hamna här.
+      if (parts.length === 0) return "/";
+      return "/" + parts[0] + "/";
+    }
+
+    function buildTargetUrl() {
+      const basePath = getBasePath();
+      // Vi vill alltid hamna i repo-scope, aldrig på /app på root-domänen.
+      return basePath + "app/index.html";
+    }
+
+    const targetUrl = buildTargetUrl();
+    document.getElementById("targetText").textContent = targetUrl;
+
     document.getElementById("loginForm").addEventListener("submit", function (e) {
       e.preventDefault();
-      // VIKTIGT: eftersom Pages publicerar docs/, måste appen ligga i docs/app/
-      window.location.href = "./app/index.html";
+      window.location.assign(targetUrl);
     });
   </script>
 </body>
