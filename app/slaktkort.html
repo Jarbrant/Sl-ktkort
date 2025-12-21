@@ -6,11 +6,8 @@
   <title>Släktkort</title>
 
   <style>
-    /* =========================================================
-       STYLING – Minimal, läsbar demosida
-       ========================================================= */
-    body { font-family: system-ui, Arial, sans-serif; padding: 24px; max-width: 900px; }
-    a { display:inline-block; margin-bottom: 16px; }
+    body { font-family: system-ui, Arial, sans-serif; padding: 24px; max-width: 900px; margin: 0 auto; }
+    a { display:inline-block; margin-bottom: 16px; margin-right: 12px; }
     h1 { margin-bottom: 6px; }
     .muted { color:#555; }
     .card { border:1px solid #ddd; border-radius:10px; padding:16px; margin-top: 16px; }
@@ -23,61 +20,26 @@
     code { background:#f4f4f4; padding:2px 6px; border-radius:6px; }
     .row { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     @media (max-width: 700px) { .row { grid-template-columns: 1fr; } }
-
-    /* =========================================================
-       MINIKARTA – Klick-yta (inte Leaflet)
-       ========================================================= */
-    .mapWrap { margin-top: 12px; }
-    .mapHint { font-size: 0.95rem; margin-top: 6px; }
-    .mapBox {
-      height: 260px;
-      border: 1px solid #ddd;
-      border-radius: 10px;
-      background: #f7f7f7;
-      position: relative;
-      overflow: hidden;
-      user-select: none;
-    }
-    .pin {
-      width: 12px;
-      height: 12px;
-      border-radius: 999px;
-      border: 2px solid #111;
-      background: #fff;
-      position: absolute;
-      transform: translate(-50%, -50%);
-      display: none;
-    }
-    .mapLabel {
-      position: absolute;
-      left: 10px;
-      top: 10px;
-      padding: 6px 10px;
-      border-radius: 999px;
-      border: 1px solid #ddd;
-      background: #fff;
-      font-size: 0.95rem;
-    }
-    .actionsRow { display:flex; gap: 12px; flex-wrap: wrap; }
+    .actionsRow { display:flex; gap: 12px; flex-wrap: wrap; align-items: center; }
     .actionsRow button { width: auto; padding: 10px 14px; }
+    .actionsRow a { margin: 0; }
   </style>
 </head>
 
 <body>
-  <a href="./index.html">← Tillbaka</a>
+  <a href="../index.html">← Tillbaka</a>
+  <a href="./map.html">Öppna karta-vy</a>
+  <a href="./tree.html">Öppna släktträd-vy</a>
 
   <h1>Släktkort</h1>
   <p class="muted">
     Skapar ett släktkort i ett valt <code>tree</code>.
-    Kräver att du är inloggad.
+    Kräver att du är inloggad (om du använder backend).
   </p>
 
-  <!-- =========================================================
-       1) TRÄDVAL
-       ========================================================= -->
   <div class="card">
     <h2>1) Välj släktträd</h2>
-    <p class="muted">Listan hämtas från <code>GET /trees</code>.</p>
+    <p class="muted">Listan hämtas från <code>GET /trees</code> (backend).</p>
 
     <label for="treeSelect">Ditt släktträd</label>
     <select id="treeSelect"></select>
@@ -89,12 +51,9 @@
     <p id="treeMsg" class="muted" aria-live="polite"></p>
   </div>
 
-  <!-- =========================================================
-       2) SKAPA SLÄKTKORT
-       ========================================================= -->
   <div class="card">
     <h2>2) Skapa släktkort</h2>
-    <p class="muted">Skapar via <code>POST /trees/:treeId/slaktkort</code>.</p>
+    <p class="muted">Skapar via <code>POST /trees/:treeId/slaktkort</code> (backend).</p>
 
     <div class="row">
       <div>
@@ -132,19 +91,8 @@
     <input id="coords" placeholder="t.ex. 59.3293, 18.0686" />
 
     <div class="actionsRow">
-      <button type="button" id="pickPlaceBtn">Välj plats på karta</button>
+      <a href="./map.html">Välj koordinater i karta-vyn</a>
       <button type="button" id="clearCoordsBtn">Rensa koordinater</button>
-    </div>
-
-    <div id="mapWrap" class="mapWrap" hidden>
-      <div class="mapBox" id="mapBox" role="application" aria-label="Minimal karta (klicka för att välja punkt)">
-        <div class="mapLabel">Klicka för att välja punkt</div>
-        <div class="pin" id="pin"></div>
-      </div>
-      <div class="mapHint muted">
-        Detta är en minimal klick-yta (inte Leaflet). Den sätter lat/lon ungefärligt.
-        För riktig kartvy: Leaflet + OpenStreetMap senare.
-      </div>
     </div>
 
     <label for="anteckning">Anteckning (valfritt)</label>
@@ -157,12 +105,9 @@
     <p id="createMsg" class="muted" aria-live="polite"></p>
   </div>
 
-  <!-- =========================================================
-       3) LISTA SLÄKTKORT
-       ========================================================= -->
   <div class="card">
     <h2>3) Lista släktkort i valt träd</h2>
-    <p class="muted">Hämtar via <code>GET /trees/:treeId/slaktkort</code>.</p>
+    <p class="muted">Hämtar via <code>GET /trees/:treeId/slaktkort</code> (backend).</p>
 
     <div class="actionsRow">
       <button id="listBtn" type="button">Hämta släktkort</button>
@@ -173,32 +118,16 @@
   </div>
 
 <script>
-  /**
-   * ============================================================
-   * FRONTEND-DEMO – Släktkort
-   *
-   * Routes:
-   * - GET  /trees
-   * - POST /trees/:treeId/slaktkort
-   * - GET  /trees/:treeId/slaktkort
-   *
-   * Auth:
-   * - credentials: "include" (cookie-baserad session)
-   *
-   * Deploy:
-   * - GitHub Pages kan inte anropa localhost.
-   *   Vid deploy måste API peka mot publik backend.
-   * ============================================================
-   */
-
-  // ============================================================
-  // KONFIG
-  // ============================================================
+  // ============================
+  // KONFIG (backend)
+  // OBS: GitHub Pages kan inte nå localhost.
+  // Detta fungerar bara när du kör backend (t.ex. i Codespaces).
+  // ============================
   const API = "http://localhost:3001";
 
-  // ============================================================
-  // DOM-REFERENSER
-  // ============================================================
+  // ============================
+  // DOM
+  // ============================
   const treeSelect = document.getElementById("treeSelect");
   const reloadTreesBtn = document.getElementById("reloadTreesBtn");
   const treeMsg = document.getElementById("treeMsg");
@@ -210,40 +139,8 @@
   const dodsarEl = document.getElementById("dodsar");
   const platsEl = document.getElementById("plats");
   const coordsEl = document.getElementById("coords");
-  // ============================================================
-// HÄMTA SENAST VALDA KOORDINATER FRÅN KARTAN (localStorage)
-// - Kart-sidan sparar i KEY: "slakttradet_last_location"
-// - Vi fyller coords-fältet automatiskt om det finns data
-// ============================================================
-(function prefillCoordsFromLocalStorage() {
-  const KEY = "slakttradet_last_location";
-
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return;
-
-    const data = JSON.parse(raw);
-    if (!data || typeof data.lat !== "number" || typeof data.lon !== "number") return;
-
-    // Kräver att du har <input id="coords" ... />
-    if (coordsEl) {
-      coordsEl.value = `${data.lat}, ${data.lon}`;
-    }
-
-    // Valfritt: rensa efter att vi använt den (så den inte “fastnar”)
-    // localStorage.removeItem(KEY);
-  } catch {
-    // Om JSON är trasig gör vi inget (fail-silent)
-  }
-})();
-
-  const anteckningEl = document.getElementById("anteckning");
-
-  const pickPlaceBtn = document.getElementById("pickPlaceBtn");
   const clearCoordsBtn = document.getElementById("clearCoordsBtn");
-  const mapWrap = document.getElementById("mapWrap");
-  const mapBox = document.getElementById("mapBox");
-  const pin = document.getElementById("pin");
+  const anteckningEl = document.getElementById("anteckning");
 
   const createBtn = document.getElementById("createBtn");
   const createMsg = document.getElementById("createMsg");
@@ -252,9 +149,6 @@
   const clearOutBtn = document.getElementById("clearOutBtn");
   const out = document.getElementById("out");
 
-  // ============================================================
-  // UI-HJÄLPARE
-  // ============================================================
   function setMsg(el, type, text) {
     el.innerHTML = type === "error"
       ? "<span class='error'>" + text + "</span>"
@@ -263,18 +157,11 @@
         : text;
   }
 
-  /**
-   * Läser valt treeId från dropdown.
-   * Returnerar: string eller null
-   */
   function getSelectedTreeId() {
     const v = treeSelect.value;
     return v ? v : null;
   }
 
-  // ============================================================
-  // PARSING / INPUT
-  // ============================================================
   function parseOptionalInt(el) {
     const raw = String(el.value || "").trim();
     if (!raw) return null;
@@ -282,10 +169,6 @@
     return Number.isFinite(n) ? n : null;
   }
 
-  /**
-   * Koordinater: "lat, lon" eller "lat lon"
-   * Returnerar { lat, lon } eller null
-   */
   function parseCoords(text) {
     const raw = String(text || "").trim();
     if (!raw) return null;
@@ -294,9 +177,8 @@
     const partsComma = normalized.split(",").map(s => s.trim()).filter(Boolean);
 
     let a, b;
-    if (partsComma.length === 2) {
-      a = partsComma[0]; b = partsComma[1];
-    } else {
+    if (partsComma.length === 2) { a = partsComma[0]; b = partsComma[1]; }
+    else {
       const partsSpace = normalized.split(" ").filter(Boolean);
       if (partsSpace.length !== 2) return null;
       a = partsSpace[0]; b = partsSpace[1];
@@ -312,9 +194,28 @@
     return { lat, lon };
   }
 
-  // ============================================================
-  // API-CALLS
-  // ============================================================
+  // ============================
+  // Prefill coords från karta-vyn (localStorage)
+  // ============================
+  (function prefillCoordsFromLocalStorage() {
+    const KEY = "slakttradet_last_location";
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (!data || typeof data.lat !== "number" || typeof data.lon !== "number") return;
+      coordsEl.value = `${data.lat}, ${data.lon}`;
+    } catch {}
+  })();
+
+  clearCoordsBtn.addEventListener("click", () => {
+    coordsEl.value = "";
+    setMsg(createMsg, "", "Koordinater rensade.");
+  });
+
+  // ============================
+  // Backend calls
+  // ============================
   async function loadTrees() {
     setMsg(treeMsg, "", "Laddar…");
     treeSelect.innerHTML = "<option value=''>Laddar…</option>";
@@ -325,14 +226,14 @@
 
       if (!res.ok) {
         treeSelect.innerHTML = "<option value=''>—</option>";
-        setMsg(treeMsg, "error", "Inte inloggad eller kan inte hämta träd. Gå till login.");
+        setMsg(treeMsg, "error", "Kan inte hämta träd (kräver backend + inloggning).");
         return;
       }
 
       const trees = Array.isArray(data.trees) ? data.trees : [];
       if (trees.length === 0) {
         treeSelect.innerHTML = "<option value=''>Inga träd ännu</option>";
-        setMsg(treeMsg, "", "Skapa ett träd först via API/UI (nästa steg).");
+        setMsg(treeMsg, "", "Skapa ett träd först.");
         return;
       }
 
@@ -370,7 +271,6 @@
       anteckning: String(anteckningEl.value || "").trim()
     };
 
-    // Minimal UI-validering (backend ska validera på riktigt)
     if (!payload.fornamn && !payload.efternamn) {
       return setMsg(createMsg, "error", "Fyll i minst förnamn eller efternamn.");
     }
@@ -387,10 +287,7 @@
       });
 
       const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        return setMsg(createMsg, "error", "Fel: " + (data.error || "UNKNOWN"));
-      }
+      if (!res.ok) return setMsg(createMsg, "error", "Fel: " + (data.error || "UNKNOWN"));
 
       setMsg(createMsg, "ok", "Släktkort sparat (id: " + (data.slaktkort?.id || "?") + ").");
     } catch {
@@ -406,85 +303,24 @@
     }
 
     try {
-      const res = await fetch(`${API}/trees/${encodeURIComponent(treeId)}/slaktkort`, {
-        credentials: "include"
-      });
-
+      const res = await fetch(`${API}/trees/${encodeURIComponent(treeId)}/slaktkort`, { credentials: "include" });
       const data = await res.json().catch(() => ({}));
       out.textContent = JSON.stringify(data, null, 2);
 
-      if (!res.ok) {
-        setMsg(treeMsg, "error", "Fel: " + (data.error || "UNKNOWN"));
-      } else {
-        setMsg(treeMsg, "ok", "Släktkort hämtade.");
-      }
+      if (!res.ok) setMsg(treeMsg, "error", "Fel: " + (data.error || "UNKNOWN"));
+      else setMsg(treeMsg, "ok", "Släktkort hämtade.");
     } catch {
       out.textContent = "[]";
       setMsg(treeMsg, "error", "Kunde inte nå backend.");
     }
   }
 
-  // ============================================================
-  // MINIKARTA (DEMO)
-  // ============================================================
-  function toggleMap() {
-    mapWrap.hidden = !mapWrap.hidden;
-    if (!mapWrap.hidden) setMsg(createMsg, "", "Klicka i rutan för att sätta koordinater.");
-  }
-
-  function mapClickToLatLon(ev) {
-    const rect = mapBox.getBoundingClientRect();
-    const x = (ev.clientX - rect.left) / rect.width;
-    const y = (ev.clientY - rect.top) / rect.height;
-
-    // "Sverige-ish" box (grov demo)
-    const latMin = 55.0, latMax = 69.0;
-    const lonMin = 11.0, lonMax = 24.0;
-
-    const lon = lonMin + x * (lonMax - lonMin);
-    const lat = latMax - y * (latMax - latMin);
-
-    return {
-      lat: Math.round(lat * 10000) / 10000,
-      lon: Math.round(lon * 10000) / 10000
-    };
-  }
-
-  function placePin(ev) {
-    const rect = mapBox.getBoundingClientRect();
-    pin.style.left = `${ev.clientX - rect.left}px`;
-    pin.style.top = `${ev.clientY - rect.top}px`;
-    pin.style.display = "block";
-  }
-
-  function setCoordsFromMap(ev) {
-    const ll = mapClickToLatLon(ev);
-    coordsEl.value = `${ll.lat}, ${ll.lon}`;
-    placePin(ev);
-    setMsg(createMsg, "ok", `Koordinater satta: ${ll.lat}, ${ll.lon}`);
-  }
-
-  function clearCoords() {
-    coordsEl.value = "";
-    pin.style.display = "none";
-    setMsg(createMsg, "", "Koordinater rensade.");
-  }
-
-  // ============================================================
-  // EVENTS
-  // ============================================================
-  reloadTreesBtn.addEventListener("click", () => loadTrees());
-  createBtn.addEventListener("click", () => createSlaktkort());
-  listBtn.addEventListener("click", () => listSlaktkort());
+  reloadTreesBtn.addEventListener("click", loadTrees);
+  createBtn.addEventListener("click", createSlaktkort);
+  listBtn.addEventListener("click", listSlaktkort);
   clearOutBtn.addEventListener("click", () => { out.textContent = "[]"; });
 
-  pickPlaceBtn.addEventListener("click", () => toggleMap());
-  clearCoordsBtn.addEventListener("click", () => clearCoords());
-  mapBox.addEventListener("click", (e) => setCoordsFromMap(e));
-
-  // ============================================================
-  // START
-  // ============================================================
+  // I GitHub Pages kommer backend inte svara — men sidan ska ändå fungera som formulär.
   loadTrees();
 </script>
 </body>
