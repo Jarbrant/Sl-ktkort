@@ -93,6 +93,8 @@
   // ============================================================
   // Initiera karta (Sverige)
   // ============================================================
+ <script>
+  // Initiera karta (Sverige)
   const map = L.map("map").setView([62.0, 15.0], 5);
 
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -100,7 +102,27 @@
     attribution: "&copy; OpenStreetMap contributors"
   }).addTo(map);
 
-  const markersLayer = L.layerGroup().addTo(map);
+  // En marker som du kan flytta
+  let pickMarker = null;
+
+  function setMarker(latlng) {
+    if (!pickMarker) {
+      pickMarker = L.marker(latlng, { draggable: true }).addTo(map);
+      pickMarker.on("dragend", () => {
+        const ll = pickMarker.getLatLng();
+        console.log("DROP:", ll.lat, ll.lng);
+      });
+    } else {
+      pickMarker.setLatLng(latlng);
+    }
+    const ll = pickMarker.getLatLng();
+    console.log("SET:", ll.lat, ll.lng);
+  }
+
+  // Klick i kartan = placera pricken
+  map.on("click", (e) => setMarker(e.latlng));
+</script>
+
 
   // ============================================================
   // DRAGGABLE PIN (det du efterfrågar: "släppa pricken")
