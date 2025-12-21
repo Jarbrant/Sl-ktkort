@@ -94,14 +94,19 @@ slakttradet/
 ---
 
 ## 🚫 Vad projektet INTE är (än)
-Detta projekt innehåller **inte**:
-- backend
-- databas
-- autentisering
-- roller / admin
-- ramverk (React, Vue etc.)
 
-Allt detta är medvetet bortvalt i detta skede.
+**Frontend-delen (app/)** använder fortfarande:
+- inga ramverk (React, Vue etc.)
+- ingen avancerad UI/komponentstruktur
+
+Projektet innehåller **inte** (än):
+- roller / admin (RBAC)
+- fler relationstyper än Förälder → Barn
+- visualisering med “riktiga” linjer/layout (bara minimal trädvy)
+- datamodell för flera träd per användare (multitenant)
+
+**Viktigt:** Projektet har nu en **backend + databas + autentisering** (spår B) för att varje person ska kunna ha en egen profil och logga in.
+
 
 ---
 
