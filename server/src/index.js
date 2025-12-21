@@ -1,2 +1,5 @@
-POST /trees
+app.post("/trees", authGuard, (req, res) => {
+  ...
+});
+
 
