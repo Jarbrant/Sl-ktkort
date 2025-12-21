@@ -1,1 +1,84 @@
+<!doctype html>
+<html lang="sv">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Släktträdet – Skaparläge</title>
+    <meta name="description" content="Lärprojekt: skapa släktkort och relationer (förälder → barn)." />
+    <style>
+      :root { color-scheme: light; }
+      body {
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        line-height: 1.5;
+        margin: 0;
+        padding: 24px;
+        max-width: 900px;
+      }
+      header { margin-bottom: 20px; }
+      h1 { margin: 0 0 6px; }
+      p { margin: 0 0 12px; }
+      .card {
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        padding: 16px;
+        margin: 14px 0;
+      }
+      .links {
+        display: grid;
+        gap: 12px;
+        margin-top: 12px;
+      }
+      a.button {
+        display: inline-block;
+        padding: 10px 12px;
+        border: 1px solid #333;
+        border-radius: 8px;
+        text-decoration: none;
+        color: inherit;
+        width: fit-content;
+      }
+      a.button:focus { outline: 2px solid #000; outline-offset: 2px; }
+      code { background: #f4f4f4; padding: 2px 6px; border-radius: 6px; }
+      .muted { color: #555; }
+      footer { margin-top: 28px; font-size: 0.95rem; }
+      ul { margin: 8px 0 0 18px; }
+    </style>
+  </head>
+
+  <body>
+    <header>
+      <h1>Släktträdet – Skaparläge</h1>
+      <p class="muted">
+        Detta är ett lärprojekt. Här finns bara två saker: <strong>Släktkort</strong> och
+        <strong>Relation (förälder → barn)</strong>.
+      </p>
+    </header>
+
+    <section class="card" aria-label="Snabblänkar">
+      <h2 style="margin:0 0 8px;">Vad vill du göra?</h2>
+      <div class="links">
+        <a class="button" href="./create-slaktkort.html">Skapa släktkort</a>
+        <a class="button" href="./create-relation.html">Skapa relation (förälder → barn)</a>
+      </div>
+    </section>
+
+    <section class="card" aria-label="Status">
+      <h2 style="margin:0 0 8px;">Status (låst)</h2>
+      <ul>
+        <li>Släktkort: 🔒 LÅST</li>
+        <li>Relationer: 🔒 LÅST</li>
+        <li>Skaparläge: 🟨 PÅGÅR</li>
+        <li>Visualisering: ⏳ EJ PÅBÖRJAD</li>
+      </ul>
+      <p class="muted" style="margin-top:10px;">
+        Datafiler ligger i <code>data/slaktkort.json</code> och <code>data/relationer.json</code>.
+      </p>
+    </section>
+
+    <footer class="muted">
+      Nästa steg: bygga <code>create-slaktkort.html</code> och <code>create-relation.html</code>
+      så du kan lägga in 6 släktkort och koppla dem.
+    </footer>
+  </body>
+</html>
 
