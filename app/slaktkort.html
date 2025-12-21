@@ -210,6 +210,33 @@
   const dodsarEl = document.getElementById("dodsar");
   const platsEl = document.getElementById("plats");
   const coordsEl = document.getElementById("coords");
+  // ============================================================
+// HÄMTA SENAST VALDA KOORDINATER FRÅN KARTAN (localStorage)
+// - Kart-sidan sparar i KEY: "slakttradet_last_location"
+// - Vi fyller coords-fältet automatiskt om det finns data
+// ============================================================
+(function prefillCoordsFromLocalStorage() {
+  const KEY = "slakttradet_last_location";
+
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return;
+
+    const data = JSON.parse(raw);
+    if (!data || typeof data.lat !== "number" || typeof data.lon !== "number") return;
+
+    // Kräver att du har <input id="coords" ... />
+    if (coordsEl) {
+      coordsEl.value = `${data.lat}, ${data.lon}`;
+    }
+
+    // Valfritt: rensa efter att vi använt den (så den inte “fastnar”)
+    // localStorage.removeItem(KEY);
+  } catch {
+    // Om JSON är trasig gör vi inget (fail-silent)
+  }
+})();
+
   const anteckningEl = document.getElementById("anteckning");
 
   const pickPlaceBtn = document.getElementById("pickPlaceBtn");
