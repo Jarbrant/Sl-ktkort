@@ -1,1 +1,290 @@
+<!doctype html>
+<html lang="sv">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Släktträdet – Trädvy (minimal)</title>
+    <meta name="description" content="Minimal trädvy: visar förälder → barn baserat på sparad data." />
+    <style>
+      :root { color-scheme: light; }
+      body {
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        line-height: 1.5;
+        margin: 0;
+        padding: 24px;
+        max-width: 980px;
+      }
+      a { color: inherit; }
+      header { margin-bottom: 18px; }
+      h1 { margin: 0 0 6px; }
+      p { margin: 0 0 12px; }
+      .muted { color: #555; }
+      .card {
+        border: 1px solid #ddd;
+        border-radius: 10px;
+        padding: 16px;
+        margin: 14px 0;
+      }
+      label { display: block; margin: 10px 0 6px; font-weight: 700; }
+      select {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 10px 10px;
+        border: 1px solid #bbb;
+        border-radius: 8px;
+        font: inherit;
+        background: #fff;
+      }
+      .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+      button, .button-link {
+        display: inline-block;
+        padding: 10px 12px;
+        border: 1px solid #333;
+        border-radius: 8px;
+        background: #fff;
+        font: inherit;
+        cursor: pointer;
+        text-decoration: none;
+      }
+      button:focus, .button-link:focus { outline: 2px solid #000; outline-offset: 2px; }
+
+      .tree {
+        display: grid;
+        gap: 14px;
+        margin-top: 10px;
+      }
+      .lane {
+        display: grid;
+        gap: 10px;
+      }
+      @media (min-width: 720px) {
+        .lane.parents { grid-template-columns: 1fr 1fr; }
+        .lane.children { grid-template-columns: repeat(3, 1fr); }
+      }
+
+      .node {
+        border: 1px solid #ccc;
+        border-radius: 12px;
+        padding: 12px;
+        background: #fff;
+      }
+      .node h3 { margin: 0 0 6px; font-size: 1.05rem; }
+      .node .meta { color: #555; font-size: 0.95rem; }
+      .node .id { color: #777; font-size: 0.9rem; margin-top: 6px; }
+      .center {
+        border: 2px solid #333;
+      }
+
+      .hint { margin-top: 10px; }
+      .error { color: #b00020; font-weight: 700; }
+    </style>
+  </head>
+
+  <body>
+    <header>
+      <a href="./index.html">← Tillbaka</a>
+      <h1>Trädvy (minimal)</h1>
+      <p class="muted">
+        Visar <strong>förälder → barn</strong> från sparad data i webbläsaren (LocalStorage).
+        Detta är en tidig visualisering för att lära sig sammanhanget.
+      </p>
+    </header>
+
+    <section class="card" aria-label="Val">
+      <label for="personSelect">Välj person (fokus i mitten)</label>
+      <select id="personSelect">
+        <option value="" selected>Välj person…</option>
+      </select>
+
+      <div class="actions">
+        <button type="button" id="reloadBtn">Ladda om data</button>
+        <a class="button-link" href="./create-slaktkort.html">Skapa släktkort</a>
+        <a class="button-link" href="./create-relation.html">Skapa relation</a>
+      </div>
+
+      <p id="msg" class="hint muted" aria-live="polite"></p>
+    </section>
+
+    <section class="card" aria-label="Träd">
+      <h2 style="margin:0 0 8px;">Träd</h2>
+
+      <div class="tree" id="tree">
+        <div class="lane parents" id="parents"></div>
+        <div class="lane centerlane" id="center"></div>
+        <div class="lane children" id="children"></div>
+      </div>
+
+      <p class="muted hint">
+        Visning: föräldrar överst, vald person i mitten, barn längst ner.
+      </p>
+    </section>
+
+    <script>
+      const KEY_PERSONS = "slakttradet_slaktkort";
+      const KEY_RELATIONS = "slakttradet_relationer";
+
+      const personSelect = document.getElementById("personSelect");
+      const reloadBtn = document.getElementById("reloadBtn");
+      const msg = document.getElementById("msg");
+
+      const parentsEl = document.getElementById("parents");
+      const centerEl = document.getElementById("center");
+      const childrenEl = document.getElementById("children");
+
+      function safeParse(json, fallback) {
+        try { return JSON.parse(json); } catch { return fallback; }
+      }
+
+      function loadPersons() {
+        const raw = localStorage.getItem(KEY_PERSONS);
+        const arr = safeParse(raw, []);
+        return Array.isArray(arr) ? arr : [];
+      }
+
+      function loadRelations() {
+        const raw = localStorage.getItem(KEY_RELATIONS);
+        const arr = safeParse(raw, []);
+        return Array.isArray(arr) ? arr : [];
+      }
+
+      function labelPerson(p) {
+        const name = `${p.fornamn || ""} ${p.efternamn || ""}`.trim();
+        const a = (p.fodelsear ?? null) !== null ? p.fodelsear : "?";
+        const b = (p.dodsar ?? null) !== null ? p.dodsar : "?";
+        const years = (a !== "?" || b !== "?") ? `${a}–${b}` : "";
+        return years ? `${name} (${years})` : name;
+      }
+
+      function renderNode(p, extraClass = "") {
+        if (!p) return "";
+        const name = labelPerson(p);
+        const plats = (p.plats || "").trim();
+        const kon = (p.kon || "").trim();
+        const metaParts = [];
+        if (kon) metaParts.push(kon);
+        if (plats) metaParts.push(plats);
+
+        const meta = metaParts.length ? metaParts.join(" · ") : "—";
+        return `
+          <div class="node ${extraClass}">
+            <h3>${escapeHtml(name)}</h3>
+            <div class="meta">${escapeHtml(meta)}</div>
+            <div class="id">id: ${escapeHtml(p.id)}</div>
+          </div>
+        `;
+      }
+
+      function escapeHtml(s) {
+        return String(s)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function setOptions(select, items) {
+        while (select.options.length > 1) select.remove(1);
+        for (const p of items) {
+          const opt = document.createElement("option");
+          opt.value = p.id;
+          opt.textContent = `${labelPerson(p)} — ${p.id}`;
+          select.appendChild(opt);
+        }
+      }
+
+      function buildIndexes(persons) {
+        const byId = new Map();
+        for (const p of persons) byId.set(p.id, p);
+        return { byId };
+      }
+
+      function getParentsOf(childId, relations) {
+        // relation: FORALDER_BARN, franPersonId = parent, tillPersonId = child
+        return relations
+          .filter(r => r && r.typ === "FORALDER_BARN" && r.tillPersonId === childId)
+          .map(r => r.franPersonId);
+      }
+
+      function getChildrenOf(parentId, relations) {
+        return relations
+          .filter(r => r && r.typ === "FORALDER_BARN" && r.franPersonId === parentId)
+          .map(r => r.tillPersonId);
+      }
+
+      function unique(arr) {
+        return [...new Set(arr)];
+      }
+
+      function renderTree(focusId, persons, relations) {
+        parentsEl.innerHTML = "";
+        centerEl.innerHTML = "";
+        childrenEl.innerHTML = "";
+
+        if (!focusId) {
+          msg.textContent = "Välj en person för att se träd.";
+          return;
+        }
+
+        const { byId } = buildIndexes(persons);
+        const focus = byId.get(focusId);
+
+        if (!focus) {
+          msg.innerHTML = '<span class="error">Personen hittades inte.</span>';
+          return;
+        }
+
+        // Parents
+        const parentIds = unique(getParentsOf(focusId, relations)).slice(0, 2);
+        if (parentIds.length === 0) {
+          parentsEl.innerHTML = `<div class="muted">Inga föräldrar registrerade.</div>`;
+        } else {
+          parentsEl.innerHTML = parentIds
+            .map(id => renderNode(byId.get(id)))
+            .join("");
+        }
+
+        // Center
+        centerEl.innerHTML = renderNode(focus, "center");
+
+        // Children
+        const childIds = unique(getChildrenOf(focusId, relations));
+        if (childIds.length === 0) {
+          childrenEl.innerHTML = `<div class="muted">Inga barn registrerade.</div>`;
+        } else {
+          childrenEl.innerHTML = childIds
+            .map(id => renderNode(byId.get(id)))
+            .join("");
+        }
+
+        msg.textContent = `Visar träd för: ${labelPerson(focus)}.`;
+      }
+
+      function loadAndInit() {
+        const persons = loadPersons();
+        const relations = loadRelations();
+
+        setOptions(personSelect, persons);
+
+        if (persons.length < 2) {
+          msg.innerHTML = '<span class="error">Du behöver minst 2 sparade släktkort för att se ett träd.</span>';
+          parentsEl.innerHTML = "";
+          centerEl.innerHTML = "";
+          childrenEl.innerHTML = "";
+          return;
+        }
+
+        // Om inget valt: välj första
+        if (!personSelect.value && persons[0]?.id) personSelect.value = persons[0].id;
+
+        renderTree(personSelect.value, persons, relations);
+      }
+
+      personSelect.addEventListener("change", () => loadAndInit());
+      reloadBtn.addEventListener("click", () => loadAndInit());
+
+      loadAndInit();
+    </script>
+  </body>
+</html>
 
