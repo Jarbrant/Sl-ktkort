@@ -15,12 +15,32 @@
     }
     a.card:hover { border-color:#aaa; }
     .title { font-weight:800; margin-bottom:6px; }
-    @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+    .topbar { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .btn {
+      display:inline-block; padding:10px 12px; border:1px solid #ddd; border-radius:10px;
+      text-decoration:none; color:inherit; background:#fff;
+    }
+    .btn:hover { border-color:#aaa; }
+    @media (max-width: 700px) {
+      .grid { grid-template-columns: 1fr; }
+      .topbar { flex-direction:column; align-items:flex-start; }
+    }
   </style>
 </head>
 <body>
-  <h1>Släktträdet</h1>
-  <p class="muted">Välj vy. (Karta och träd är separata vyer.)</p>
+  <div class="topbar">
+    <div>
+      <h1>Släktträdet</h1>
+      <p class="muted">Välj vy. (Karta och träd är separata vyer.)</p>
+    </div>
+
+    <!-- Justera sökvägen beroende på var login ligger -->
+    <!-- Om denna fil ligger i docs/app/: -->
+    <a class="btn" href="../index.html">Logga ut</a>
+    <!-- Om denna fil ligger direkt i docs/: använd istället:
+    <a class="btn" href="./index.html">Logga ut</a>
+    -->
+  </div>
 
   <div class="grid">
     <a class="card" href="./slaktkort.html">
@@ -33,10 +53,13 @@
       <div class="muted">Välj lat/lon och spara till släktkortet.</div>
     </a>
 
-    <a class="card" href="./tree.html">
+    <!-- VIKTIGT: välj rätt filnamn -->
+    <!-- Om filen heter trees.html: -->
+    <a class="card" href="./trees.html">
       <div class="title">Släktträd-vy</div>
       <div class="muted">Visa relationer (kommande/under bygg).</div>
     </a>
+    <!-- Om filen faktiskt heter tree.html, byt länken ovan till ./tree.html -->
 
     <a class="card" href="./create-relation.html">
       <div class="title">Skapa relation</div>
