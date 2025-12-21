@@ -210,3 +210,5 @@ app.post("/trees/:treeId/slaktkort", authGuard, (req, res) => {
     return res.status(500).json({ error: "SLÄKTKORT_CREATE_FAILED" });
   }
 });
+Add documented backend routes for släktkort scoped to tree,
+including role checks and lat/lon support.
