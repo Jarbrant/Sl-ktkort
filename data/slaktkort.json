@@ -1,15 +1,7 @@
 {
-  "relationer": []
-}
-{
-  "id": "p472318",
-  "fornamn": "Anders",
-  "efternamn": "Jarbrant",
-  "kon": "Okänt",
-  "fodelsear": null,
-  "dodsar": null,
-  "plats": "",
-  "anteckning": ""
+  "slaktkort": [
+    { "id": "p123456", "fornamn": "Anna", "efternamn": "Karlsson", "kon": "Kvinna", "fodelsear": 1985, "dodsar": null, "plats": "Uppsala", "anteckning": "" }
+  ]
 }
 
 
