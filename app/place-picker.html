@@ -1,1 +1,100 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Välj plats (karta)</title>
+
+  <!-- Leaflet via CDN -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin: 0; }
+    header { padding: 16px 20px; border-bottom: 1px solid #ddd; }
+    h1 { margin: 0 0 6px; font-size: 1.2rem; }
+    .muted { color:#555; margin:0; }
+    .wrap { padding: 12px 20px; }
+    #map { height: 60vh; border: 1px solid #ddd; border-radius: 12px; overflow: hidden; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 12px 14px; margin-top: 12px; }
+    code { background:#f4f4f4; padding:2px 6px; border-radius:6px; }
+    button { padding: 10px 12px; border:1px solid #333; background:#fff; cursor:pointer; border-radius: 10px; }
+    .row { display:flex; gap:10px; flex-wrap: wrap; align-items: center; }
+    .ok { font-weight: 800; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Välj plats på karta</h1>
+    <p class="muted">Klicka i kartan → vi sparar lat/lon till <code>localStorage</code> så <code>slaktkort.html</code> kan hämta den.</p>
+  </header>
+
+  <div class="wrap">
+    <div id="map"></div>
+
+    <div class="card">
+      <div class="row">
+        <div>Vald position: <code id="pos">ingen</code></div>
+        <button id="useBtn" disabled>Spara plats & stäng</button>
+      </div>
+      <p class="muted" style="margin-top:10px;">
+        “Spara plats & stäng” sparar koordinaterna i <code>slakttradet_last_location</code> och stänger fliken.
+      </p>
+      <p id="msg" class="muted" aria-live="polite"></p>
+    </div>
+  </div>
+
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
+  <script>
+    const KEY = "slakttradet_last_location";
+    const posEl = document.getElementById("pos");
+    const useBtn = document.getElementById("useBtn");
+    const msg = document.getElementById("msg");
+
+    // Sverige ungefär
+    const map = L.map("map").setView([62.0, 15.0], 5);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
+
+    let marker = null;
+    let last = null;
+
+    function fmt(n) {
+      return Math.round(n * 1000000) / 1000000; // 6 decimaler
+    }
+
+    map.on("click", (e) => {
+      const lat = fmt(e.latlng.lat);
+      const lon = fmt(e.latlng.lng);
+      last = { lat, lon, pickedAt: new Date().toISOString() };
+
+      if (!marker) marker = L.marker([lat, lon]).addTo(map);
+      marker.setLatLng([lat, lon]);
+
+      posEl.textContent = `${lat}, ${lon}`;
+      useBtn.disabled = false;
+      msg.textContent = "Plats vald. Klicka 'Spara plats & stäng'.";
+    });
+
+    useBtn.addEventListener("click", () => {
+      if (!last) return;
+      localStorage.setItem(KEY, JSON.stringify(last));
+      msg.innerHTML = "<span class='ok'>Sparat.</span> Du kan gå tillbaka till släktkortet.";
+      // Försök stänga fliken (funkar ibland, annars bara lämna öppet)
+      setTimeout(() => { try { window.close(); } catch {} }, 200);
+    });
+  </script>
+</body>
+</html>
 
