@@ -1,11 +1,48 @@
 <!doctype html>
 <html lang="sv">
 <head>
-  <meta charset="utf-8">
-  <title>Test</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Släktträdet – Logga in</title>
+  <style>
+    body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+      font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#f4f6f8;color:#222}
+    .box{width:100%;max-width:380px;background:#fff;padding:2rem;border-radius:12px;
+      box-shadow:0 10px 30px rgba(0,0,0,.08)}
+    h1{margin:0 0 .25rem;font-size:1.6rem;text-align:center}
+    .muted{text-align:center;color:#666;margin:0 0 1.25rem;font-size:.9rem}
+    label{display:block;margin:.6rem 0 .25rem;font-size:.85rem;color:#444}
+    input{width:100%;padding:.6rem .7rem;border:1px solid #ccc;border-radius:8px;font-size:.95rem}
+    button{margin-top:.9rem;width:100%;padding:.7rem;border:0;border-radius:10px;background:#2b5cff;color:#fff;
+      font-size:.95rem;cursor:pointer}
+    button:hover{background:#244fd6}
+    .note{margin-top:1rem;text-align:center;font-size:.75rem;color:#777}
+  </style>
 </head>
 <body>
-  <h1>GitHub Pages fungerar</h1>
+  <div class="box">
+    <h1>Släktträdet</h1>
+    <p class="muted">Logga in (demo)</p>
+
+    <form id="loginForm">
+      <label for="username">Användarnamn</label>
+      <input id="username" type="text" autocomplete="username" required />
+
+      <label for="password">Lösenord</label>
+      <input id="password" type="password" autocomplete="current-password" required />
+
+      <button type="submit">Logga in</button>
+    </form>
+
+    <div class="note">Demo-läge. Ingen riktig autentisering än.</div>
+  </div>
+
+  <script>
+    document.getElementById("loginForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      // Stabilt: vi går till en fil som också ligger i docs/
+      window.location.href = "./start.html";
+    });
+  </script>
 </body>
 </html>
-
