@@ -3,128 +3,22 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Skapa relation</title>
+  <title>Släktkort – Start</title>
   <style>
-    body {
-      font-family: system-ui, Arial, sans-serif;
-      padding: 24px;
-      max-width: 900px;
-    }
-    h1 { margin-bottom: 6px; }
-    .muted { color: #555; }
-    label { display: block; margin-top: 14px; font-weight: 700; }
-    select, button {
-      width: 100%;
-      padding: 10px;
-      margin-top: 6px;
-      font-size: 1rem;
-    }
-    button {
-      margin-top: 18px;
-      border: 1px solid #333;
-      background: #fff;
-      cursor: pointer;
-    }
-    .card {
-      border: 1px solid #ddd;
-      border-radius: 10px;
-      padding: 16px;
-      margin-top: 18px;
-    }
-    .ok { font-weight: 700; }
-    .error { color: #b00020; font-weight: 700; }
-    a { display: inline-block; margin-bottom: 16px; }
+    body { font-family: system-ui, Arial, sans-serif; padding: 24px; max-width: 900px; }
+    h1 { margin: 0 0 10px; }
+    .muted { color:#555; }
+    a { display:block; padding: 10px 12px; border:1px solid #ddd; border-radius:10px; margin: 10px 0; text-decoration:none; color:#111; }
+    a:hover { background:#f7f7f7; }
   </style>
 </head>
-
 <body>
-  <a href="./index.html">← Tillbaka</a>
-  <a href="./tree.html">Se trädvy</a>
+  <h1>Släktkort</h1>
+  <p class="muted">Välj vad du vill göra:</p>
 
-  <h1>Skapa relation</h1>
-  <p class="muted">Relationstyp: <strong>Förälder → Barn</strong></p>
-
-    <p id="msg" class="muted" aria-live="polite"></p>
-  </div>
-
-<script>
-  const KEY_PERSONS = "slakttradet_slaktkort";
-  const KEY_RELATIONS = "slakttradet_relationer";
-
-  const parentSelect = document.getElementById("parent");
-  const childSelect = document.getElementById("child");
-  const msg = document.getElementById("msg");
-  const saveBtn = document.getElementById("saveBtn");
-
-  function loadPersons() {
-    try {
-      return JSON.parse(localStorage.getItem(KEY_PERSONS)) || [];
-    } catch {
-      return [];
-    }
-  }
-
-  function loadRelations() {
-    try {
-      return JSON.parse(localStorage.getItem(KEY_RELATIONS)) || [];
-    } catch {
-      return [];
-    }
-  }
-
-  function saveRelations(relations) {
-    localStorage.setItem(KEY_RELATIONS, JSON.stringify(relations));
-  }
-
-  function makeId() {
-    return "r" + Date.now().toString().slice(-6);
-  }
-
-  function fillSelect(select, persons) {
-    select.innerHTML = "<option value=''>Välj…</option>";
-    for (const p of persons) {
-      const opt = document.createElement("option");
-      opt.value = p.id;
-      opt.textContent = `${p.fornamn} ${p.efternamn} (${p.id})`;
-      select.appendChild(opt);
-    }
-  }
-
-  const persons = loadPersons();
-  fillSelect(parentSelect, persons);
-  fillSelect(childSelect, persons);
-
-  saveBtn.addEventListener("click", () => {
-    msg.textContent = "";
-
-    const parentId = parentSelect.value;
-    const childId = childSelect.value;
-
-    if (!parentId || !childId) {
-      msg.innerHTML = "<span class='error'>Välj både förälder och barn.</span>";
-      return;
-    }
-    if (parentId === childId) {
-      msg.innerHTML = "<span class='error'>En person kan inte vara förälder till sig själv.</span>";
-      return;
-    }
-
-    const relations = loadRelations();
-
-    const relation = {
-      id: makeId(),
-      typ: "FORALDER_BARN",
-      franPersonId: parentId,
-      tillPersonId: childId
-    };
-
-    relations.push(relation);
-    saveRelations(relations);
-
-    msg.innerHTML = "<span class='ok'>Relation sparad.</span>";
-    parentSelect.value = "";
-    childSelect.value = "";
-  });
-</script>
+  <a href="./app/slaktkort.html">Skapa släktkort</a>
+  <a href="./app/place-picker.html">Karta: välj lat/lon</a>
+  <a href="./app/create-relation.html">Skapa relation (förälder → barn)</a>
+  <a href="./app/tree.html">Trädvy</a>
 </body>
 </html>
