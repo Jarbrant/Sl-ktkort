@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Karta – Släktträd</title>
 
-  <!-- Leaflet (karta) -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -19,15 +18,12 @@
     .muted { color:#555; margin:0; }
 
     .wrap { padding: 12px 20px; }
-    label { font-weight: 700; display:block; margin-top: 8px; }
-    select { padding: 10px; width: 100%; max-width: 420px; }
-
     .msg { margin-top: 10px; }
-    .error { color:#b00020; font-weight: 800; }
     .ok { font-weight: 800; }
+    .error { color:#b00020; font-weight: 800; }
 
     #map {
-      height: 65vh;
+      height: 70vh;
       margin-top: 14px;
       border: 1px solid #ddd;
       border-radius: 12px;
@@ -53,11 +49,6 @@
 </header>
 
 <div class="wrap">
-  <label for="treeSelect">Välj träd (valfritt)</label>
-  <select id="treeSelect">
-    <option value="">(ingen)</option>
-  </select>
-
   <div id="msg" class="msg muted" aria-live="polite"></div>
 
   <div class="coordsBox">
@@ -70,13 +61,6 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
 <script>
-  // ============================================================
-  // Viktigt i Codespaces:
-  // - Använd relativa endpoints ("/trees") om du serverar app/ från backend.
-  // - Om du öppnar filen "från fel ställe" kan cookies/auth och API strula.
-  // ============================================================
-
-  const treeSelect = document.getElementById("treeSelect");
   const msg = document.getElementById("msg");
   const coordsOut = document.getElementById("coordsOut");
 
@@ -86,13 +70,8 @@
   }
 
   function setCoordsText(lat, lon) {
-    const pretty = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
-    coordsOut.textContent = pretty;
+    coordsOut.textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
   }
-
-  // ============================================================
-  // Initiera karta (Sverige)
-  // ============================================================
 
   // Initiera karta (Sverige)
   const map = L.map("map").setView([62.0, 15.0], 5);
@@ -102,31 +81,7 @@
     attribution: "&copy; OpenStreetMap contributors"
   }).addTo(map);
 
-  // En marker som du kan flytta
-  let pickMarker = null;
-
-  function setMarker(latlng) {
-    if (!pickMarker) {
-      pickMarker = L.marker(latlng, { draggable: true }).addTo(map);
-      pickMarker.on("dragend", () => {
-        const ll = pickMarker.getLatLng();
-        console.log("DROP:", ll.lat, ll.lng);
-      });
-    } else {
-      pickMarker.setLatLng(latlng);
-    }
-    const ll = pickMarker.getLatLng();
-    console.log("SET:", ll.lat, ll.lng);
-  }
-
-  // Klick i kartan = placera pricken
-  map.on("click", (e) => setMarker(e.latlng));
-</script>
-
-
-  // ============================================================
-  // DRAGGABLE PIN (det du efterfrågar: "släppa pricken")
-  // ============================================================
+  // Marker som kan dras och släppas
   let pickMarker = null;
 
   function ensurePickMarker(latlng) {
@@ -147,96 +102,13 @@
     setCoordsText(ll.lat, ll.lng);
   }
 
+  // Klick i kartan = sätt punkt
   map.on("click", (e) => {
     ensurePickMarker(e.latlng);
-    setMsg("ok", "Punkt satt (klick). Du kan nu dra och släppa pricken.");
+    setMsg("ok", "Punkt satt. Du kan nu dra och släppa pricken.");
   });
 
-  // ============================================================
-  // (VALFRITT) Ladda träd + visa släktkort med coords
-  // - Detta kräver att backend är igång och att du är inloggad.
-  // ============================================================
-  async function safeJson(res) {
-    try { return await res.json(); } catch { return {}; }
-  }
-
-  function clearMarkers() {
-    markersLayer.clearLayers();
-  }
-
-  function getLatLon(p) {
-    // stöd både {lat,lon} och {coords:{lat,lon}}
-    const lat = (typeof p.lat === "number") ? p.lat : (p.coords && typeof p.coords.lat === "number" ? p.coords.lat : null);
-    const lon = (typeof p.lon === "number") ? p.lon : (p.coords && typeof p.coords.lon === "number" ? p.coords.lon : null);
-    return (typeof lat === "number" && typeof lon === "number") ? { lat, lon } : null;
-  }
-
-  function addMarker(p) {
-    const ll = getLatLon(p);
-    if (!ll) return;
-
-    const name = `${String(p.fornamn || "").trim()} ${String(p.efternamn || "").trim()}`.trim() || "Okänt namn";
-    const plats = String(p.plats || "").trim() || "Ingen plats angiven";
-
-    // säkert popup-innehåll (ingen injicerad HTML från data)
-    const div = document.createElement("div");
-    const strong = document.createElement("strong");
-    strong.textContent = name;
-    const br = document.createElement("br");
-    const span = document.createElement("span");
-    span.textContent = plats;
-
-    div.appendChild(strong);
-    div.appendChild(br);
-    div.appendChild(span);
-
-    L.marker([ll.lat, ll.lon]).addTo(markersLayer).bindPopup(div);
-  }
-
-  async function loadTrees() {
-    // Om du inte har backend igång/inloggning: vi skippar tyst.
-    const res = await fetch("/trees", { credentials: "include" }).catch(() => null);
-    if (!res) return;
-
-    const data = await safeJson(res);
-    if (!res.ok) {
-      // detta ska inte stoppa kartan
-      setMsg("", "Kartan fungerar. Träd kräver inloggning/backend.");
-      return;
-    }
-
-    const trees = Array.isArray(data.trees) ? data.trees : [];
-    treeSelect.innerHTML = "<option value=''>(ingen)</option>";
-
-    for (const t of trees) {
-      const opt = document.createElement("option");
-      opt.value = String(t.id);
-      opt.textContent = String(t.name || ("Träd " + t.id));
-      treeSelect.appendChild(opt);
-    }
-  }
-
-  async function loadSlaktkort(treeId) {
-    clearMarkers();
-    if (!treeId) return;
-
-    const res = await fetch(`/trees/${encodeURIComponent(treeId)}/slaktkort`, { credentials: "include" }).catch(() => null);
-    if (!res) return;
-
-    const data = await safeJson(res);
-    if (!res.ok) return;
-
-    const cards = Array.isArray(data.slaktkort) ? data.slaktkort : [];
-    for (const p of cards) addMarker(p);
-  }
-
-  treeSelect.addEventListener("change", () => {
-    loadSlaktkort(treeSelect.value);
-  });
-
-  // Start: kartan funkar alltid; träd laddas om backend finns
-  setMsg("", "Klicka i kartan för att placera en prick. Dra och släpp för att flytta den.");
-  loadTrees();
+  setMsg("", "Klicka i kartan för att placera pricken.");
 </script>
 
 </body>
