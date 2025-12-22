@@ -61,11 +61,7 @@
       text-decoration:none;
     }
     .btn.secondary{ border-color:#bbb; }
-    .btn.disabled{
-      opacity:.45;
-      cursor:not-allowed;
-      pointer-events:none;
-    }
+    .btn.disabled{ opacity:.45; cursor:not-allowed; pointer-events:none; }
 
     .pillRow{
       display:flex;
@@ -144,7 +140,6 @@
       width:auto;
       padding:0;
       margin:0;
-      accent-color: auto;
     }
 
     #map{
@@ -193,6 +188,25 @@
       background: #fff9ee;
     }
     code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
+
+    /* Popup (nivå 1 + stor länk) */
+    .popupWrap{ min-width: 220px; max-width: 260px; }
+    .popupTitle{ font-weight: 950; margin: 0 0 4px; font-size: 1.05rem; }
+    .popupLine{ margin: 0; color:#333; }
+    .popupMuted{ margin: 0; color:#555; }
+    .popupDivider{ height: 1px; background:#eee; margin: 10px 0; }
+    .popupCta{
+      display:block;
+      width:100%;
+      box-sizing:border-box;
+      text-align:center;
+      padding:10px 12px;
+      border:1px solid #333;
+      border-radius:10px;
+      font-weight:900;
+      background:#fff;
+    }
+    .popupCta:hover{ background:#f5f5f5; }
   </style>
 </head>
 
@@ -200,7 +214,7 @@
 <header>
   <div>
     <h1>Karta</h1>
-    <p class="muted">Visar <strong>personer</strong> och <strong>kopplingar</strong> (Förälder→Barn) i aktivt träd.</p>
+    <p class="muted">Klicka en markör för <strong>nivå 1</strong> info + stor knapp “Öppna person”.</p>
 
     <nav class="topbar" aria-label="Navigation">
       <a class="btn secondary" href="../start.html">Start</a>
@@ -227,7 +241,7 @@
 <div class="grid">
   <section class="card" aria-label="Kontroller">
     <h2>Filter & vy</h2>
-    <p class="small">Klicka en person för att zooma och öppna popup.</p>
+    <p class="small">Klicka en person i listan för att zooma och öppna popup.</p>
 
     <label for="search">Sök</label>
     <input id="search" placeholder="Sök namn eller plats…" autocomplete="off" />
@@ -276,7 +290,7 @@
   })();
 
   // ============================
-  // Keys (måste matcha dina andra sidor)
+  // Keys (MÅSTE matcha övriga sidor)
   // ============================
   const KEY_TREES  = "slakttradet_trees";
   const KEY_ACTIVE = "slakttradet_active_tree_id";
@@ -310,6 +324,10 @@
     const raw = localStorage.getItem(key);
     return raw ? safeParse(raw, fallback) : fallback;
   }
+  function saveJson(key, value){
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+
   function activeTreeId(){ return localStorage.getItem(KEY_ACTIVE) || ""; }
   function getTrees(){
     const trees = loadJson(KEY_TREES, []);
@@ -321,10 +339,7 @@
     const t = getTrees().find(x => String(x.id) === String(id));
     return t ? (t.name || t.id) : id;
   }
-  function personName(p){
-    const n = `${p.fornamn || ""} ${p.efternamn || ""}`.trim();
-    return n || "(namnlös)";
-  }
+
   function escapeHtml(s){
     return String(s || "")
       .replaceAll("&","&amp;")
@@ -334,8 +349,20 @@
       .replaceAll("'","&#039;");
   }
 
+  function personName(p){
+    const n = `${p.fornamn || ""} ${p.efternamn || ""}`.trim();
+    return n || "(namnlös)";
+  }
+
+  function yearsLine(p){
+    const a = (p && p.fodelsear != null && String(p.fodelsear).trim() !== "") ? String(p.fodelsear).trim() : "";
+    const b = (p && p.dodsar != null && String(p.dodsar).trim() !== "") ? String(p.dodsar).trim() : "";
+    if(!a && !b) return "";
+    if(a && b) return `${a}–${b}`;
+    return a ? `${a}–` : `–${b}`;
+  }
+
   function coordsFromPerson(p){
-    // accepterar p.coords={lat,lon} eller p.coords="lat, lon"
     if(p && typeof p.coords === "object" && p.coords){
       const lat = Number(p.coords.lat);
       const lon = Number(p.coords.lon);
@@ -367,7 +394,6 @@
     attribution: '&copy; OpenStreetMap'
   }).addTo(map);
 
-  // Default: Stockholm-ish
   map.setView([59.3293, 18.0686], 5);
 
   const markerLayer = L.layerGroup().addTo(map);
@@ -416,6 +442,28 @@
   }
 
   // ============================
+  // Popup content (Nivå 1 + stor länk)
+  // ============================
+  function buildPopupHtml(person){
+    const name = personName(person);
+    const years = yearsLine(person);
+    const place = String(person.plats || "").trim();
+
+    const pid = encodeURIComponent(String(person.id || ""));
+    const href = "./slaktkort.html?personId=" + pid;
+
+    return (
+      "<div class='popupWrap'>" +
+        "<p class='popupTitle'>" + escapeHtml(name) + "</p>" +
+        (years ? ("<p class='popupMuted'>" + escapeHtml(years) + "</p>") : "") +
+        (place ? ("<p class='popupLine'>Plats: " + escapeHtml(place) + "</p>") : "") +
+        "<div class='popupDivider'></div>" +
+        "<a class='popupCta' href='" + href + "'>Öppna person</a>" +
+      "</div>"
+    );
+  }
+
+  // ============================
   // Render
   // ============================
   function renderHint(hasTrees, hasActive, peopleWithCoords){
@@ -454,10 +502,7 @@
     for(const p of people){
       const c = coordsFromPerson(p);
       const place = (p.plats || "").trim();
-      const year = [
-        (p.fodelsear != null ? String(p.fodelsear) : ""),
-        (p.dodsar != null ? String(p.dodsar) : "")
-      ].filter(Boolean).join("–");
+      const years = yearsLine(p);
 
       const li = document.createElement("li");
       li.className = "item";
@@ -466,9 +511,9 @@
       li.innerHTML =
         "<p class='itemTitle'>" + escapeHtml(personName(p)) + "</p>" +
         "<p class='itemMeta'>" +
-        (year ? escapeHtml(year) + " · " : "") +
-        (place ? escapeHtml(place) + " · " : "") +
-        (c ? (Number(c.lat).toFixed(4) + ", " + Number(c.lon).toFixed(4)) : "—") +
+          (years ? escapeHtml(years) + " · " : "") +
+          (place ? escapeHtml(place) + " · " : "") +
+          (c ? (Number(c.lat).toFixed(4) + ", " + Number(c.lon).toFixed(4)) : "—") +
         "</p>";
 
       li.addEventListener("click", () => openMarker(String(p.id)));
@@ -485,17 +530,9 @@
 
       coordsById.set(String(p.id), c);
 
-      const title = personName(p);
-      const place = (p.plats || "").trim();
-      const note = (p.anteckning || "").trim();
-
-      const popupHtml =
-        "<strong>" + escapeHtml(title) + "</strong><br/>" +
-        (place ? ("Plats: " + escapeHtml(place) + "<br/>") : "") +
-        "Koordinater: " + Number(c.lat).toFixed(5) + ", " + Number(c.lon).toFixed(5) +
-        (note ? ("<br/><span style='color:#555'>Anteckning: " + escapeHtml(note.slice(0, 140)) + (note.length > 140 ? "…" : "") + "</span>") : "");
-
+      const popupHtml = buildPopupHtml(p);
       const m = L.marker([c.lat, c.lon]).addTo(markerLayer).bindPopup(popupHtml);
+
       markersById.set(String(p.id), m);
     }
   }
@@ -510,7 +547,6 @@
 
     let drawn = 0;
 
-    // Vi ritar bara FORALDER_BARN, och bara om båda har coords
     for(const r of relations){
       if(!r || r.typ !== "FORALDER_BARN") continue;
 
@@ -522,13 +558,11 @@
       const b = coordsById.get(toId);
       if(!a || !b) continue;
 
-      // Standard Leaflet polyline (ingen färgspec här — enkel)
-      const line = L.polyline([[a.lat, a.lon], [b.lat, b.lon]], {
+      L.polyline([[a.lat, a.lon], [b.lat, b.lon]], {
         weight: 3,
         opacity: 0.75
-      });
+      }).addTo(linkLayer);
 
-      line.addTo(linkLayer);
       drawn++;
     }
 
@@ -560,7 +594,6 @@
     const peopleWithCoords = allPeople.filter(p => !!coordsFromPerson(p));
     const filtered = currentFiltered(peopleWithCoords);
 
-    // Status pills
     setPill(
       pillTree,
       hasActive ? "ok" : (hasTrees ? "warn" : "err"),
