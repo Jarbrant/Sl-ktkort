@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Skapa relation</title>
-  <meta name="description" content="Skapa relationer i aktivt släktträd (localStorage). Förälder–barn + Partner (gift/sambo/särbo/skilda)." />
+  <meta name="description" content="Skapa relationer i aktivt släktträd (localStorage)." />
   <style>
     :root { color-scheme: light; }
     body{
@@ -42,7 +42,6 @@
     .row{ display: grid; gap: 12px; grid-template-columns: 1fr; }
     @media (min-width: 720px){
       .row.two{ grid-template-columns: 1fr 1fr; }
-      .row.three{ grid-template-columns: 1fr 1fr 1fr; }
     }
     .actions{
       display: flex;
@@ -61,7 +60,6 @@
       cursor: pointer;
       text-decoration: none;
     }
-    button:focus, .button-link:focus{ outline: 2px solid #000; outline-offset: 2px; }
     pre{
       background: #f4f4f4;
       padding: 12px;
@@ -70,467 +68,168 @@
       white-space: pre-wrap;
     }
     code{ background: #f4f4f4; padding: 2px 6px; border-radius: 6px; }
-    .hint{ margin-top: 10px; }
     .error{ color: #b00020; font-weight: 700; }
     .ok{ font-weight: 800; }
-
-    .pill{
-      display: inline-block;
-      padding: 2px 8px;
-      border: 1px solid #bbb;
-      border-radius: 999px;
-      font-size: 0.9rem;
-      margin-left: 6px;
-      background: #fafafa;
-    }
-
     .hidden{ display:none !important; }
   </style>
 </head>
 
 <body>
-  <header>
-    <a href="../start.html">← Tillbaka</a>
-    <h1>Skapa relation <span class="pill">localStorage</span></h1>
-    <p class="muted">Skapar relationer i aktivt träd. Stöd: Förälder→Barn och Partner (gift/sambo/särbo/skilda + år).</p>
-  </header>
+<header>
+  <a href="../start.html">← Tillbaka</a>
+  <h1>Skapa relation</h1>
+  <p class="muted">Förälder → barn (max 2 föräldrar per barn). Data sparas i localStorage.</p>
+</header>
 
-  <section class="card" aria-label="Förutsättningar">
-    <h2 style="margin:0 0 8px;">Förutsättning</h2>
-    <p class="muted" style="margin-top:0;">
-      Denna sida läser personer från <strong>localStorage</strong> i valt träd.
-    </p>
+<section class="card">
+  <h2>Relation</h2>
 
-    <div class="actions">
-      <a class="button-link" href="./trees.html">Skapa/Välj träd</a>
-      <a class="button-link" href="./slaktkort.html">Skapa släktkort</a>
-      <a class="button-link" href="./map.html">Öppna karta</a>
-      <button type="button" id="reloadBtn">Ladda om personer</button>
+  <form id="form">
+    <div class="row two">
+      <div>
+        <label for="relationType">Relationstyp *</label>
+        <select id="relationType">
+          <option value="FORALDER_BARN" selected>Förälder → Barn</option>
+        </select>
+      </div>
     </div>
 
-    <p id="loadMsg" class="hint muted" aria-live="polite"></p>
-  </section>
-
-  <section class="card" aria-label="Relation formulär">
-    <form id="form">
-      <div class="row two">
-        <div>
-          <label for="relationType">Relationstyp *</label>
-          <select id="relationType" required>
-            <option value="FORALDER_BARN" selected>Förälder → Barn</option>
-            <option value="PARTNER">Partner (gift/sambo/särbo/skilda)</option>
-          </select>
-        </div>
-
-        <div id="partnerStatusWrap" class="hidden">
-          <label for="partnerStatus">Partnerstatus *</label>
-          <select id="partnerStatus">
-            <option value="GIFT">Gift</option>
-            <option value="SAMBO">Sambo</option>
-            <option value="SARBO">Särbo</option>
-            <option value="SKILDA">Skilda</option>
-          </select>
-        </div>
+    <div class="row two">
+      <div>
+        <label for="aSelect" id="aLabel">Förälder *</label>
+        <select id="aSelect" required>
+          <option value="">Välj…</option>
+        </select>
       </div>
-
-      <div class="row two">
-        <div>
-          <label for="aSelect" id="aLabel">Förälder *</label>
-          <select id="aSelect" required>
-            <option value="" selected>Välj…</option>
-          </select>
-        </div>
-        <div>
-          <label for="bSelect" id="bLabel">Barn *</label>
-          <select id="bSelect" required>
-            <option value="" selected>Välj…</option>
-          </select>
-        </div>
+      <div>
+        <label for="bSelect" id="bLabel">Barn *</label>
+        <select id="bSelect" required>
+          <option value="">Välj…</option>
+        </select>
       </div>
-
-      <div id="partnerYearsWrap" class="row two hidden">
-        <div>
-          <label for="fromYear">Från år (valfritt)</label>
-          <input id="fromYear" type="number" inputmode="numeric" placeholder="t.ex. 1924" />
-        </div>
-        <div>
-          <label for="toYear">Till år (valfritt)</label>
-          <input id="toYear" type="number" inputmode="numeric" placeholder="t.ex. 1938" />
-        </div>
-      </div>
-
-      <div class="actions">
-        <button type="submit">Spara relation</button>
-        <button type="button" id="resetBtn">Rensa</button>
-        <a class="button-link" href="../start.html">Avbryt</a>
-      </div>
-
-      <p id="msg" class="hint muted" aria-live="polite"></p>
-    </form>
-  </section>
-
-  <section class="card" aria-label="Lista relationer">
-    <h2 style="margin:0 0 8px;">Relationer i aktivt träd</h2>
-    <p class="muted" style="margin-top:0;">Visas som JSON (demo) – detta är exakt vad kartan använder.</p>
-
-    <div class="actions">
-      <button type="button" id="listBtn">Hämta relationer</button>
-      <button type="button" id="clearBtn">Töm relationer (aktivt träd)</button>
-      <button type="button" id="copyBtn">Kopiera JSON</button>
     </div>
 
-    <pre><code id="out">[]</code></pre>
-  </section>
+    <div class="actions">
+      <button type="submit">Spara relation</button>
+      <button type="button" id="resetBtn">Rensa</button>
+      <a class="button-link" href="../start.html">Avbryt</a>
+    </div>
 
-  <script>
-    // =========================
-    // Keys (måste matcha slaktkort.html + map.html)
-    // =========================
-    const KEY_TREES  = "slakttradet_trees";
-    const KEY_ACTIVE = "slakttradet_active_tree_id";
-    function cardsKey(treeId){ return "slakttradet_slaktkort_" + String(treeId); }
-    function relKey(treeId){ return "slakttradet_relationer_" + String(treeId); }
+    <p id="msg" class="muted"></p>
+  </form>
+</section>
 
-    // DOM
-    const relationType = document.getElementById("relationType");
-    const partnerStatusWrap = document.getElementById("partnerStatusWrap");
-    const partnerStatus = document.getElementById("partnerStatus");
-    const partnerYearsWrap = document.getElementById("partnerYearsWrap");
-    const fromYear = document.getElementById("fromYear");
-    const toYear = document.getElementById("toYear");
+<section class="card">
+  <h2>Relationer (aktivt träd)</h2>
+  <div class="actions">
+    <button type="button" id="listBtn">Visa</button>
+    <button type="button" id="clearBtn">Töm</button>
+  </div>
+  <pre><code id="out">[]</code></pre>
+</section>
 
-    const aSelect = document.getElementById("aSelect");
-    const bSelect = document.getElementById("bSelect");
-    const aLabel = document.getElementById("aLabel");
-    const bLabel = document.getElementById("bLabel");
+<script>
+  const KEY_TREES  = "slakttradet_trees";
+  const KEY_ACTIVE = "slakttradet_active_tree_id";
+  const cardsKey = id => "slakttradet_slaktkort_" + id;
+  const relKey   = id => "slakttradet_relationer_" + id;
 
-    const form = document.getElementById("form");
-    const msg = document.getElementById("msg");
-    const loadMsg = document.getElementById("loadMsg");
-    const reloadBtn = document.getElementById("reloadBtn");
-    const resetBtn = document.getElementById("resetBtn");
+  const aSelect = document.getElementById("aSelect");
+  const bSelect = document.getElementById("bSelect");
+  const msg = document.getElementById("msg");
+  const out = document.getElementById("out");
 
-    const listBtn = document.getElementById("listBtn");
-    const clearBtn = document.getElementById("clearBtn");
-    const copyBtn = document.getElementById("copyBtn");
-    const out = document.getElementById("out");
+  function loadJson(k,f){ try{const r=localStorage.getItem(k);return r?JSON.parse(r):f}catch{return f}}
+  function saveJson(k,v){ localStorage.setItem(k,JSON.stringify(v)); }
+  function activeTree(){ return localStorage.getItem(KEY_ACTIVE)||""; }
 
-    let persons = [];
-
-    function loadJson(key, fallback) {
-      try {
-        const raw = localStorage.getItem(key);
-        if (!raw) return fallback;
-        return JSON.parse(raw);
-      } catch {
-        return fallback;
-      }
-    }
-
-    function saveJson(key, value) {
-      localStorage.setItem(key, JSON.stringify(value));
-    }
-
-    function getActiveTreeId() {
-      return localStorage.getItem(KEY_ACTIVE) || "";
-    }
-
-    function getActiveTreeName(treeId){
-      const trees = loadJson(KEY_TREES, []);
-      const t = Array.isArray(trees) ? trees.find(x => String(x.id) === String(treeId)) : null;
-      return t?.name ? String(t.name) : String(treeId || "");
-    }
-
-    function makeRelationId() {
-      const s = String(Date.now());
-      return "r" + s.slice(-8);
-    }
-
-    function parseOptionalYear(el) {
-      const raw = String(el.value || "").trim();
-      if (!raw) return null;
-      const n = Number(raw);
-      return Number.isFinite(n) ? n : null;
-    }
-
-    // =========================
-    // AUTOPATCH: barn-count + max 2 föräldrar per barn
-    // =========================
-    function loadRelations(treeId){
-      const rels = loadJson(relKey(treeId), []);
-      return Array.isArray(rels) ? rels : [];
-    }
-
-    function saveRelations(treeId, rels){
-      saveJson(relKey(treeId), rels);
-    }
-
-    function buildChildCountByParentId(rels){
-      const counts = {};
-      for(const r of (Array.isArray(rels) ? rels : [])){
-        if(!r || r.typ !== "FORALDER_BARN") continue;
-        const parentId = String(r.franPersonId || "");
-        if(!parentId) continue;
-        counts[parentId] = (counts[parentId] || 0) + 1;
-      }
-      return counts;
-    }
-
-    function buildParentSetForChild(rels, childId){
-      const set = new Set();
-      for(const r of (Array.isArray(rels) ? rels : [])){
-        if(!r || r.typ !== "FORALDER_BARN") continue;
-        if(String(r.tillPersonId || "") === String(childId)){
-          const pid = String(r.franPersonId || "");
-          if(pid) set.add(pid);
-        }
-      }
-      return set;
-    }
-
-    function labelPerson(p, childCountByParentId) {
-      const name = `${p.fornamn || ""} ${p.efternamn || ""}`.trim() || "(namnlös)";
-      const a = (p.fodelsear ?? "") !== null && (p.fodelsear ?? "") !== "" ? p.fodelsear : "";
-      const b = (p.dodsar ?? "") !== null && (p.dodsar ?? "") !== "" ? p.dodsar : "";
-      const yearText = (a || b) ? ` (${a || "?"}–${b || "?"})` : "";
-      const kids = Number(childCountByParentId?.[p.id] || 0);
-      const kidsText = ` (barn: ${kids})`;
-      return `${name}${yearText}${kidsText} — ${p.id}`;
-    }
-
-    function setOptions(select, items, childCountByParentId) {
-      while (select.options.length > 1) select.remove(1);
-      for (const p of items) {
-        const opt = document.createElement("option");
-        opt.value = p.id;
-        opt.textContent = labelPerson(p, childCountByParentId);
-        select.appendChild(opt);
-      }
-    }
-
-    function setMsg(type, text){
-      msg.innerHTML = type === "error"
-        ? `<span class="error">${text}</span>`
-        : type === "ok"
-          ? `<span class="ok">${text}</span>`
-          : text;
-    }
-
-    function setLoadMsg(type, text){
-      loadMsg.innerHTML = type === "error"
-        ? `<span class="error">${text}</span>`
-        : type === "ok"
-          ? `<span class="ok">${text}</span>`
-          : text;
-    }
-
-    function currentMode(){
-      return relationType.value; // FORALDER_BARN | PARTNER
-    }
-
-    function updateUiForMode(){
-      const mode = currentMode();
-
-      if(mode === "PARTNER"){
-        partnerStatusWrap.classList.remove("hidden");
-        partnerYearsWrap.classList.remove("hidden");
-        aLabel.textContent = "Partner A *";
-        bLabel.textContent = "Partner B *";
-      }else{
-        partnerStatusWrap.classList.add("hidden");
-        partnerYearsWrap.classList.add("hidden");
-        aLabel.textContent = "Förälder *";
-        bLabel.textContent = "Barn *";
-      }
-    }
-
-    function loadPersonsFromLocalStorage(){
-      setLoadMsg("", "Laddar personer…");
-      setMsg("", "");
-      out.textContent = "[]";
-
-      const treeId = getActiveTreeId();
-      if(!treeId){
-        persons = [];
-        setOptions(aSelect, persons, {});
-        setOptions(bSelect, persons, {});
-        setLoadMsg("error", "Inget aktivt träd valt. Gå till Träd och välj ett aktivt träd.");
-        return;
-      }
-
-      const cards = loadJson(cardsKey(treeId), []);
-      persons = (Array.isArray(cards) ? cards : [])
-        .filter(p => p && typeof p.id === "string" && p.id.trim().length > 0);
-
-      // AUTOPATCH: barn-count från relationer i aktivt träd
-      const rels = loadRelations(treeId);
-      const childCountByParentId = buildChildCountByParentId(rels);
-
-      setOptions(aSelect, persons, childCountByParentId);
-      setOptions(bSelect, persons, childCountByParentId);
-
-      const treeName = getActiveTreeName(treeId);
-      if(persons.length === 0){
-        setLoadMsg("error", `Inga personer i aktivt träd: <code>${treeName}</code>. Skapa släktkort först.`);
-      }else{
-        setLoadMsg("ok", `Aktivt träd: <code>${treeName}</code>. Hittade ${persons.length} släktkort.`);
-      }
-    }
-
-    function validateCommon(aId, bId){
-      if(!aId || !bId) return "Du måste välja båda personerna.";
-      if(aId === bId) return "En relation kan inte peka på samma person.";
-      return null;
-    }
-
-    function validatePartnerYears(status, fy, ty){
-      if(fy !== null && !Number.isFinite(fy)) return "Från-år är ogiltigt.";
-      if(ty !== null && !Number.isFinite(ty)) return "Till-år är ogiltigt.";
-      if(fy !== null && ty !== null && fy > ty) return "Från-år kan inte vara senare än Till-år.";
-      return null;
-    }
-
-    function pretty(obj){
-      return JSON.stringify(obj, null, 2);
-    }
-
-    // Events
-    relationType.addEventListener("change", updateUiForMode);
-    reloadBtn.addEventListener("click", loadPersonsFromLocalStorage);
-
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      setMsg("", "");
-
-      const treeId = getActiveTreeId();
-      if(!treeId) return setMsg("error", "Inget aktivt träd valt. Välj träd först.");
-
-      const mode = currentMode();
-      const aId = aSelect.value;
-      const bId = bSelect.value;
-
-      const commonErr = validateCommon(aId, bId);
-      if(commonErr) return setMsg("error", commonErr);
-
-      let rel = null;
-
-      const rels = loadRelations(treeId);
-
-      if(mode === "FORALDER_BARN"){
-        // AUTOPATCH: max 2 föräldrar per barn + ingen dublett
-        const parentSet = buildParentSetForChild(rels, bId);
-
-        if(parentSet.has(String(aId))){
-          return setMsg("error", "Den föräldern är redan kopplad till barnet (dublett).");
-        }
-        if(parentSet.size >= 2){
-          return setMsg("error", "Det här barnet har redan 2 föräldrar. (Max 2 i FAS 2)");
-        }
-
-        rel = {
-          id: makeRelationId(),
-          typ: "FORALDER_BARN",
-          franPersonId: aId,
-          tillPersonId: bId,
-          createdAt: new Date().toISOString()
-        };
-      }else{
-        const status = partnerStatus.value;
-        const fy = parseOptionalYear(fromYear);
-        const ty = parseOptionalYear(toYear);
-
-        const yrErr = validatePartnerYears(status, fy, ty);
-        if(yrErr) return setMsg("error", yrErr);
-
-        const pair = [aId, bId].sort();
-        rel = {
-          id: makeRelationId(),
-          typ: "PARTNER",
-          personAId: pair[0],
-          personBId: pair[1],
-          status: status,         // GIFT | SAMBO | SARBO | SKILDA
-          fromYear: fy,
-          toYear: ty,
-          createdAt: new Date().toISOString()
-        };
-      }
-
-      // Enkel duplikatkontroll (för PARTNER samt extra skydd)
-      const exists = rels.some(r => {
-        if(!r || r.typ !== rel.typ) return false;
-        if(rel.typ === "FORALDER_BARN"){
-          return String(r.franPersonId) === String(rel.franPersonId) &&
-                 String(r.tillPersonId) === String(rel.tillPersonId);
-        }
-        if(rel.typ === "PARTNER"){
-          return String(r.personAId) === String(rel.personAId) &&
-                 String(r.personBId) === String(rel.personBId) &&
-                 String(r.status) === String(rel.status) &&
-                 (r.fromYear ?? null) === (rel.fromYear ?? null) &&
-                 (r.toYear ?? null) === (rel.toYear ?? null);
-        }
-        return false;
-      });
-
-      if(exists){
-        return setMsg("error", "Den relationen finns redan (dublett).");
-      }
-
-      rels.push(rel);
-      saveRelations(treeId, rels);
-
-      setMsg("ok", "Relation sparad i localStorage för aktivt träd.");
-      out.textContent = pretty(rels);
-
-      // AUTOPATCH: uppdatera barn-count i dropdown direkt efter spara
-      loadPersonsFromLocalStorage();
+  function buildChildCount(rels){
+    const c={};
+    rels.filter(r=>r.typ==="FORALDER_BARN").forEach(r=>{
+      c[r.franPersonId]=(c[r.franPersonId]||0)+1;
     });
+    return c;
+  }
 
-    resetBtn.addEventListener("click", () => {
-      form.reset();
-      updateUiForMode();
-      setMsg("", "");
+  function parentsOfChild(rels, childId){
+    return new Set(
+      rels.filter(r=>r.typ==="FORALDER_BARN" && r.tillPersonId===childId)
+          .map(r=>r.franPersonId)
+    );
+  }
+
+  function label(p,count){
+    const n=`${p.fornamn||""} ${p.efternamn||""}`.trim();
+    return `${n} (barn: ${count||0})`;
+  }
+
+  function loadPersons(){
+    const t=activeTree();
+    if(!t){ msg.textContent="Välj ett träd först."; return; }
+
+    const cards=loadJson(cardsKey(t),[]);
+    const rels =loadJson(relKey(t),[]);
+    const counts=buildChildCount(rels);
+
+    aSelect.innerHTML='<option value="">Välj…</option>';
+    bSelect.innerHTML='<option value="">Välj…</option>';
+
+    cards.forEach(p=>{
+      if(!p.id) return;
+      const o1=document.createElement("option");
+      o1.value=p.id;
+      o1.textContent=label(p,counts[p.id]);
+      aSelect.appendChild(o1);
+
+      const o2=document.createElement("option");
+      o2.value=p.id;
+      o2.textContent=`${p.fornamn||""} ${p.efternamn||""}`.trim();
+      bSelect.appendChild(o2);
     });
+  }
 
-    listBtn.addEventListener("click", () => {
-      const treeId = getActiveTreeId();
-      if(!treeId){
-        out.textContent = "[]";
-        return setMsg("error", "Inget aktivt träd valt.");
-      }
-      const rels = loadRelations(treeId);
-      out.textContent = pretty(rels);
-      setMsg("ok", `Hämtade ${rels.length} relationer från aktivt träd.`);
+  document.getElementById("form").addEventListener("submit",e=>{
+    e.preventDefault();
+    const t=activeTree();
+    if(!t) return;
+
+    const a=aSelect.value,b=bSelect.value;
+    if(!a||!b||a===b){ msg.textContent="Ogiltigt val."; return; }
+
+    const rels=loadJson(relKey(t),[]);
+    const parents=parentsOfChild(rels,b);
+    if(parents.has(a)) return msg.textContent="Redan kopplad.";
+    if(parents.size>=2) return msg.textContent="Barnet har redan 2 föräldrar.";
+
+    rels.push({
+      id:"r"+Date.now(),
+      typ:"FORALDER_BARN",
+      franPersonId:a,
+      tillPersonId:b,
+      createdAt:new Date().toISOString()
     });
+    saveJson(relKey(t),rels);
+    msg.textContent="Relation sparad.";
+    out.textContent=JSON.stringify(rels,null,2);
+    loadPersons();
+  });
 
-    clearBtn.addEventListener("click", () => {
-      const treeId = getActiveTreeId();
-      if(!treeId){
-        out.textContent = "[]";
-        return setMsg("error", "Inget aktivt träd valt.");
-      }
-      saveRelations(treeId, []);
-      out.textContent = "[]";
-      setMsg("ok", "Tömde relationer i aktivt träd.");
-      loadPersonsFromLocalStorage();
-    });
+  document.getElementById("listBtn").onclick=()=>{
+    const t=activeTree();
+    out.textContent=JSON.stringify(loadJson(relKey(t),[]),null,2);
+  };
+  document.getElementById("clearBtn").onclick=()=>{
+    const t=activeTree();
+    saveJson(relKey(t),[]);
+    out.textContent="[]";
+    loadPersons();
+  };
+  document.getElementById("resetBtn").onclick=()=>{
+    document.getElementById("form").reset();
+    msg.textContent="";
+  };
 
-    copyBtn.addEventListener("click", async () => {
-      const text = out.textContent.trim();
-      if(!text || text === "[]"){
-        return setMsg("error", "Inget att kopiera. Hämta relationer eller skapa en relation först.");
-      }
-      try{
-        await navigator.clipboard.writeText(text);
-        setMsg("ok", "Kopierat.");
-      }catch{
-        setMsg("error", "Kunde inte kopiera automatiskt. Markera texten manuellt och kopiera.");
-      }
-    });
-
-    // Start
-    updateUiForMode();
-    loadPersonsFromLocalStorage();
-  </script>
+  loadPersons();
+</script>
 </body>
 </html>
