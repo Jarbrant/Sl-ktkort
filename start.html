@@ -145,7 +145,8 @@
   </article>
 
   <article class="card">
-    <h2 id="relsTitle">🔗 Steg 2 – Relationer</h2>
+    <!-- Patch: konsekvent default-rubrik (JS kommer ändå ändra beroende på läge) -->
+    <h2 id="relsTitle">🔗 Steg 3 – Relationer</h2>
     <p class="small">Koppla förälder → barn (max 2 föräldrar per barn).</p>
     <div class="actions">
       <a class="btn disabled" id="goRels" href="./app/create-relation.html" aria-disabled="true" tabindex="-1">Öppna Relationer</a>
@@ -154,7 +155,7 @@
   </article>
 
   <article class="card">
-    <h2 id="mapTitle">🗺️ Steg 3 – Karta</h2>
+    <h2 id="mapTitle">🗺️ Steg 4 – Karta</h2>
     <p class="small">Visa personer med koordinater i aktivt träd.</p>
     <div class="actions">
       <a class="btn disabled" id="goMap" href="./app/map.html" aria-disabled="true" tabindex="-1">Öppna Karta</a>
@@ -168,7 +169,6 @@
   (function authGuard(){
     try{
       if(sessionStorage.getItem("demo_auth") !== "1"){
-        // om du inte vill ha guard: kommentera bort nästa rad
         window.location.href = "./index.html";
       }
     }catch{}
@@ -201,10 +201,27 @@
   const goMap = document.getElementById("goMap");
 
   function safeParse(raw, fallback){ try{ return JSON.parse(raw); }catch{ return fallback; } }
-  function loadJson(key, fallback){
-    const raw = localStorage.getItem(key);
-    return raw ? safeParse(raw, fallback) : fallback;
+
+  function hasLocalStorage(){
+    try{
+      const k = "__ls_test__";
+      localStorage.setItem(k, "1");
+      localStorage.removeItem(k);
+      return true;
+    }catch{
+      return false;
+    }
   }
+
+  function loadJson(key, fallback){
+    try{
+      const raw = localStorage.getItem(key);
+      return raw ? safeParse(raw, fallback) : fallback;
+    }catch{
+      return fallback;
+    }
+  }
+
   function setDisabled(el, disabled){
     if(disabled){
       el.classList.add("disabled");
@@ -217,7 +234,10 @@
     }
   }
 
-  function activeTreeId(){ return localStorage.getItem(KEY_ACTIVE) || ""; }
+  function activeTreeId(){
+    try{ return localStorage.getItem(KEY_ACTIVE) || ""; }catch{ return ""; }
+  }
+
   function activeTreeLabel(){
     const id = activeTreeId();
     if(!id) return "—";
@@ -225,16 +245,37 @@
     const t = Array.isArray(trees) ? trees.find(x => String(x.id) === String(id)) : null;
     return t ? (t.name || t.id) : id;
   }
+
   function countPersons(treeId){
     const arr = loadJson(cardsKey(treeId), []);
     return Array.isArray(arr) ? arr.length : 0;
   }
+
   function countRelations(treeId){
     const arr = loadJson(relKey(treeId), []);
     return Array.isArray(arr) ? arr.length : 0;
   }
 
+  function setNote(html){
+    noteBox.hidden = false;
+    noteBox.innerHTML = html;
+  }
+
+  function clearNote(){
+    noteBox.hidden = true;
+    noteBox.textContent = "";
+  }
+
   function render(){
+    if(!hasLocalStorage()){
+      setNote("<strong>⚠️ localStorage är avstängt:</strong> Sidan kan inte spara eller läsa data i denna webbläsarmiljö (t.ex. privat läge).");
+      // Lås allt som kräver sparad data
+      setDisabled(goPeople, true);
+      setDisabled(goRels, true);
+      setDisabled(goMap, true);
+      return;
+    }
+
     const trees = loadJson(KEY_TREES, []);
     const hasTrees = Array.isArray(trees) && trees.length > 0;
 
@@ -248,25 +289,23 @@
 
     pillTree.className = "pill " + (hasActive ? "ok" : (hasTrees ? "warn" : "err"));
     pillTree.innerHTML = "Aktivt träd: <strong>" + (hasActive ? activeTreeLabel() : "—") + "</strong>";
+
     pillPeople.innerHTML = "Personer: <strong>" + peopleCount + "</strong>";
     pillRels.innerHTML = "Relationer: <strong>" + relsCount + "</strong>";
+
     pillMode.className = "pill " + (firstTime ? "warn" : "ok");
     pillMode.innerHTML = "Läge: <strong>" + (firstTime ? "Första gången" : "Återvändare") + "</strong>";
 
     if(!hasTrees){
-      noteBox.hidden = false;
-      noteBox.innerHTML = "<strong>🚩 Inga träd sparade:</strong> Börja i <a href='./app/trees.html'><code>Träd</code></a> och skapa ett träd.";
+      setNote("<strong>🚩 Inga träd sparade:</strong> Börja i <a href='./app/trees.html'><code>Träd</code></a> och skapa ett träd.");
     }else if(!hasActive){
-      noteBox.hidden = false;
-      noteBox.innerHTML = "<strong>🚩 Inget aktivt träd:</strong> Välj ett träd i <a href='./app/trees.html'><code>Träd</code></a>.";
+      setNote("<strong>🚩 Inget aktivt träd:</strong> Välj ett träd i <a href='./app/trees.html'><code>Träd</code></a>.");
     }else if(peopleCount < 2){
-      noteBox.hidden = false;
-      noteBox.innerHTML = "<strong>Tips:</strong> Skapa minst <strong>2 personer</strong> i <a href='./app/slaktkort.html'><code>Personer</code></a> innan relationer.";
+      setNote("<strong>Tips:</strong> Skapa minst <strong>2 personer</strong> i <a href='./app/slaktkort.html'><code>Personer</code></a> innan relationer.");
     }else{
-      noteBox.hidden = true;
+      clearNote();
     }
 
-    // Renummering och text beroende på första gången / återvändare
     treeTitle.textContent  = firstTime ? "🌳 Steg 1 – Träd" : "🌳 Träd (kontext)";
     treeText.textContent   = firstTime
       ? "Första gången: skapa/välj ett träd så resten av sidorna vet var de ska spara."
@@ -279,14 +318,17 @@
     // Enable/disable knappar
     setDisabled(goPeople, !hasActive);
     setDisabled(goRels, !(hasActive && peopleCount >= 2));
+
+    // Karta: kräver minst 1 person idag. (Senare kan du kräva koordinater.)
     setDisabled(goMap,  !(hasActive && peopleCount >= 1));
 
-    // Raderna under korten
     treeLine.textContent = hasActive ? ("Aktivt: " + activeTreeLabel()) : "Välj ett aktivt träd först.";
     peopleLine.textContent = !hasActive ? "Välj träd först."
       : (peopleCount === 0 ? "Skapa första personen." : (peopleCount < 2 ? "Skapa minst en person till." : "Klart, du kan skapa relationer."));
+
     relsLine.textContent = !(hasActive && peopleCount >= 2) ? "Skapa minst 2 personer först."
       : (relsCount === 0 ? "Skapa första relationen." : ("Du har " + relsCount + " relation(er)."));
+
     mapLine.textContent = !hasActive ? "Välj träd först." : "Kartan blir bättre om personer har koordinater.";
   }
 
