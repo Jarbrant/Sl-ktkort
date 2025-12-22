@@ -1,100 +1,364 @@
-
 <!doctype html>
 <html lang="sv">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Släktträdet – Adminpanel</title>
+  <title>Start – Släktkort</title>
+  <meta name="description" content="Start och röd tråd för Släktkort (localStorage-first)." />
   <style>
-    body { font-family: system-ui, Arial, sans-serif; margin: 0; padding: 32px 20px; background:#fafafa; color:#111; }
-    .container { max-width: 880px; margin: 0 auto; }
-    h1 { margin: 0 0 6px; font-size: 1.6rem; }
-    .muted { color:#555; margin-bottom: 24px; }
-    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:16px; }
-    .card { background:#fff; border:1px solid #ddd; border-radius:14px; padding:18px; display:flex; flex-direction:column; gap:12px; }
-    .card h2 { margin:0; font-size:1.1rem; }
-    .card p { margin:0; color:#555; font-size:0.95rem; line-height:1.4; }
-    .card a { margin-top:auto; display:inline-block; text-decoration:none; border:1px solid #333; border-radius:10px; padding:10px 14px; color:#111; font-weight:600; background:#fff; width:fit-content; }
-    .card a:hover { background:#f0f0f0; }
-
-    .card.status { border-left: 6px solid #b00020; }
-    .card.status a { border-color:#b00020; }
-
-    .card.primary {
-      border-left: 6px solid #2b5cff;
+    :root { color-scheme: light; }
+    body{
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      line-height: 1.5;
+      margin: 0;
+      padding: 24px;
+      max-width: 980px;
+      margin-inline: auto;
+      background: #fff;
+      color: #111;
     }
-    .card.primary a {
-      border-color:#2b5cff;
-      font-weight:800;
+    a { color: inherit; }
+    header{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    h1{ margin: 0 0 6px; font-size: 1.6rem; }
+    p{ margin: 0 0 12px; }
+    .muted{ color:#555; }
+
+    .topbar{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin: 10px 0 0;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 8px 10px;
+      border: 1px solid #ddd;
+      border-radius: 999px;
+      background: #fafafa;
+      font-size: .95rem;
+    }
+    .pill strong{ font-weight: 800; }
+    .pill.ok{ border-color:#cfe8cf; background:#f5fff5; }
+    .pill.warn{ border-color:#ffe1a6; background:#fff9ee; }
+
+    .grid{
+      display:grid;
+      gap: 14px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 860px){
+      .grid{ grid-template-columns: 1fr 1fr; }
     }
 
-    footer { margin-top: 40px; font-size:0.9rem; color:#666; }
-    code { background:#eee; padding:2px 6px; border-radius:6px; }
+    .card{
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      padding: 16px;
+      background: #fff;
+    }
+    .card h2{
+      margin: 0 0 6px;
+      font-size: 1.15rem;
+    }
+    .card .desc{ margin: 0 0 12px; color:#555; }
+    .stepTag{
+      display:inline-block;
+      font-weight: 800;
+      font-size: .85rem;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid #ddd;
+      background:#fafafa;
+      margin-bottom: 10px;
+    }
+    .stepTag.primary{ border-color:#cfe8cf; background:#f5fff5; }
+    .stepTag.optional{ border-color:#d9e6ff; background:#f5f9ff; }
+
+    .actions{
+      display:flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 10px;
+    }
+    .btn, button{
+      display:inline-block;
+      padding: 10px 12px;
+      border: 1px solid #333;
+      border-radius: 10px;
+      background: #fff;
+      font: inherit;
+      cursor: pointer;
+      text-decoration:none;
+    }
+    .btn.secondary{
+      border-color:#bbb;
+      color:#111;
+    }
+    .btn.disabled{
+      opacity: .45;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .note{
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid #ffe1a6;
+      background: #fff9ee;
+    }
+    .note strong{ font-weight: 900; }
+
+    footer{
+      margin-top: 18px;
+      color:#666;
+      font-size: .95rem;
+    }
+    hr{ border:none; border-top:1px solid #eee; margin: 18px 0; }
   </style>
 </head>
+
 <body>
-  <div class="container">
-    <h1>Släktträdet – Adminpanel</h1>
-    <p class="muted">
-      Intern kontrollpanel. I GitHub Pages-läge kör vi lokalt i <code>localStorage</code>.
-      (Backend/Codespaces kan kopplas på senare.)
-    </p>
+<header>
+  <div>
+    <h1>Släktkort – Start</h1>
+    <p class="muted">Röd tråd: <strong>Träd → Personer → Relationer → Karta</strong> (localStorage-first).</p>
 
-    <div class="grid">
-      <!-- STATUS / START -->
-      <div class="card status">
-        <h2>🚩 Inga träd sparade?</h2>
-        <p>
-          Gå till <strong>Skapa/Välj träd</strong> och skapa ett träd först.
-          Det är grunden för personer, relationer och vyer.
-        </p>
-        <a href="./app/trees.html">Skapa / välj släktträd</a>
-      </div>
-
-      <!-- NY: HELHETSVY -->
-      <div class="card primary">
-        <h2>🗺️ Släktkarta (hel vy)</h2>
-        <p>
-          Visa hela släkten i aktivt träd på karta.
-          Flaggar med namn, klick → relationer och detaljer.
-        </p>
-        <a href="./app/map.html">Öppna släktkartan</a>
-      </div>
-
-      <div class="card">
-        <h2>🌳 Släktträd</h2>
-        <p>Skapa, välj och byt aktivt släktträd.</p>
-        <a href="./app/trees.html">Öppna träd</a>
-      </div>
-
-      <div class="card">
-        <h2>👤 Släktkort</h2>
-        <p>Skapa personer i valt träd (namn, årtal, plats, anteckning, koordinater).</p>
-        <a href="./app/slaktkort.html">Öppna släktkort</a>
-      </div>
-
-      <div class="card">
-        <h2>🔗 Relationer</h2>
-        <p>Koppla personer (förälder → barn).</p>
-        <a href="./app/create-relation.html">Skapa relation</a>
-      </div>
-
-      <div class="card">
-        <h2>📍 Platsväljare</h2>
-        <p>Välj plats i karta och spara lat/lon till släktkort.</p>
-        <a href="./app/place-picker.html">Öppna platsväljare</a>
-      </div>
-
-      <div class="card">
-        <h2>🧬 Trädvy (struktur)</h2>
-        <p>Visuell trädstruktur (demo nu, byggs ut senare).</p>
-        <a href="./app/tree.html">Öppna trädvy</a>
-      </div>
-    </div>
-
-    <footer>
-      <p>Status: <strong>GitHub Pages</strong> (statisk) • Data i webbläsaren • Backend valfritt senare.</p>
-    </footer>
+    <nav class="topbar" aria-label="Navigation">
+      <a class="btn secondary" href="start.html">Start</a>
+      <a class="btn secondary" href="app/trees.html">Träd</a>
+      <a class="btn secondary" href="app/slaktkort.html">Personer</a>
+      <a class="btn secondary" href="app/create-relation.html">Relationer</a>
+      <a class="btn secondary" href="app/map.html">Karta</a>
+    </nav>
   </div>
+
+  <div class="actions">
+    <button id="logoutBtn" class="btn secondary" type="button" title="Estetisk utloggning">Logga ut</button>
+  </div>
+</header>
+
+<section id="statusRow" class="actions" aria-label="Status">
+  <span id="pillTree" class="pill warn">Aktivt träd: <strong>—</strong></span>
+  <span id="pillPeople" class="pill">Personer: <strong>0</strong></span>
+  <span id="pillRels" class="pill">Relationer: <strong>0</strong></span>
+</section>
+
+<div id="noTreeNote" class="note" hidden>
+  <strong>🚩 Inga träd sparade/valt:</strong> Börja med <a href="app/trees.html">Träd</a> och skapa eller välj ett aktivt träd.
+</div>
+
+<hr />
+
+<section class="grid" aria-label="Flöde">
+  <!-- STEG 1 -->
+  <article class="card">
+    <div class="stepTag primary">STEG 1</div>
+    <h2>🌳 Träd</h2>
+    <p class="desc">Skapa eller välj ett aktivt träd. All data (personer, relationer, karta) kopplas till det aktiva trädet.</p>
+    <div class="actions">
+      <a class="btn" href="app/trees.html">Öppna Träd</a>
+      <button class="btn secondary" type="button" id="refreshBtn1">Uppdatera status</button>
+    </div>
+  </article>
+
+  <!-- STEG 2 -->
+  <article class="card">
+    <div class="stepTag">STEG 2</div>
+    <h2>👤 Personer (Släktkort)</h2>
+    <p class="desc">Lägg in personer i valt träd (namn, årtal, plats, anteckning, koordinater).</p>
+    <div class="actions">
+      <a id="linkPeople" class="btn" href="app/slaktkort.html">Öppna Personer</a>
+      <a class="btn secondary" href="app/place-picker.html">Välj plats (karta)</a>
+    </div>
+    <p class="muted" id="hintPeople" style="margin:10px 0 0;"></p>
+  </article>
+
+  <!-- STEG 3 -->
+  <article class="card">
+    <div class="stepTag">STEG 3</div>
+    <h2>🔗 Relationer</h2>
+    <p class="desc">Koppla personer (förälder → barn). Rekommenderat efter att du lagt in minst två personer.</p>
+    <div class="actions">
+      <a id="linkRels" class="btn" href="app/create-relation.html">Öppna Relationer</a>
+      <a class="btn secondary" href="app/map.html">Visa på karta</a>
+    </div>
+    <p class="muted" id="hintRels" style="margin:10px 0 0;"></p>
+  </article>
+
+  <!-- STEG 4 -->
+  <article class="card">
+    <div class="stepTag optional">STEG 4 (valfri vy)</div>
+    <h2>🗺️ Karta (hel vy)</h2>
+    <p class="desc">Visa personer med koordinater på karta. Bra som “resultatvy” när grunden (träd + personer + relationer) finns.</p>
+    <div class="actions">
+      <a id="linkMap" class="btn" href="app/map.html">Öppna Karta</a>
+      <a class="btn secondary" href="app/place-picker.html">Plats-picker</a>
+    </div>
+    <p class="muted" id="hintMap" style="margin:10px 0 0;"></p>
+  </article>
+</section>
+
+<footer>
+  Status: GitHub Pages (statisk) • Data i webbläsaren (localStorage) • Inloggning är estetisk.
+</footer>
+
+<script>
+  // Estetisk "auth" (för flow-känsla, inte säkerhet)
+  (function authGuard(){
+    try{
+      if(sessionStorage.getItem("demo_auth") !== "1"){
+        // Skicka till login
+        window.location.href = "index.html";
+      }
+    }catch{
+      // Om sessionStorage är låst: låt sidan fungera ändå
+    }
+  })();
+
+  const KEY_ACTIVE = "slakttradet_active_tree_id";
+  const cardsKey = (id) => "slakttradet_slaktkort_" + id;
+  const relKey   = (id) => "slakttradet_relationer_" + id;
+  const treesKey = "slakttradet_trees";
+
+  const pillTree   = document.getElementById("pillTree");
+  const pillPeople = document.getElementById("pillPeople");
+  const pillRels   = document.getElementById("pillRels");
+  const noTreeNote = document.getElementById("noTreeNote");
+
+  const linkPeople = document.getElementById("linkPeople");
+  const linkRels   = document.getElementById("linkRels");
+  const linkMap    = document.getElementById("linkMap");
+
+  const hintPeople = document.getElementById("hintPeople");
+  const hintRels   = document.getElementById("hintRels");
+  const hintMap    = document.getElementById("hintMap");
+
+  function loadJson(k, fallback){
+    try{
+      const raw = localStorage.getItem(k);
+      return raw ? JSON.parse(raw) : fallback;
+    }catch{
+      return fallback;
+    }
+  }
+
+  function getActiveTreeId(){
+    try{ return localStorage.getItem(KEY_ACTIVE) || ""; }
+    catch{ return ""; }
+  }
+
+  function hasAnyTrees(){
+    const trees = loadJson(treesKey, []);
+    return Array.isArray(trees) && trees.length > 0;
+  }
+
+  function countPeople(treeId){
+    const cards = loadJson(cardsKey(treeId), []);
+    if(!Array.isArray(cards)) return 0;
+    return cards.filter(p => p && p.id).length;
+  }
+
+  function countRelations(treeId){
+    const rels = loadJson(relKey(treeId), []);
+    if(!Array.isArray(rels)) return 0;
+    return rels.length;
+  }
+
+  function countPeopleWithCoords(treeId){
+    const cards = loadJson(cardsKey(treeId), []);
+    if(!Array.isArray(cards)) return 0;
+    return cards.filter(p => {
+      if(!p || !p.id) return false;
+      const lat = Number(p.lat ?? p.latitude ?? p.coords?.lat);
+      const lon = Number(p.lon ?? p.lng ?? p.longitude ?? p.coords?.lon);
+      return Number.isFinite(lat) && Number.isFinite(lon);
+    }).length;
+  }
+
+  function setDisabled(anchorEl, disabled){
+    if(disabled){
+      anchorEl.classList.add("disabled");
+      anchorEl.setAttribute("aria-disabled", "true");
+      anchorEl.setAttribute("tabindex", "-1");
+    }else{
+      anchorEl.classList.remove("disabled");
+      anchorEl.removeAttribute("aria-disabled");
+      anchorEl.removeAttribute("tabindex");
+    }
+  }
+
+  function refresh(){
+    const treeId = getActiveTreeId();
+    const anyTrees = hasAnyTrees();
+
+    const people = treeId ? countPeople(treeId) : 0;
+    const rels   = treeId ? countRelations(treeId) : 0;
+    const coords = treeId ? countPeopleWithCoords(treeId) : 0;
+
+    // Tree pill
+    const treeLabel = treeId ? treeId : "—";
+    pillTree.innerHTML = 'Aktivt träd: <strong>' + treeLabel + '</strong>';
+    pillTree.classList.remove("ok","warn");
+    pillTree.classList.add(treeId ? "ok" : "warn");
+
+    // People / rels
+    pillPeople.innerHTML = 'Personer: <strong>' + people + '</strong>';
+    pillRels.innerHTML   = 'Relationer: <strong>' + rels + '</strong>';
+
+    // Note
+    noTreeNote.hidden = !!treeId || anyTrees; // om det finns träd men inget valt, visa inte "inga träd sparade" som hård sanning
+    if(!treeId){
+      // Om det finns träd men inget valt: visa en mjukare hint
+      if(anyTrees){
+        noTreeNote.hidden = false;
+        noTreeNote.innerHTML = '<strong>🚩 Inget aktivt träd valt:</strong> Gå till <a href="app/trees.html">Träd</a> och välj ett aktivt träd.';
+      }else{
+        noTreeNote.hidden = false;
+        noTreeNote.innerHTML = '<strong>🚩 Inga träd sparade:</strong> Börja med <a href="app/trees.html">Träd</a> och skapa ett träd.';
+      }
+    }
+
+    // Locking (UX)
+    const lockPeople = !treeId;
+    const lockRels = !treeId || people < 2;
+    const lockMap  = !treeId || coords < 1;
+
+    setDisabled(linkPeople, lockPeople);
+    setDisabled(linkRels, lockRels);
+    setDisabled(linkMap,  lockMap);
+
+    hintPeople.textContent = lockPeople
+      ? "Först: välj/skapa ett aktivt träd."
+      : "Klart: lägg till personer i det aktiva trädet.";
+
+    hintRels.textContent = lockRels
+      ? (!treeId ? "Först: välj/skapa ett aktivt träd." : "Lägg till minst 2 personer för att skapa relationer.")
+      : "Klart: nu kan du koppla Förälder → Barn.";
+
+    hintMap.textContent = lockMap
+      ? (!treeId ? "Först: välj/skapa ett aktivt träd." : "Lägg till minst 1 person med koordinater för att kartan ska bli meningsfull.")
+      : "Klart: nu kan du se personer på karta.";
+  }
+
+  document.getElementById("refreshBtn1").addEventListener("click", refresh);
+
+  document.getElementById("logoutBtn").addEventListener("click", () => {
+    try{ sessionStorage.removeItem("demo_auth"); }catch{}
+    window.location.href = "index.html";
+  });
+
+  refresh();
+</script>
 </body>
 </html>
