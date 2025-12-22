@@ -7,7 +7,35 @@
   <meta name="description" content="Skapa och välj aktivt släktträd (localStorage)." />
 
   <style>
-    :root { color-scheme: light; }
+    :root{
+      color-scheme: light;
+
+      /* Samma typ av lugna toner som din start.html (varm/grå + mild grön) */
+      --bg: #ffffff;
+      --text: #111111;
+      --muted: #555555;
+
+      --border: #eaeaea;
+      --card: #ffffff;
+      --shadow: 0 8px 28px rgba(0,0,0,.05);
+
+      --pill-bg: #fafafa;
+      --pill-border: #e6e6e6;
+
+      --warn-bg: #fff9ee;
+      --warn-border: #ffe1a6;
+
+      --ok-bg: #f5fff5;
+      --ok-border: #cfe8cf;
+
+      /* Ljusgrön markering (dämpad) */
+      --active-text: #1f7a3f;
+      --active-bg: #f3fbf5;
+      --active-border: #cfe8cf;
+
+      --focus: rgba(0,0,0,.18);
+    }
+
     body{
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       line-height: 1.5;
@@ -15,10 +43,12 @@
       padding: 24px;
       max-width: 980px;
       margin-inline: auto;
-      background: #fff;
-      color: #111;
+      background: var(--bg);
+      color: var(--text);
     }
+
     a{ color: inherit; text-decoration: none; }
+
     header{
       display:flex;
       align-items:flex-start;
@@ -26,9 +56,10 @@
       gap: 12px;
       margin-bottom: 18px;
     }
-    h1{ margin: 0 0 6px; font-size: 1.6rem; }
+
+    h1{ margin: 0 0 6px; font-size: 1.6rem; letter-spacing:-0.01em; }
     p{ margin: 0 0 12px; }
-    .muted{ color:#555; }
+    .muted{ color: var(--muted); }
 
     .topbar{
       display:flex;
@@ -37,11 +68,12 @@
       align-items:center;
       margin: 10px 0 0;
     }
+
     .btn, button{
       display:inline-block;
       padding: 10px 12px;
-      border: 1px solid #333;
-      border-radius: 10px;
+      border: 1px solid #bbb;
+      border-radius: 12px;
       background: #fff;
       font: inherit;
       cursor: pointer;
@@ -49,16 +81,12 @@
     }
     .btn.secondary{
       border-color:#bbb;
-      color:#111;
+      color: var(--text);
     }
-    .btn.danger{
-      border-color:#b00020;
-      color:#b00020;
-    }
-    .btn.disabled{
-      opacity: .45;
-      cursor: not-allowed;
-      pointer-events: none;
+    .btn:focus-visible, button:focus-visible, a:focus-visible{
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+      border-radius: 12px;
     }
 
     .pillRow{
@@ -73,21 +101,22 @@
       align-items:center;
       gap:8px;
       padding: 8px 10px;
-      border: 1px solid #ddd;
+      border: 1px solid var(--pill-border);
       border-radius: 999px;
-      background: #fafafa;
+      background: var(--pill-bg);
       font-size: .95rem;
+      white-space: nowrap;
     }
     .pill strong{ font-weight: 900; }
-    .pill.ok{ border-color:#cfe8cf; background:#f5fff5; }
-    .pill.warn{ border-color:#ffe1a6; background:#fff9ee; }
+    .pill.ok{ border-color: var(--ok-border); background: var(--ok-bg); }
+    .pill.warn{ border-color: var(--warn-border); background: var(--warn-bg); }
 
     .note{
       margin: 0 0 18px;
-      padding: 12px;
-      border-radius: 12px;
-      border: 1px solid #ffe1a6;
-      background: #fff9ee;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--warn-border);
+      background: var(--warn-bg);
     }
     .note strong{ font-weight: 900; }
 
@@ -101,23 +130,25 @@
     }
 
     .card{
-      border: 1px solid #ddd;
-      border-radius: 12px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
       padding: 16px;
-      background: #fff;
+      background: var(--card);
+      box-shadow: var(--shadow);
     }
     .card h2{
       margin: 0 0 6px;
       font-size: 1.15rem;
+      letter-spacing:-0.01em;
     }
-    .small{ font-size: .95rem; color:#555; margin: 0 0 10px; }
+    .small{ font-size: .95rem; color: var(--muted); margin: 0 0 10px; }
 
-    label{ display:block; margin: 10px 0 6px; font-weight: 700; }
-    input, select{
+    label{ display:block; margin: 10px 0 6px; font-weight: 800; }
+    input{
       width: 100%;
       box-sizing: border-box;
       padding: 10px;
-      border-radius: 10px;
+      border-radius: 12px;
       border: 1px solid #bbb;
       font: inherit;
       background: #fff;
@@ -132,18 +163,102 @@
     }
     .row > *{ flex: 1; min-width: 160px; }
 
-    pre{
-      background:#f4f4f4;
-      padding: 12px;
-      border-radius: 12px;
-      overflow:auto;
-      white-space: pre-wrap;
-      margin: 10px 0 0;
-    }
-    code{ background:#f4f4f4; padding: 2px 6px; border-radius: 6px; }
+    .msg{ margin: 10px 0 0; color: var(--muted); }
+    .msg strong{ color: var(--text); }
 
-    .msg{ margin: 10px 0 0; color:#555; }
-    .msg strong{ color:#111; }
+    /* ---------- Trädlista (kryssruta + ljusgrön aktiv markering) ---------- */
+    .treeList{
+      margin: 10px 0 0;
+      padding: 0;
+      list-style: none;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    .treeRow{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      padding: 12px 12px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: #fff;
+      cursor:pointer;
+      transition: background .12s ease, transform .12s ease;
+    }
+    .treeRow:hover{
+      background:#fcfcfc;
+      transform: translateY(-1px);
+    }
+    .treeRow.active{
+      border-color: var(--active-border);
+      background: var(--active-bg);
+    }
+
+    /* Visuell "kryssruta" (men radio-beteende) */
+    .check{
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      border: 1px solid #bbb;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      flex: 0 0 auto;
+      background:#fff;
+      color: transparent;
+      font-weight: 900;
+      line-height: 1;
+    }
+    .treeRow.active .check{
+      border-color: var(--active-border);
+      background: #fff;
+      color: var(--active-text);
+    }
+
+    .treeMain{ min-width:0; flex:1; }
+    .treeName{
+      margin:0;
+      font-weight: 950;
+      letter-spacing:-0.01em;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .treeRow.active .treeName{ color: var(--active-text); }
+
+    .treeMeta{
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: .95rem;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+
+    .emptyBox{
+      border: 1px dashed var(--border);
+      border-radius: 16px;
+      padding: 12px;
+      color: var(--muted);
+      background: #fff;
+    }
+
+    .continueWrap{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-top: 12px;
+    }
+    .btn.disabled{
+      opacity: .45;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    code{ background:#f4f4f4; padding: 2px 6px; border-radius: 8px; }
 
     footer{
       margin-top: 18px;
@@ -156,103 +271,84 @@
 <body>
 <header>
   <div>
-    <h1>🌳 Träd – Skapa & välj</h1>
+    <h1>🌳 Träd</h1>
     <p class="muted">
-      GitHub Pages-läge: allt sparas lokalt i <code>localStorage</code>. Välj ett “aktivt träd” som resten av sidorna använder.
+      GitHub Pages-läge: allt sparas lokalt i <code>localStorage</code>. Välj ett träd som resten av sidorna använder.
     </p>
 
-    <!-- NAV (matchar din nya start.html) -->
     <nav class="topbar" aria-label="Navigation">
-      <a class="btn secondary" href="start.html">Start</a>
-
-      <!-- Om dina filer ligger i root: byt dessa till rätt filer -->
-      <a class="btn secondary" href="trees.html">Träd</a>
-      <a class="btn secondary" href="slaktkort.html">Personer</a>
-      <a class="btn secondary" href="create-relation.html">Relationer</a>
-      <a class="btn secondary" href="map.html">Karta</a>
+      <a class="btn secondary" href="../start.html">Start</a>
+      <a class="btn secondary" href="./trees.html" aria-current="page">Träd</a>
+      <a class="btn secondary" href="./slaktkort.html">Personer</a>
+      <a class="btn secondary" href="./create-relation.html">Relationer</a>
+      <a class="btn secondary" href="./map.html">Karta</a>
     </nav>
   </div>
 
   <div class="row" style="justify-content:flex-end; max-width: 320px;">
-    <button id="logoutBtn" class="btn secondary" type="button" title="Estetisk utloggning">Logga ut</button>
+    <button id="logoutBtn" class="btn secondary" type="button">Logga ut</button>
   </div>
 </header>
 
 <section class="pillRow" aria-label="Status">
-  <span id="pillTree" class="pill warn">Aktivt träd: <strong>—</strong></span>
+  <span id="pillTree" class="pill warn">Valt träd: <strong>—</strong></span>
   <span id="pillTrees" class="pill">Träd sparade: <strong>0</strong></span>
-  <span id="pillNext" class="pill warn">Nästa steg: <strong>Skapa/välj träd</strong></span>
 </section>
 
 <div id="noteBox" class="note" hidden></div>
 
 <section class="grid" aria-label="Trädfunktioner">
   <article class="card">
-    <h2>1) Skapa nytt träd</h2>
-    <p class="small">Skapar ett nytt träd och gör det aktivt direkt.</p>
+    <h2>Skapa nytt träd</h2>
+    <p class="small">Skapar ett nytt träd och markerar det direkt som valt.</p>
 
     <label for="treeName">Namn på träd</label>
     <input id="treeName" placeholder="t.ex. Anderssons släkt" />
 
     <div class="row">
       <button id="createBtn" type="button" class="btn">Skapa träd</button>
-      <button id="refreshBtn" type="button" class="btn secondary">Uppdatera status</button>
     </div>
 
     <p class="msg" id="createMsg" aria-live="polite"></p>
   </article>
 
   <article class="card">
-    <h2>2) Välj aktivt träd</h2>
-    <p class="small">Det aktiva trädet används av andra vyer.</p>
+    <h2>Välj träd</h2>
+    <p class="small">Kryssa i ett träd för att arbeta i det.</p>
 
-    <label for="treeSelect">Dina träd</label>
-    <select id="treeSelect"></select>
-
-    <div class="row">
-      <button id="setActiveBtn" type="button" class="btn">Sätt som aktivt</button>
-      <button id="deleteBtn" type="button" class="btn danger">Ta bort valt</button>
+    <div id="listWrap">
+      <div class="emptyBox" id="emptyBox" hidden>
+        Inga träd sparade ännu. Skapa ett träd först.
+      </div>
+      <ul id="treeList" class="treeList" aria-label="Trädlista"></ul>
     </div>
 
-    <div class="row">
-      <a id="continueBtn" class="btn disabled" href="slaktkort.html" aria-disabled="true" tabindex="-1">Fortsätt → Personer</a>
-      <a class="btn secondary" href="start.html">Tillbaka till Start</a>
+    <div class="continueWrap">
+      <a id="continueBtn" class="btn disabled" href="./slaktkort.html" aria-disabled="true" tabindex="-1">Fortsätt → Personer</a>
     </div>
 
     <p class="msg" id="selectMsg" aria-live="polite"></p>
   </article>
-
-  <article class="card" style="grid-column: 1 / -1;">
-    <h2>3) Debug (valfritt)</h2>
-    <p class="small">Visar exakt vad som ligger i localStorage.</p>
-    <div class="row">
-      <button id="refreshDebugBtn" type="button" class="btn secondary">Uppdatera debug</button>
-      <button id="clearAllBtn" type="button" class="btn danger" title="Tar bort alla träd och nollställer aktivt träd">Nollställ träd</button>
-    </div>
-    <pre id="debugOut">[]</pre>
-  </article>
 </section>
 
-<footer>
-  Tips: När du ser “Aktivt träd” som grön pill är du klar med steg 1 och kan gå vidare till Personer.
+<footer class="muted">
+  Tips: När ett träd är markerat (ljusgrönt) är du klar och kan gå vidare till Personer.
 </footer>
 
 <script>
   // ============================
-  // Estetisk "auth" (flow, inte säkerhet)
+  // DEMO AUTH-GUARD
   // ============================
   (function authGuard(){
     try{
       if(sessionStorage.getItem("demo_auth") !== "1"){
-        window.location.href = "index.html";
+        window.location.href = "../index.html";
       }
-    }catch{
-      // Om sessionStorage är låst: tillåt ändå (demo)
-    }
+    }catch{}
   })();
 
   // ============================
-  // LocalStorage-nycklar (enhetliga)
+  // LocalStorage keys
   // ============================
   const KEY_TREES  = "slakttradet_trees";
   const KEY_ACTIVE = "slakttradet_active_tree_id";
@@ -260,23 +356,17 @@
   // DOM
   const pillTree  = document.getElementById("pillTree");
   const pillTrees = document.getElementById("pillTrees");
-  const pillNext  = document.getElementById("pillNext");
   const noteBox   = document.getElementById("noteBox");
 
   const treeName  = document.getElementById("treeName");
   const createBtn = document.getElementById("createBtn");
-  const refreshBtn= document.getElementById("refreshBtn");
   const createMsg = document.getElementById("createMsg");
 
-  const treeSelect  = document.getElementById("treeSelect");
-  const setActiveBtn= document.getElementById("setActiveBtn");
-  const deleteBtn   = document.getElementById("deleteBtn");
+  const treeList  = document.getElementById("treeList");
+  const emptyBox  = document.getElementById("emptyBox");
+
   const continueBtn = document.getElementById("continueBtn");
   const selectMsg   = document.getElementById("selectMsg");
-
-  const refreshDebugBtn = document.getElementById("refreshDebugBtn");
-  const clearAllBtn     = document.getElementById("clearAllBtn");
-  const debugOut        = document.getElementById("debugOut");
 
   const logoutBtn = document.getElementById("logoutBtn");
 
@@ -318,85 +408,91 @@
     }
   }
 
-  function fillSelect(){
-    const trees = loadTrees();
-    const activeId = getActiveTreeId();
-
-    treeSelect.innerHTML = "";
-
-    if(trees.length === 0){
-      const opt = document.createElement("option");
-      opt.value = "";
-      opt.textContent = "Inga träd sparade";
-      treeSelect.appendChild(opt);
-
-      treeSelect.disabled = true;
-      setActiveBtn.disabled = true;
-      deleteBtn.disabled = true;
-      return;
-    }
-
-    treeSelect.disabled = false;
-    setActiveBtn.disabled = false;
-    deleteBtn.disabled = false;
-
-    for(const t of trees){
-      const opt = document.createElement("option");
-      opt.value = t.id;
-      opt.textContent = (t.name || ("Träd " + t.id)) + (t.id === activeId ? " (aktivt)" : "");
-      treeSelect.appendChild(opt);
-    }
-
-    if(activeId) treeSelect.value = activeId;
-    if(!treeSelect.value) treeSelect.selectedIndex = 0;
+  function esc(s){
+    return String(s || "")
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
   }
 
   function updateStatus(){
     const trees = loadTrees();
     const activeId = getActiveTreeId();
-    const active = trees.find(t => t.id === activeId);
+    const active = trees.find(t => String(t.id) === String(activeId));
 
     pillTrees.innerHTML = 'Träd sparade: <strong>' + trees.length + '</strong>';
 
-    if(trees.length === 0){
+    if(!trees.length){
       pillTree.className = "pill warn";
-      pillTree.innerHTML = 'Aktivt träd: <strong>—</strong>';
-      pillNext.className = "pill warn";
-      pillNext.innerHTML = 'Nästa steg: <strong>Skapa träd</strong>';
-
+      pillTree.innerHTML = 'Valt träd: <strong>—</strong>';
       noteBox.hidden = false;
-      noteBox.innerHTML = '<strong>🚩 Inga träd sparade:</strong> Skapa ett träd i steg 1.';
-
+      noteBox.innerHTML = '<strong>🚩 Inga träd sparade:</strong> Skapa ett träd för att börja.';
       setDisabled(continueBtn, true);
       return;
     }
 
     if(!active){
       pillTree.className = "pill warn";
-      pillTree.innerHTML = 'Aktivt träd: <strong>—</strong>';
-      pillNext.className = "pill warn";
-      pillNext.innerHTML = 'Nästa steg: <strong>Välj aktivt träd</strong>';
-
+      pillTree.innerHTML = 'Valt träd: <strong>—</strong>';
       noteBox.hidden = false;
-      noteBox.innerHTML = '<strong>🚩 Inget aktivt träd valt:</strong> Välj ett träd och klicka “Sätt som aktivt”.';
-
+      noteBox.innerHTML = '<strong>🚩 Välj ett träd:</strong> Kryssa i ett träd i listan.';
       setDisabled(continueBtn, true);
       return;
     }
 
     pillTree.className = "pill ok";
-    pillTree.innerHTML = 'Aktivt träd: <strong>' + (active.name || active.id) + '</strong>';
-    pillNext.className = "pill ok";
-    pillNext.innerHTML = 'Nästa steg: <strong>Gå till Personer</strong>';
-
+    pillTree.innerHTML = 'Valt träd: <strong>' + esc(active.name || active.id) + '</strong>';
     noteBox.hidden = true;
     setDisabled(continueBtn, false);
   }
 
-  function refreshDebug(){
+  function renderList(){
     const trees = loadTrees();
     const activeId = getActiveTreeId();
-    debugOut.textContent = JSON.stringify({ activeTreeId: activeId, trees }, null, 2);
+
+    treeList.innerHTML = "";
+
+    if(!trees.length){
+      emptyBox.hidden = false;
+      return;
+    }
+    emptyBox.hidden = true;
+
+    for(const t of trees){
+      const id = String(t.id);
+      const isActive = id === String(activeId);
+
+      const li = document.createElement("li");
+
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "treeRow" + (isActive ? " active" : "");
+      row.setAttribute("aria-pressed", isActive ? "true" : "false");
+      row.setAttribute("data-id", id);
+
+      row.innerHTML =
+        "<span class='check' aria-hidden='true'>" + (isActive ? "✓" : "") + "</span>" +
+        "<span class='treeMain'>" +
+          "<p class='treeName'>" + esc(t.name || ("Träd " + t.id)) + "</p>" +
+          "<p class='treeMeta'>Kryssa i för att välja</p>" +
+        "</span>";
+
+      row.addEventListener("click", () => {
+        createMsg.textContent = "";
+        selectMsg.textContent = "";
+
+        setActiveTreeId(id);
+        selectMsg.innerHTML = "<strong>Valt:</strong> Trädet är nu markerat.";
+
+        renderList();
+        updateStatus();
+      });
+
+      li.appendChild(row);
+      treeList.appendChild(li);
+    }
   }
 
   // ============================
@@ -420,78 +516,22 @@
     setActiveTreeId(id);
 
     treeName.value = "";
-    createMsg.innerHTML = "<strong>Klart:</strong> Träd skapat och satt som aktivt.";
+    createMsg.innerHTML = "<strong>Klart:</strong> Träd skapat och markerat.";
 
-    fillSelect();
+    renderList();
     updateStatus();
-    refreshDebug();
   });
-
-  setActiveBtn.addEventListener("click", () => {
-    createMsg.textContent = "";
-    selectMsg.textContent = "";
-
-    const id = treeSelect.value;
-    if(!id) return;
-
-    setActiveTreeId(id);
-    selectMsg.innerHTML = "<strong>Klart:</strong> Aktivt träd uppdaterat.";
-
-    fillSelect();
-    updateStatus();
-    refreshDebug();
-  });
-
-  deleteBtn.addEventListener("click", () => {
-    createMsg.textContent = "";
-    selectMsg.textContent = "";
-
-    const id = treeSelect.value;
-    if(!id) return;
-
-    const trees = loadTrees().filter(t => t.id !== id);
-    saveTrees(trees);
-
-    const activeId = getActiveTreeId();
-    if(activeId === id) setActiveTreeId("");
-
-    selectMsg.innerHTML = "<strong>Klart:</strong> Träd borttaget.";
-
-    fillSelect();
-    updateStatus();
-    refreshDebug();
-  });
-
-  clearAllBtn.addEventListener("click", () => {
-    // Nollställ endast trädlistan + aktivt träd (rör inte persondata-nycklar)
-    saveTrees([]);
-    setActiveTreeId("");
-    createMsg.textContent = "";
-    selectMsg.innerHTML = "<strong>Klart:</strong> Träd är nollställda.";
-    fillSelect();
-    updateStatus();
-    refreshDebug();
-  });
-
-  refreshBtn.addEventListener("click", () => {
-    fillSelect();
-    updateStatus();
-    refreshDebug();
-  });
-
-  refreshDebugBtn.addEventListener("click", refreshDebug);
 
   logoutBtn.addEventListener("click", () => {
     try{ sessionStorage.removeItem("demo_auth"); }catch{}
-    window.location.href = "index.html";
+    window.location.href = "../index.html";
   });
 
   // ============================
   // Start
   // ============================
-  fillSelect();
+  renderList();
   updateStatus();
-  refreshDebug();
 </script>
 </body>
 </html>
