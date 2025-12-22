@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Relationer – Släktkort</title>
+  <title>Skapa relation – Släktkort</title>
   <meta name="description" content="Skapa relationer (Förälder→Barn + Partner) i aktivt träd. localStorage-first." />
 
   <style>
@@ -41,7 +41,6 @@
       text-decoration:none;
     }
     .btn.secondary{ border-color:#bbb; }
-    .btn.danger{ border-color:#b00020; color:#b00020; }
 
     .pillRow{
       display:flex;
@@ -99,22 +98,21 @@
 
     .error{ color:#b00020; font-weight:950; }
     .ok{ font-weight:950; }
-
-    pre{ white-space:pre-wrap; background:#f4f4f4; padding:12px; border-radius:12px; overflow:auto; }
     code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
   </style>
 </head>
 
 <body>
 <header>
-  <h1>🔗 Relationer</h1>
-  <p class="muted">Steg 3 i flödet. Skapa Förälder→Barn och Partner i aktivt träd.</p>
+  <h1>🔗 Skapa relation</h1>
+  <p class="muted">Steg 3 i flödet. Fokusperson först → relationstyp → välj motpart.</p>
 
   <nav class="topbar" aria-label="Navigation">
     <a class="btn secondary" href="../start.html">Start</a>
     <a class="btn secondary" href="./trees.html">Träd</a>
     <a class="btn secondary" href="./slaktkort.html">Personer</a>
-    <a class="btn" href="./create-relation.html">Relationer</a>
+    <a class="btn" href="./create-relation.html">Skapa relation</a>
+    <a class="btn secondary" href="./relations.html">Översikt relationer</a>
     <a class="btn secondary" href="./map.html">Karta</a>
     <button id="logoutBtn" class="btn secondary" type="button">Logga ut</button>
   </nav>
@@ -128,14 +126,18 @@
 </header>
 
 <section class="card">
-  <h2>1) Skapa relation</h2>
-  <p class="small">
-    Rekommendation: spara bara grundrelationer (Förälder→Barn och Partner).
-    Syskon/kusin/morbror kan räknas fram senare från dessa.
-  </p>
+  <h2>1) Välj fokusperson</h2>
+  <p class="small">Fokuspersonen blir “Barn” i Förälder→Barn, eller “Partner A” i Partner.</p>
 
   <form id="form">
     <div class="row three">
+      <div>
+        <label for="focusSelect">Fokusperson *</label>
+        <select id="focusSelect" required>
+          <option value="">Välj…</option>
+        </select>
+      </div>
+
       <div>
         <label for="relationType">Relationstyp *</label>
         <select id="relationType" required>
@@ -151,13 +153,6 @@
           <option value="SAMBO">Sambo</option>
           <option value="SARBO">Särbo</option>
           <option value="SKILDA">Skilda</option>
-        </select>
-      </div>
-
-      <div>
-        <label for="focusSelect">Fokusperson *</label>
-        <select id="focusSelect" required>
-          <option value="">Välj…</option>
         </select>
       </div>
     </div>
@@ -178,28 +173,19 @@
         <select id="bSelect" required>
           <option value="">Välj…</option>
         </select>
-        <p class="small" id="bHelp">Fokuspersonen blir automatiskt “Barn” i Förälder→Barn.</p>
+        <p class="small" id="bHelp">Barn = fokuspersonen (låst för enkel röd tråd).</p>
       </div>
     </div>
 
     <div class="actions">
       <button type="submit" class="btn">Spara relation</button>
       <button type="button" id="resetBtn" class="btn secondary">Rensa val</button>
+      <a class="btn secondary" href="./relations.html">Öppna översikt</a>
       <a class="btn secondary" href="./map.html">Fortsätt → Karta</a>
     </div>
 
     <p id="msg" class="muted" aria-live="polite"></p>
   </form>
-</section>
-
-<section class="card">
-  <h2>2) Relationer i aktivt träd</h2>
-  <div class="actions">
-    <button type="button" id="listBtn" class="btn secondary">Visa</button>
-    <button type="button" id="clearBtn" class="btn danger">Töm relationer</button>
-    <button type="button" id="refreshBtn" class="btn secondary">Uppdatera listor</button>
-  </div>
-  <pre><code id="out">[]</code></pre>
 </section>
 
 <script>
@@ -242,7 +228,6 @@
   const bHelp = document.getElementById("bHelp");
 
   const msg = document.getElementById("msg");
-  const out = document.getElementById("out");
 
   // Utils
   function safeParse(raw, fallback){ try{ return JSON.parse(raw); }catch{ return fallback; } }
@@ -264,6 +249,15 @@
     return t ? (t.name || t.id) : id;
   }
 
+  function escapeHtml(s){
+    return String(s || "")
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+
   function personName(p){
     const n = `${p.fornamn || ""} ${p.efternamn || ""}`.trim();
     return n || "(namnlös)";
@@ -275,14 +269,6 @@
       : type === "ok"
         ? "<span class='ok'>" + escapeHtml(text) + "</span>"
         : escapeHtml(text || "");
-  }
-  function escapeHtml(s){
-    return String(s || "")
-      .replaceAll("&","&amp;")
-      .replaceAll("<","&lt;")
-      .replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;")
-      .replaceAll("'","&#039;");
   }
 
   function loadPeople(){
@@ -341,6 +327,7 @@
 
     for(const p of people){
       if(!p || !p.id) continue;
+
       const opt1 = document.createElement("option");
       opt1.value = String(p.id);
       opt1.textContent = personName(p);
@@ -373,19 +360,21 @@
   // Relation type behavior
   function applyTypeUI(){
     const typ = relationType.value;
+    const focus = String(focusSelect.value || "").trim();
 
-    // Fokusperson används alltid – men olika roll beroende på typ
     if(typ === "FORALDER_BARN"){
       partnerStatusWrap.hidden = true;
 
       aLabel.textContent = "Förälder *";
       bLabel.textContent = "Barn *";
       aHelp.textContent = "Välj en förälder som kopplas till fokuspersonen (barnet). Max 2 föräldrar per barn.";
-      bHelp.textContent = "Fokuspersonen blir automatiskt “Barn”. Du kan byta om du vill.";
+      bHelp.textContent = "Barn = fokuspersonen (låst för enkel röd tråd).";
 
-      // Fokus -> Barn (om valt)
-      const focus = focusSelect.value;
+      // Fokus -> Barn (låst)
       if(focus) bSelect.value = focus;
+
+      // Förälder ska väljas manuellt (ingen auto)
+      if(aSelect.value === focus) aSelect.value = "";
 
       aSelect.required = true;
       bSelect.required = true;
@@ -396,19 +385,23 @@
 
       aLabel.textContent = "Partner A *";
       bLabel.textContent = "Partner B *";
-      aHelp.textContent = "Välj första personen.";
+      aHelp.textContent = "Partner A = fokuspersonen (låst för enkel röd tråd).";
       bHelp.textContent = "Välj andra personen.";
 
-      // Fokus -> Partner A (om valt)
-      const focus = focusSelect.value;
+      // Fokus -> Partner A (låst)
       if(focus) aSelect.value = focus;
+      if(bSelect.value === focus) bSelect.value = "";
 
       aSelect.required = true;
       bSelect.required = true;
     }
   }
 
-  focusSelect.addEventListener("change", applyTypeUI);
+  focusSelect.addEventListener("change", () => {
+    // När fokus ändras: uppdatera default för A/B
+    applyTypeUI();
+  });
+
   relationType.addEventListener("change", () => {
     // reset val så man inte råkar spara fel typ med gamla val
     aSelect.value = "";
@@ -424,7 +417,6 @@
 
     const typ = relationType.value;
     const focusId = String(focusSelect.value || "").trim();
-
     const a = String(aSelect.value || "").trim();
     const b = String(bSelect.value || "").trim();
 
@@ -438,8 +430,7 @@
       const parentId = a;
       const childId = b;
 
-      // Lås fokus till barnet om du vill (enkel röd tråd)
-      // Om du vill tillåta fokus ≠ barn, kommentera bort nästa två rader:
+      // Lås fokus = barn (röd tråd)
       if(childId !== focusId) return setMsg("error", "I Förälder→Barn måste fokusperson vara Barn (byt fokus eller barn).");
 
       if(hasSameParentChild(rels, parentId, childId)) return setMsg("error", "Redan kopplad.");
@@ -462,7 +453,7 @@
       const personAId = a;
       const personBId = b;
 
-      // Lås fokus till partner A (enkel röd tråd)
+      // Lås fokus = Partner A (röd tråd)
       if(personAId !== focusId) return setMsg("error", "I Partner måste fokusperson vara Partner A (byt fokus eller Partner A).");
 
       if(hasSamePartner(rels, personAId, personBId)) return setMsg("error", "Partnerrelation finns redan.");
@@ -481,34 +472,14 @@
     }
 
     pillRels.textContent = String(loadRels().length);
-    out.textContent = JSON.stringify(loadRels(), null, 2);
   });
 
   // Buttons
   document.getElementById("resetBtn").addEventListener("click", () => {
     document.getElementById("form").reset();
     setMsg("", "");
-    applyTypeUI();
-  });
-
-  document.getElementById("listBtn").addEventListener("click", () => {
-    out.textContent = JSON.stringify(loadRels(), null, 2);
-    pillRels.textContent = String(loadRels().length);
-  });
-
-  document.getElementById("clearBtn").addEventListener("click", () => {
-    const yes = confirm("Töm alla relationer i aktivt träd?");
-    if(!yes) return;
-    saveRels([]);
-    out.textContent = "[]";
-    pillRels.textContent = "0";
-    setMsg("ok", "Relationer tömda.");
-  });
-
-  document.getElementById("refreshBtn").addEventListener("click", () => {
     fillPeopleSelects();
     applyTypeUI();
-    out.textContent = JSON.stringify(loadRels(), null, 2);
   });
 
   logoutBtn.addEventListener("click", () => {
@@ -519,7 +490,6 @@
   // Init
   fillPeopleSelects();
   applyTypeUI();
-  out.textContent = JSON.stringify(loadRels(), null, 2);
 </script>
 </body>
 </html>
