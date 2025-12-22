@@ -212,12 +212,17 @@
     }
     .popupCta:hover{ background:#f5f5f5; }
 
-    /* ======= Side panel (desktop) / drawer (mobile) ======= */
+    /* =====================================================
+       PANEL: ÖPPNAR FRÅN VÄNSTER, MEN BARA ÖVER KARTAN
+       (inte över vänsterspalten)
+       ===================================================== */
+    .mapCard { position: relative; }
+
     .panel{
-      position: fixed;
+      position: absolute;
       inset: 0;
       pointer-events: none;
-      z-index: 9999;
+      z-index: 9999; /* över Leaflet */
     }
     .panelOverlay{
       position:absolute;
@@ -228,30 +233,34 @@
     }
     .panelSheet{
       position:absolute;
-      right: 12px;
+      left: 12px;
       top: 12px;
       bottom: 12px;
-      width: min(420px, calc(100vw - 24px));
+      width: min(420px, calc(100% - 24px));
       background:#fff;
       border:1px solid #ddd;
       border-radius:16px;
       box-shadow: 0 10px 40px rgba(0,0,0,.15);
-      transform: translateX(16px);
+      transform: translateX(-16px);
       opacity:0;
       transition: transform .18s ease, opacity .18s ease;
       overflow:hidden;
       display:flex;
       flex-direction:column;
     }
+
+    /* Mobile: drawer längst ned (fortfarande bara över kart-kortet) */
     @media (max-width: 820px){
       .panelSheet{
         left: 12px;
         right: 12px;
         top: auto;
         height: min(78vh, 640px);
+        width: auto;
         transform: translateY(16px);
       }
     }
+
     .panel.open{ pointer-events: auto; }
     .panel.open .panelOverlay{ opacity:1; }
     .panel.open .panelSheet{ opacity:1; transform: translateX(0); }
@@ -420,9 +429,6 @@
     <h2>Filter & vy</h2>
     <p class="small">Sök på namn eller plats. Klicka i listan för att zooma och öppna panel.</p>
 
-    <!-- =====================================================
-         SÖK + RENSNING
-         ===================================================== -->
     <label for="search">Sök</label>
     <input id="search" placeholder="Sök namn eller plats…" autocomplete="off" />
 
@@ -431,9 +437,6 @@
       <span id="matchInfo" class="small" aria-live="polite">—</span>
     </div>
 
-    <!-- =====================================================
-         TOGGLES (LÄNKAR)
-         ===================================================== -->
     <div class="toggleRow" role="group" aria-label="Visningsval">
       <label>
         <input id="toggleParentChild" type="checkbox" checked />
@@ -449,9 +452,6 @@
       </label>
     </div>
 
-    <!-- =====================================================
-         LEGEND
-         ===================================================== -->
     <div class="hintBox" style="margin-top:10px;">
       <strong>Legend:</strong>
       <div class="small" style="margin-top:6px;">
@@ -476,64 +476,64 @@
     </div>
   </section>
 
-  <section class="card" aria-label="Karta">
+  <section class="card mapCard" aria-label="Karta">
     <h2>Karta</h2>
     <p class="small">OpenStreetMap via Leaflet.</p>
     <div id="map" role="application" aria-label="Karta med markörer och kopplingar"></div>
     <p id="msg" class="muted" aria-live="polite" style="margin-top:10px;"></p>
-  </section>
-</div>
 
-<!-- =====================================================
-     SIDE PANEL
-     ===================================================== -->
-<div id="panel" class="panel" aria-hidden="true">
-  <div id="panelOverlay" class="panelOverlay" tabindex="-1" aria-label="Stäng panel"></div>
+    <!-- =====================================================
+         SIDE PANEL (ÖVER KARTAN)
+         ===================================================== -->
+    <div id="panel" class="panel" aria-hidden="true">
+      <div id="panelOverlay" class="panelOverlay" tabindex="-1" aria-label="Stäng panel"></div>
 
-  <aside class="panelSheet" role="dialog" aria-modal="true" aria-label="Släktöversikt">
-    <div class="panelHeader">
-      <div style="min-width:0;">
-        <h2 id="panelName" class="panelTitle">—</h2>
-        <p id="panelMeta" class="panelMeta">—</p>
-      </div>
-      <button id="panelClose" class="btn panelClose" type="button" aria-label="Stäng">Stäng</button>
-    </div>
-
-    <div class="panelBody">
-      <div class="panelSection">
-        <h3>Släkt (översikt)</h3>
-
-        <div class="miniTree" aria-label="Mini-träd">
-          <div class="miniGrid">
-            <div id="slotParents" class="slotParents"></div>
-            <div id="slotPartner" class="slotPartner"></div>
-            <div id="slotFocus" class="slotFocus"></div>
-            <div id="slotChildren" class="slotChildren"></div>
+      <aside class="panelSheet" role="dialog" aria-modal="true" aria-label="Släktöversikt">
+        <div class="panelHeader">
+          <div style="min-width:0;">
+            <h2 id="panelName" class="panelTitle">—</h2>
+            <p id="panelMeta" class="panelMeta">—</p>
           </div>
+          <button id="panelClose" class="btn panelClose" type="button" aria-label="Stäng">Stäng</button>
+        </div>
 
-          <div id="expandBox" class="expandBox" hidden>
-            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-              <strong id="expandTitle">Barn</strong>
-              <button id="expandClose" class="btn secondary" type="button" style="padding:8px 10px;">Stäng lista</button>
+        <div class="panelBody">
+          <div class="panelSection">
+            <h3>Släkt (översikt)</h3>
+
+            <div class="miniTree" aria-label="Mini-träd">
+              <div class="miniGrid">
+                <div id="slotParents" class="slotParents"></div>
+                <div id="slotPartner" class="slotPartner"></div>
+                <div id="slotFocus" class="slotFocus"></div>
+                <div id="slotChildren" class="slotChildren"></div>
+              </div>
+
+              <div id="expandBox" class="expandBox" hidden>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                  <strong id="expandTitle">Barn</strong>
+                  <button id="expandClose" class="btn secondary" type="button" style="padding:8px 10px;">Stäng lista</button>
+                </div>
+                <ul id="expandList" class="expandList" aria-label="Lista"></ul>
+              </div>
             </div>
-            <ul id="expandList" class="expandList" aria-label="Lista"></ul>
+
+            <p id="panelHint" class="small" style="margin-top:10px;">Tips: klicka på en chip för att byta fokus.</p>
+
+            <div class="panelActions">
+              <a class="btn secondary" href="./slaktkort.html">Gå till Personer</a>
+              <a class="btn secondary" href="./create-relation.html">Gå till Relationer</a>
+            </div>
+          </div>
+
+          <div class="panelSection">
+            <h3>Teknisk info</h3>
+            <p class="small" id="panelTech">Dold som standard. (Visa här bara om du vill felsöka.)</p>
           </div>
         </div>
-
-        <p id="panelHint" class="small" style="margin-top:10px;">Tips: klicka på en chip för att byta fokus.</p>
-
-        <div class="panelActions">
-          <a class="btn secondary" href="./slaktkort.html">Gå till Personer</a>
-          <a class="btn secondary" href="./create-relation.html">Gå till Relationer</a>
-        </div>
-      </div>
-
-      <div class="panelSection">
-        <h3>Teknisk info</h3>
-        <p class="small" id="panelTech">Dold som standard. (Visa här bara om du vill felsöka.)</p>
-      </div>
+      </aside>
     </div>
-  </aside>
+  </section>
 </div>
 
 <script>
@@ -661,7 +661,7 @@
   }
 
   // =====================================================
-  // COORDS PARSE + RANGE CHECK (PATCH #2)
+  // COORDS PARSE + RANGE CHECK
   // =====================================================
   function inLatLonRange(lat, lon){
     return Number.isFinite(lat) && Number.isFinite(lon) &&
@@ -670,7 +670,6 @@
   }
 
   function coordsFromPerson(p){
-    // ---- Object {lat, lon}
     if(p && typeof p.coords === "object" && p.coords){
       const lat = Number(p.coords.lat);
       const lon = Number(p.coords.lon);
@@ -678,7 +677,6 @@
       return null;
     }
 
-    // ---- String "lat, lon"
     if(typeof p.coords === "string"){
       const s = p.coords.trim();
       const parts = s.split(",").map(x => x.trim()).filter(Boolean);
@@ -842,7 +840,6 @@
     );
   }
 
-  // ---- bind popup CTA reliably
   map.on("popupopen", (e) => {
     try{
       const el = e.popup.getElement();
@@ -939,10 +936,6 @@
 
   // =====================================================
   // LINK RENDER
-  //  - toggle: parent/child
-  //  - toggle: partner
-  //  - toggle: focusOnly (PATCH #3)
-  //  - dublettskydd
   // =====================================================
   function renderLinks(relations, focusId){
     clearLinks();
@@ -967,9 +960,6 @@
     for(const r of relations){
       if(!r || !r.typ) continue;
 
-      // --------------------------
-      // FÖRÄLDER → BARN
-      // --------------------------
       if(showParentChild && r.typ === "FORALDER_BARN"){
         const fromId = String(r.franPersonId || "");
         const toId   = String(r.tillPersonId || "");
@@ -994,9 +984,6 @@
         continue;
       }
 
-      // --------------------------
-      // PARTNER (streckad)
-      // --------------------------
       if(showPartner && r.typ === "PARTNER"){
         const aId = String(r.personAId || "");
         const bId = String(r.personBId || "");
@@ -1060,21 +1047,16 @@
   }
 
   // =====================================================
-  // SIDE PANEL STATE (PATCH #1)
-  //  - expandedMode: NONE / BARN / PARTNER
+  // SIDE PANEL STATE
   // =====================================================
   let panelPersonId = "";
-
   let expandedMode = "NONE"; // "NONE" | "BARN" | "PARTNER"
 
   function closePanel(){
     panel.classList.remove("open");
     panel.setAttribute("aria-hidden","true");
-
     panelPersonId = "";
     expandedMode = "NONE";
-
-    try{ document.body.style.overflow = ""; }catch{}
   }
 
   function openPanel(personId, opts){
@@ -1083,15 +1065,11 @@
 
     panel.classList.add("open");
     panel.setAttribute("aria-hidden","false");
-
     expandedMode = "NONE";
-
-    try{ document.body.style.overflow = "hidden"; }catch{}
 
     renderPanel(panelPersonId);
 
-    // ---- när panelen öppnas: uppdatera länkar om focusOnly är aktiv
-    //      (för att “fokus-läge” ska kännas direkt)
+    // uppdatera länkar om focusOnly är aktiv
     try{ refreshLinksOnly(); }catch{}
 
     if(opts && opts.focusMap){
@@ -1136,7 +1114,6 @@
 
   function setExpandList(title, people){
     expandTitle.textContent = title;
-
     expandList.innerHTML = "";
 
     for(const p of people){
@@ -1145,7 +1122,6 @@
       const b = document.createElement("button");
       b.type = "button";
       b.className = "expandItemBtn";
-
       b.textContent = personName(p) + (yearsLine(p) ? (" · " + yearsLine(p)) : "");
 
       b.addEventListener("click", () => openPanel(String(p.id), { focusMap: true }));
@@ -1232,9 +1208,6 @@
     slotFocus.innerHTML = "";
     slotChildren.innerHTML = "";
 
-    // --------------------------
-    // Parents
-    // --------------------------
     if(fam.parents.length > 0){
       for(const par of fam.parents.slice(0, 2)){
         slotParents.appendChild(makeChip(personName(par), "Förälder", par.id, ""));
@@ -1246,9 +1219,6 @@
       slotParents.appendChild(makeChip("—", "Föräldrar", null, "muted"));
     }
 
-    // --------------------------
-    // Partner
-    // --------------------------
     if(fam.partners.length > 0){
       const first = fam.partners[0];
       slotPartner.appendChild(makeChip(personName(first), "Partner", first.id, ""));
@@ -1271,14 +1241,8 @@
       slotPartner.appendChild(makeChip("—", "Partner", null, "muted"));
     }
 
-    // --------------------------
-    // Focus
-    // --------------------------
     slotFocus.appendChild(makeChip(name, "Fokus", focusId, "primary"));
 
-    // --------------------------
-    // Children
-    // --------------------------
     if(fam.children.length > 0){
       const visible = fam.children.slice(0, 4);
 
@@ -1306,9 +1270,6 @@
       slotChildren.appendChild(makeChip("—", "Barn", null, "muted"));
     }
 
-    // --------------------------
-    // Expand box state
-    // --------------------------
     if(expandedMode === "NONE"){
       expandBox.hidden = true;
       expandList.innerHTML = "";
@@ -1318,8 +1279,8 @@
   // =====================================================
   // PANEL EVENTS
   // =====================================================
-  panelClose.addEventListener("click", closePanel);
-  panelOverlay.addEventListener("click", closePanel);
+  panelClose.addEventListener("click", () => { closePanel(); try{ refreshLinksOnly(); }catch{} });
+  panelOverlay.addEventListener("click", () => { closePanel(); try{ refreshLinksOnly(); }catch{} });
 
   expandClose.addEventListener("click", () => {
     expandedMode = "NONE";
@@ -1342,41 +1303,30 @@
   let lastPeopleWithCoordsAll = [];
 
   function refreshLinksOnly(){
-    // ---- länkar använder ALLA coords, och ev focus-filter om panel är öppen
     const focusId = panel.classList.contains("open") ? panelPersonId : "";
     renderLinks(lastAllRelations, focusId);
   }
 
   function refresh(){
-    // ---- trees status
     const trees = getTrees();
     const hasTrees = trees.length > 0;
 
-    // ---- active tree status
     const t = activeTreeId();
     const hasActive = !!t;
 
-    // ---- data
     const allPeople = hasActive ? loadPeople() : [];
     const allRelations = hasActive ? loadRelations() : [];
 
-    // ---- cache for "links only refresh"
     lastAllPeople = allPeople;
     lastAllRelations = allRelations;
 
-    // ---- build list of people with valid coords
     const peopleWithCoordsAll = allPeople.filter(p => !!coordsFromPerson(p));
     lastPeopleWithCoordsAll = peopleWithCoordsAll;
 
-    // ---- build coords index from ALL coords (länkar ska inte försvinna pga filter)
     rebuildCoordsIndex(peopleWithCoordsAll);
 
-    // ---- filtered people affects list + markers
     const filtered = currentFiltered(peopleWithCoordsAll);
 
-    // =================================================
-    // UI COUNTERS
-    // =================================================
     setPill(
       pillTree,
       hasActive ? "ok" : (hasTrees ? "warn" : "err"),
@@ -1386,30 +1336,18 @@
     pillPeople.innerHTML = "Personer: <strong>" + allPeople.length + "</strong>";
     pillWithCoords.innerHTML = "Med koordinater: <strong>" + peopleWithCoordsAll.length + "</strong>";
 
-    // ---- match info (PATCH #8)
     matchInfo.textContent =
       filtered.length + " matchar filtret" +
       (peopleWithCoordsAll.length ? (" (av " + peopleWithCoordsAll.length + ")") : "");
 
-    // =================================================
-    // HINTS
-    // =================================================
     renderHint(hasTrees, hasActive, peopleWithCoordsAll);
 
-    // =================================================
-    // RENDER
-    // =================================================
     renderList(filtered);
     renderMarkers(filtered);
 
-    // ---- focus id influences links if focusOnly toggle is on
     const focusId = panel.classList.contains("open") ? panelPersonId : "";
-
     const drawn = renderLinks(allRelations, focusId);
 
-    // =================================================
-    // MAP STATUS TEXT
-    // =================================================
     if(coordsById.size > 0){
       fitToAllCoords();
 
@@ -1423,9 +1361,6 @@
         "<span class='error'>Inga markörer.</span> Inga personer i aktivt träd har koordinater (eller matchar filtret).";
     }
 
-    // =================================================
-    // PANEL CONSISTENCY
-    // =================================================
     if(panel.classList.contains("open") && panelPersonId){
       const exists = allPeople.some(p => String(p.id) === String(panelPersonId));
       if(!exists){
@@ -1446,14 +1381,12 @@
     if(coordsById.size > 0) fitToAllCoords();
   });
 
-  // ---- debounce typing
   let searchTimer = null;
   searchEl.addEventListener("input", () => {
     if(searchTimer) clearTimeout(searchTimer);
     searchTimer = setTimeout(refresh, 120);
   });
 
-  // ---- Enter triggers refresh (PATCH #8)
   searchEl.addEventListener("keydown", (e) => {
     if(e.key === "Enter"){
       e.preventDefault();
@@ -1461,19 +1394,16 @@
     }
   });
 
-  // ---- clear search (PATCH #8)
   clearSearchBtn.addEventListener("click", () => {
     searchEl.value = "";
     refresh();
     try{ searchEl.focus(); }catch{}
   });
 
-  // ---- toggles: full refresh is OK for MVP
   toggleParentChildEl.addEventListener("change", refreshLinksOnly);
   togglePartnerEl.addEventListener("change", refreshLinksOnly);
   toggleFocusOnlyEl.addEventListener("change", refreshLinksOnly);
 
-  // ---- logout
   logoutBtn.addEventListener("click", () => {
     try{ sessionStorage.removeItem("demo_auth"); }catch{}
     window.location.href = "../index.html";
