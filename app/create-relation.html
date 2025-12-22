@@ -253,20 +253,57 @@
       return Number.isFinite(n) ? n : null;
     }
 
-    function labelPerson(p) {
+    // =========================
+    // AUTOPATCH: barn-count + max 2 föräldrar per barn
+    // =========================
+    function loadRelations(treeId){
+      const rels = loadJson(relKey(treeId), []);
+      return Array.isArray(rels) ? rels : [];
+    }
+
+    function saveRelations(treeId, rels){
+      saveJson(relKey(treeId), rels);
+    }
+
+    function buildChildCountByParentId(rels){
+      const counts = {};
+      for(const r of (Array.isArray(rels) ? rels : [])){
+        if(!r || r.typ !== "FORALDER_BARN") continue;
+        const parentId = String(r.franPersonId || "");
+        if(!parentId) continue;
+        counts[parentId] = (counts[parentId] || 0) + 1;
+      }
+      return counts;
+    }
+
+    function buildParentSetForChild(rels, childId){
+      const set = new Set();
+      for(const r of (Array.isArray(rels) ? rels : [])){
+        if(!r || r.typ !== "FORALDER_BARN") continue;
+        if(String(r.tillPersonId || "") === String(childId)){
+          const pid = String(r.franPersonId || "");
+          if(pid) set.add(pid);
+        }
+      }
+      return set;
+    }
+
+    function labelPerson(p, childCountByParentId) {
       const name = `${p.fornamn || ""} ${p.efternamn || ""}`.trim() || "(namnlös)";
       const a = (p.fodelsear ?? "") !== null && (p.fodelsear ?? "") !== "" ? p.fodelsear : "";
       const b = (p.dodsar ?? "") !== null && (p.dodsar ?? "") !== "" ? p.dodsar : "";
       const yearText = (a || b) ? ` (${a || "?"}–${b || "?"})` : "";
-      return `${name}${yearText} — ${p.id}`;
+      const kids = Number(childCountByParentId?.[p.id] || 0);
+      const kidsText = ` (barn: ${kids})`;
+      return `${name}${yearText}${kidsText} — ${p.id}`;
     }
 
-    function setOptions(select, items) {
+    function setOptions(select, items, childCountByParentId) {
       while (select.options.length > 1) select.remove(1);
       for (const p of items) {
         const opt = document.createElement("option");
         opt.value = p.id;
-        opt.textContent = labelPerson(p);
+        opt.textContent = labelPerson(p, childCountByParentId);
         select.appendChild(opt);
       }
     }
@@ -315,8 +352,8 @@
       const treeId = getActiveTreeId();
       if(!treeId){
         persons = [];
-        setOptions(aSelect, persons);
-        setOptions(bSelect, persons);
+        setOptions(aSelect, persons, {});
+        setOptions(bSelect, persons, {});
         setLoadMsg("error", "Inget aktivt träd valt. Gå till Träd och välj ett aktivt träd.");
         return;
       }
@@ -325,8 +362,12 @@
       persons = (Array.isArray(cards) ? cards : [])
         .filter(p => p && typeof p.id === "string" && p.id.trim().length > 0);
 
-      setOptions(aSelect, persons);
-      setOptions(bSelect, persons);
+      // AUTOPATCH: barn-count från relationer i aktivt träd
+      const rels = loadRelations(treeId);
+      const childCountByParentId = buildChildCountByParentId(rels);
+
+      setOptions(aSelect, persons, childCountByParentId);
+      setOptions(bSelect, persons, childCountByParentId);
 
       const treeName = getActiveTreeName(treeId);
       if(persons.length === 0){
@@ -336,15 +377,6 @@
       }
     }
 
-    function loadRelations(treeId){
-      const rels = loadJson(relKey(treeId), []);
-      return Array.isArray(rels) ? rels : [];
-    }
-
-    function saveRelations(treeId, rels){
-      saveJson(relKey(treeId), rels);
-    }
-
     function validateCommon(aId, bId){
       if(!aId || !bId) return "Du måste välja båda personerna.";
       if(aId === bId) return "En relation kan inte peka på samma person.";
@@ -352,15 +384,9 @@
     }
 
     function validatePartnerYears(status, fy, ty){
-      // Minimal, men smart:
-      // - år får vara null
-      // - om båda finns: fromYear <= toYear
       if(fy !== null && !Number.isFinite(fy)) return "Från-år är ogiltigt.";
       if(ty !== null && !Number.isFinite(ty)) return "Till-år är ogiltigt.";
       if(fy !== null && ty !== null && fy > ty) return "Från-år kan inte vara senare än Till-år.";
-      if(status === "SKILDA" && ty === null){
-        // rekommendation men inte stopp: vi varnar inte hårt här i FAS 2
-      }
       return null;
     }
 
@@ -388,7 +414,19 @@
 
       let rel = null;
 
+      const rels = loadRelations(treeId);
+
       if(mode === "FORALDER_BARN"){
+        // AUTOPATCH: max 2 föräldrar per barn + ingen dublett
+        const parentSet = buildParentSetForChild(rels, bId);
+
+        if(parentSet.has(String(aId))){
+          return setMsg("error", "Den föräldern är redan kopplad till barnet (dublett).");
+        }
+        if(parentSet.size >= 2){
+          return setMsg("error", "Det här barnet har redan 2 föräldrar. (Max 2 i FAS 2)");
+        }
+
         rel = {
           id: makeRelationId(),
           typ: "FORALDER_BARN",
@@ -404,8 +442,6 @@
         const yrErr = validatePartnerYears(status, fy, ty);
         if(yrErr) return setMsg("error", yrErr);
 
-        // Partnerrelation: vi sparar den som symmetrisk (A<->B)
-        // och vi normaliserar så A/B alltid blir samma ordning, så du slipper dubletter.
         const pair = [aId, bId].sort();
         rel = {
           id: makeRelationId(),
@@ -419,9 +455,7 @@
         };
       }
 
-      const rels = loadRelations(treeId);
-
-      // Enkel duplikatkontroll (FAS 2, minimal)
+      // Enkel duplikatkontroll (för PARTNER samt extra skydd)
       const exists = rels.some(r => {
         if(!r || r.typ !== rel.typ) return false;
         if(rel.typ === "FORALDER_BARN"){
@@ -447,6 +481,9 @@
 
       setMsg("ok", "Relation sparad i localStorage för aktivt träd.");
       out.textContent = pretty(rels);
+
+      // AUTOPATCH: uppdatera barn-count i dropdown direkt efter spara
+      loadPersonsFromLocalStorage();
     });
 
     resetBtn.addEventListener("click", () => {
@@ -475,6 +512,7 @@
       saveRelations(treeId, []);
       out.textContent = "[]";
       setMsg("ok", "Tömde relationer i aktivt träd.");
+      loadPersonsFromLocalStorage();
     });
 
     copyBtn.addEventListener("click", async () => {
