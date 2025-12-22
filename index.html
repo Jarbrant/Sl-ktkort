@@ -3,97 +3,101 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Släktträdet – Adminpanel</title>
+  <title>Logga in – Släktkort</title>
+  <meta name="description" content="Estetisk inloggning till Släktkort" />
   <style>
-    body { font-family: system-ui, Arial, sans-serif; margin: 0; padding: 32px 20px; background:#fafafa; color:#111; }
-    .container { max-width: 880px; margin: 0 auto; }
-    h1 { margin: 0 0 6px; font-size: 1.6rem; }
-    .muted { color:#555; margin-bottom: 24px; }
-    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:16px; }
-    .card { background:#fff; border:1px solid #ddd; border-radius:14px; padding:18px; display:flex; flex-direction:column; gap:12px; }
-    .card h2 { margin:0; font-size:1.1rem; }
-    .card p { margin:0; color:#555; font-size:0.95rem; line-height:1.4; }
-    .card a { margin-top:auto; display:inline-block; text-decoration:none; border:1px solid #333; border-radius:10px; padding:10px 14px; color:#111; font-weight:600; background:#fff; width:fit-content; }
-    .card a:hover { background:#f0f0f0; }
-
-    .card.status { border-left: 6px solid #b00020; }
-    .card.status a { border-color:#b00020; }
-
-    .card.primary {
-      border-left: 6px solid #2b5cff;
+    :root { color-scheme: light; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #f5f5f5;
+      color: #111;
     }
-    .card.primary a {
-      border-color:#2b5cff;
-      font-weight:800;
+    .login {
+      background: #fff;
+      padding: 28px;
+      border-radius: 12px;
+      border: 1px solid #ddd;
+      width: 100%;
+      max-width: 360px;
     }
-
-    footer { margin-top: 40px; font-size:0.9rem; color:#666; }
-    code { background:#eee; padding:2px 6px; border-radius:6px; }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.4rem;
+    }
+    p {
+      margin: 0 0 18px;
+      color: #555;
+    }
+    label {
+      display: block;
+      margin: 12px 0 6px;
+      font-weight: 600;
+    }
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #bbb;
+      font: inherit;
+    }
+    button {
+      width: 100%;
+      margin-top: 18px;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #333;
+      background: #fff;
+      font: inherit;
+      cursor: pointer;
+    }
+    .error {
+      margin-top: 12px;
+      color: #b00020;
+      font-weight: 600;
+    }
   </style>
 </head>
+
 <body>
-  <div class="container">
-    <h1>Släktträdet – Adminpanel</h1>
-    <p class="muted">
-      Intern kontrollpanel. I GitHub Pages-läge kör vi lokalt i <code>localStorage</code>.
-      (Backend/Codespaces kan kopplas på senare.)
-    </p>
 
-    <div class="grid">
-      <!-- STATUS / START -->
-      <div class="card status">
-        <h2>🚩 Inga träd sparade?</h2>
-        <p>
-          Gå till <strong>Skapa/Välj träd</strong> och skapa ett träd först.
-          Det är grunden för personer, relationer och vyer.
-        </p>
-        <a href="./app/trees.html">Skapa / välj släktträd</a>
-      </div>
+  <form class="login" id="loginForm">
+    <h1>Släktkort</h1>
+    <p>Logga in för att fortsätta</p>
 
-      <!-- NY: HELHETSVY -->
-      <div class="card primary">
-        <h2>🗺️ Släktkarta (hel vy)</h2>
-        <p>
-          Visa hela släkten i aktivt träd på karta.
-          Flaggar med namn, klick → relationer och detaljer.
-        </p>
-        <a href="./app/map.html">Öppna släktkartan</a>
-      </div>
+    <label for="username">Användarnamn</label>
+    <input id="username" type="text" autocomplete="off" />
 
-      <div class="card">
-        <h2>🌳 Släktträd</h2>
-        <p>Skapa, välj och byt aktivt släktträd.</p>
-        <a href="./app/trees.html">Öppna träd</a>
-      </div>
+    <label for="password">Lösenord</label>
+    <input id="password" type="password" />
 
-      <div class="card">
-        <h2>👤 Släktkort</h2>
-        <p>Skapa personer i valt träd (namn, årtal, plats, anteckning, koordinater).</p>
-        <a href="./app/slaktkort.html">Öppna släktkort</a>
-      </div>
+    <button type="submit">Logga in</button>
 
-      <div class="card">
-        <h2>🔗 Relationer</h2>
-        <p>Koppla personer (förälder → barn).</p>
-        <a href="./app/create-relation.html">Skapa relation</a>
-      </div>
+    <div id="error" class="error" hidden>Fel användarnamn eller lösenord</div>
+  </form>
 
-      <div class="card">
-        <h2>📍 Platsväljare</h2>
-        <p>Välj plats i karta och spara lat/lon till släktkort.</p>
-        <a href="./app/place-picker.html">Öppna platsväljare</a>
-      </div>
+  <script>
+    const form = document.getElementById("loginForm");
+    const error = document.getElementById("error");
 
-      <div class="card">
-        <h2>🧬 Trädvy (struktur)</h2>
-        <p>Visuell trädstruktur (demo nu, byggs ut senare).</p>
-        <a href="./app/tree.html">Öppna trädvy</a>
-      </div>
-    </div>
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
 
-    <footer>
-      <p>Status: <strong>GitHub Pages</strong> (statisk) • Data i webbläsaren • Backend valfritt senare.</p>
-    </footer>
-  </div>
+      const user = document.getElementById("username").value.trim();
+      const pass = document.getElementById("password").value.trim();
+
+      if (user === "Kapten" && pass === "1234") {
+        sessionStorage.setItem("demo_auth", "1");
+        window.location.href = "start.html";
+      } else {
+        error.hidden = false;
+      }
+    });
+  </script>
+
 </body>
 </html>
