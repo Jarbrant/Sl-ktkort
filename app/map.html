@@ -76,6 +76,25 @@
     .popup .sectionTitle { margin: 10px 0 4px; font-weight: 800; }
     .popup ul { margin: 0; padding-left: 18px; }
     .popup li { margin: 2px 0; }
+    .popup .submuted { color:#666; font-size: .92rem; }
+
+    .popup .topRow {
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content: space-between;
+      margin: 0 0 8px;
+    }
+    .popup .toggleBtn {
+      border: 1px solid #333;
+      background: #fff;
+      border-radius: 10px;
+      padding: 6px 10px;
+      cursor: pointer;
+      font: inherit;
+      font-size: .95rem;
+      white-space: nowrap;
+    }
   </style>
 </head>
 <body>
@@ -87,7 +106,10 @@
   <a href="./trees.html">Träd</a>
 
   <h1>Släktträd – karta</h1>
-  <p class="muted">Markörer + namn. Klicka på en markör för relationer. Linjer visar förälder↔barn och syskon (streckad).</p>
+  <p class="muted">
+    Markörer + namn. Klicka på en markör för relationer.
+    Linjer: förälder→barn (solid), syskon (streckad), partner med barn ihop (streck-prick).
+  </p>
 </header>
 
 <div class="wrap">
@@ -198,11 +220,16 @@
   }
 
   function siblingWord(sibling){
-    // använd syskonets kön för ordval
     const k = String(sibling?.kon || "").toLowerCase();
     if(k === "kvinna") return "syster";
     if(k === "man") return "bror";
     return "syskon";
+  }
+
+  function normPair(a,b){
+    const x = String(a || "");
+    const y = String(b || "");
+    return (x < y) ? (x + "|" + y) : (y + "|" + x);
   }
 
   // =========================
@@ -258,14 +285,64 @@
   });
 
   // =========================
-  // Relation-indexering
+  // Relation-indexering + AUTO-SYSKON + PARTNER/BARN IHOP
   // =========================
   function buildRelationIndex(rels){
-    const parentsOf = {};   // childId -> [parentId]
-    const childrenOf = {};  // parentId -> [childId]
-    const siblingsOf = {};  // personId -> [siblingId]
-    const siblingPairs = []; // [[a,b]] för linjer
+    const parentsOf = {};      // childId -> [parentId]
+    const childrenOf = {};     // parentId -> [childId]
+    const siblingsOf = {};     // personId -> [siblingId] (union)
+    const siblingPairsSet = new Set();
 
+    const partnersOf = {};     // personId -> [{ otherId, status, fromYear, toYear }]
+    const partnerPairs = [];   // [{ pairKey, aId, bId, status, fromYear, toYear }]
+
+    function addSibling(a,b){
+      if(!a || !b || a === b) return;
+      if(!siblingsOf[a]) siblingsOf[a] = [];
+      if(!siblingsOf[b]) siblingsOf[b] = [];
+      if(!siblingsOf[a].includes(b)) siblingsOf[a].push(b);
+      if(!siblingsOf[b].includes(a)) siblingsOf[b].push(a);
+      siblingPairsSet.add(normPair(a,b));
+    }
+
+    function addPartner(a,b,status,fromYear,toYear){
+      if(!a || !b || a === b) return;
+      const aId = String(a), bId = String(b);
+      const pairKey = normPair(aId,bId);
+
+      const itemA = { otherId: bId, status, fromYear, toYear };
+      const itemB = { otherId: aId, status, fromYear, toYear };
+
+      if(!partnersOf[aId]) partnersOf[aId] = [];
+      if(!partnersOf[bId]) partnersOf[bId] = [];
+
+      const existsA = partnersOf[aId].some(x =>
+        String(x.otherId) === bId &&
+        String(x.status) === String(status) &&
+        (x.fromYear ?? null) === (fromYear ?? null) &&
+        (x.toYear ?? null) === (toYear ?? null)
+      );
+      if(!existsA) partnersOf[aId].push(itemA);
+
+      const existsB = partnersOf[bId].some(x =>
+        String(x.otherId) === aId &&
+        String(x.status) === String(status) &&
+        (x.fromYear ?? null) === (fromYear ?? null) &&
+        (x.toYear ?? null) === (toYear ?? null)
+      );
+      if(!existsB) partnersOf[bId].push(itemB);
+
+      partnerPairs.push({
+        pairKey,
+        aId: aId < bId ? aId : bId,
+        bId: aId < bId ? bId : aId,
+        status: String(status || ""),
+        fromYear: fromYear ?? null,
+        toYear: toYear ?? null
+      });
+    }
+
+    // Samla relationer
     for(const r of (Array.isArray(rels) ? rels : [])){
       if(!r) continue;
 
@@ -285,17 +362,43 @@
         const a = String(r.personAId || "");
         const b = String(r.personBId || "");
         if(!a || !b || a === b) continue;
+        addSibling(a,b);
+      }
 
-        if(!siblingsOf[a]) siblingsOf[a] = [];
-        if(!siblingsOf[b]) siblingsOf[b] = [];
-        if(!siblingsOf[a].includes(b)) siblingsOf[a].push(b);
-        if(!siblingsOf[b].includes(a)) siblingsOf[b].push(a);
-
-        siblingPairs.push([a, b]);
+      if(r.typ === "PARTNER"){
+        const a = String(r.personAId || "");
+        const b = String(r.personBId || "");
+        if(!a || !b || a === b) continue;
+        addPartner(a,b, String(r.status || ""), r.fromYear ?? null, r.toYear ?? null);
       }
     }
 
-    return { parentsOf, childrenOf, siblingsOf, siblingPairs };
+    // AUTO-SYSKON: barn som delar förälder
+    for(const parentId of Object.keys(childrenOf)){
+      const kids = childrenOf[parentId] || [];
+      for(let i=0; i<kids.length; i++){
+        for(let j=i+1; j<kids.length; j++){
+          addSibling(String(kids[i]), String(kids[j]));
+        }
+      }
+    }
+
+    for(const pid of Object.keys(siblingsOf)){
+      siblingsOf[pid].sort();
+    }
+
+    // dedupe partnerPairs
+    const seenPartner = new Set();
+    const uniquePartnerPairs = [];
+    for(const p of partnerPairs){
+      const key = `${p.pairKey}|${p.status}|${String(p.fromYear ?? "")}|${String(p.toYear ?? "")}`;
+      if(seenPartner.has(key)) continue;
+      seenPartner.add(key);
+      uniquePartnerPairs.push(p);
+    }
+
+    const siblingPairs = Array.from(siblingPairsSet).map(k => k.split("|"));
+    return { parentsOf, childrenOf, siblingsOf, siblingPairs, partnersOf, partnerPairs: uniquePartnerPairs };
   }
 
   function renderPersonList(ids, byId, mode){
@@ -305,7 +408,7 @@
       .filter(Boolean)
       .map(p => {
         if(mode === "siblings"){
-          return `<li>${escapeHtml(formatName(p))}${escapeHtml(formatYears(p))} <span class="muted">(${escapeHtml(siblingWord(p))})</span></li>`;
+          return `<li>${escapeHtml(formatName(p))}${escapeHtml(formatYears(p))} <span class="submuted">(${escapeHtml(siblingWord(p))})</span></li>`;
         }
         return `<li>${escapeHtml(formatName(p))}${escapeHtml(formatYears(p))}</li>`;
       })
@@ -313,11 +416,33 @@
     return `<ul>${items}</ul>`;
   }
 
+  function formatPartnerText(p){
+    const status = (p.status || "").toString().trim();
+    const fy = (p.fromYear ?? null);
+    const ty = (p.toYear ?? null);
+    const yearPart = (fy !== null || ty !== null) ? ` (${fy ?? "?"}–${ty ?? "?"})` : "";
+    return `${status || "Partner"}${yearPart}`;
+  }
+
+  function sharedChildren(aId, bId, childrenOf){
+    const aKids = new Set((childrenOf[aId] || []).map(String));
+    const bKids = new Set((childrenOf[bId] || []).map(String));
+    const shared = [];
+    for(const k of aKids){
+      if(bKids.has(k)) shared.push(k);
+    }
+    shared.sort();
+    return shared;
+  }
+
   // =========================
   // Render
   // =========================
   let lastBounds = null;
   let showLines = true;
+
+  // AUTOPATCH: popup-läge per person
+  const popupModeByPersonId = {}; // personId -> "near" | "all"
 
   function updateLinesUi(){
     toggleLinesBtn.textContent = "Linjer: " + (showLines ? "PÅ" : "AV");
@@ -328,6 +453,76 @@
     updateLinesUi();
     renderMap();
   });
+
+  // Globala “render-context” (uppdateras varje renderMap)
+  let _CTX = null;
+
+  function buildPopupHtml(personId, mode){
+    const ctx = _CTX;
+    const p = ctx.byId[personId];
+    if(!p) return `<div class="popup"><div class="error">Okänd person</div></div>`;
+
+    const parents = ctx.parentsOf[personId] || [];
+    const kids = ctx.childrenOf[personId] || [];
+    const sibs = ctx.siblingsOf[personId] || [];
+    const partners = ctx.partnersOf[personId] || [];
+
+    const isAll = (mode === "all");
+    const btnText = isAll ? "Visa bara närmaste" : "Visa allt";
+
+    // Partnerlista:
+    // - "near": visar endast partners där de har minst 1 gemensamt barn
+    // - "all": visar alla partners oavsett gemensamma barn
+    const partnerItems = partners
+      .map(x => {
+        const other = ctx.byId[x.otherId];
+        if(!other) return null;
+
+        const shared = sharedChildren(String(personId), String(x.otherId), ctx.childrenOf);
+        if(!isAll && shared.length === 0) return null;
+
+        const kidsHtml = shared.length
+          ? `<div class="submuted">Barn ihop: ${shared.map(kidId => escapeHtml(formatName(ctx.byId[kidId] || { id: kidId }))).join(", ")}</div>`
+          : `<div class="submuted">Barn ihop: —</div>`;
+
+        return `
+          <li>
+            ${escapeHtml(formatName(other))}${escapeHtml(formatYears(other))}
+            — <span class="submuted">${escapeHtml(formatPartnerText(x))}</span>
+            ${kidsHtml}
+          </li>
+        `;
+      })
+      .filter(Boolean)
+      .join("");
+
+    const partnersHtml = partnerItems ? `<ul>${partnerItems}</ul>` : "<div class='muted'>—</div>";
+
+    function section(title, html, hasAny){
+      if(!isAll && !hasAny) return "";
+      return `<div class="sectionTitle">${title}</div>${html}`;
+    }
+
+    const html = `
+      <div class="popup">
+        <div class="topRow">
+          <div>
+            <h3 style="margin:0;">${escapeHtml(formatName(p))}${escapeHtml(formatYears(p))}</h3>
+            <div class="meta">${escapeHtml(p.plats || "")}</div>
+          </div>
+          <button class="toggleBtn" type="button" data-action="toggleDetails" data-person-id="${escapeHtml(personId)}">
+            ${escapeHtml(btnText)}
+          </button>
+        </div>
+
+        ${section("Föräldrar", renderPersonList(parents, ctx.byId), parents.length > 0)}
+        ${section("Barn", renderPersonList(kids, ctx.byId), kids.length > 0)}
+        ${section("Syskon", renderPersonList(sibs, ctx.byId, "siblings"), sibs.length > 0)}
+        ${section("Partner", partnersHtml, partnerItems.length > 0)}
+      </div>
+    `;
+    return html;
+  }
 
   function renderMap(){
     cardsLayer.clearLayers();
@@ -354,18 +549,28 @@
     const safeRels  = Array.isArray(rels) ? rels : [];
     countRelsEl.textContent = String(safeRels.length);
 
-    // indexera personer
     const byId = {};
     for(const p of safeCards){
       if(p && typeof p.id === "string" && p.id.trim()) byId[p.id] = p;
     }
 
-    const { parentsOf, childrenOf, siblingsOf, siblingPairs } = buildRelationIndex(safeRels);
+    const idx = buildRelationIndex(safeRels);
 
-    // marker-index (personId -> LatLng)
+    // spara “render-context” för popup-toggle
+    _CTX = {
+      treeId,
+      treeName,
+      byId,
+      parentsOf: idx.parentsOf,
+      childrenOf: idx.childrenOf,
+      siblingsOf: idx.siblingsOf,
+      partnersOf: idx.partnersOf,
+      partnerPairs: idx.partnerPairs,
+      siblingPairs: idx.siblingPairs
+    };
+
     const posById = {};
 
-    // lägg markörer
     let countWithCoords = 0;
     for(const p of safeCards){
       const c = parseCoordsObj(p);
@@ -374,24 +579,11 @@
       countWithCoords++;
       posById[p.id] = L.latLng(c.lat, c.lon);
 
-      const popupHtml = `
-        <div class="popup">
-          <h3>${escapeHtml(formatName(p))}${escapeHtml(formatYears(p))}</h3>
-          <div class="meta">${escapeHtml(p.plats || "")}</div>
-
-          <div class="sectionTitle">Föräldrar</div>
-          ${renderPersonList(parentsOf[p.id] || [], byId)}
-
-          <div class="sectionTitle">Barn</div>
-          ${renderPersonList(childrenOf[p.id] || [], byId)}
-
-          <div class="sectionTitle">Syskon</div>
-          ${renderPersonList(siblingsOf[p.id] || [], byId, "siblings")}
-        </div>
-      `;
+      if(!popupModeByPersonId[p.id]) popupModeByPersonId[p.id] = "near";
+      const initialHtml = buildPopupHtml(p.id, popupModeByPersonId[p.id]);
 
       const marker = L.marker([c.lat, c.lon]).addTo(cardsLayer);
-      marker.bindPopup(popupHtml);
+      marker.bindPopup(initialHtml);
 
       marker.bindTooltip(escapeHtml(formatName(p)), {
         permanent: true,
@@ -412,14 +604,12 @@
       return;
     }
 
-    // rita linjer (enkla)
     let drawnLines = 0;
 
     if(showLines){
-      // Förälder–barn (solid)
+      // 1) Förälder–barn (solid)
       for(const r of safeRels){
         if(!r || r.typ !== "FORALDER_BARN") continue;
-
         const parentId = String(r.franPersonId || "");
         const childId  = String(r.tillPersonId || "");
         if(!parentId || !childId) continue;
@@ -432,8 +622,8 @@
         drawnLines++;
       }
 
-      // Syskon (streckad)
-      for(const [a,b] of siblingPairs){
+      // 2) Syskon (streckad)
+      for(const [a,b] of idx.siblingPairs){
         const p1 = posById[a];
         const p2 = posById[b];
         if(!p1 || !p2) continue;
@@ -441,12 +631,57 @@
         L.polyline([p1, p2], { weight: 2, opacity: 0.6, dashArray: "6 6" }).addTo(linesLayer);
         drawnLines++;
       }
+
+      // 3) Partnerlinje endast om de har minst 1 gemensamt barn (streck-prick)
+      const drawnPartnerPair = new Set();
+      for(const pr of idx.partnerPairs){
+        const aId = String(pr.aId || "");
+        const bId = String(pr.bId || "");
+        if(!aId || !bId) continue;
+
+        const shared = sharedChildren(aId, bId, idx.childrenOf);
+        if(shared.length === 0) continue;
+
+        const p1 = posById[aId];
+        const p2 = posById[bId];
+        if(!p1 || !p2) continue;
+
+        const key = `${normPair(aId,bId)}|${String(pr.status)}|${String(pr.fromYear ?? "")}|${String(pr.toYear ?? "")}`;
+        if(drawnPartnerPair.has(key)) continue;
+        drawnPartnerPair.add(key);
+
+        L.polyline([p1, p2], { weight: 2, opacity: 0.65, dashArray: "10 6 2 6" }).addTo(linesLayer);
+        drawnLines++;
+      }
     }
 
     countLinesEl.textContent = String(drawnLines);
-
     setMsg("ok", `Klar: ${countWithCoords} markörer, ${drawnLines} linjer i '${treeName}'.`);
   }
+
+  // AUTOPATCH: popup toggle (Visa allt / Visa bara närmaste)
+  map.on("popupopen", (e) => {
+    const popupEl = e.popup.getElement();
+    if(!popupEl) return;
+
+    const btn = popupEl.querySelector('button[data-action="toggleDetails"]');
+    if(!btn) return;
+
+    btn.addEventListener("click", () => {
+      const personId = String(btn.getAttribute("data-person-id") || "");
+      if(!personId || !_CTX || !_CTX.byId[personId]) return;
+
+      const current = popupModeByPersonId[personId] || "near";
+      const next = (current === "near") ? "all" : "near";
+      popupModeByPersonId[personId] = next;
+
+      const html = buildPopupHtml(personId, next);
+      e.popup.setContent(html);
+
+      // viktigt: Leaflet bygger ny DOM efter setContent → knappen byts ut
+      // så vi låter popupopen-eventet trigga igen när användaren klickar nästa gång
+    }, { once: true });
+  });
 
   reloadBtn.addEventListener("click", renderMap);
   fitBtn.addEventListener("click", () => {
