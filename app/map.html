@@ -3,696 +3,549 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Karta – Släktträd</title>
+  <title>Karta – Släktkort</title>
+  <meta name="description" content="Steg 3: Visa personer med koordinater i aktivt träd (GitHub Pages / localStorage)." />
 
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <!-- Leaflet (CDN) -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
 
   <style>
-    body { font-family: system-ui, Arial, sans-serif; margin: 0; }
-    header { padding: 16px 20px; border-bottom: 1px solid #ddd; }
-    header a { margin-right: 12px; color: inherit; }
-    h1 { margin: 8px 0 6px; font-size: 1.2rem; }
-    .muted { color:#555; margin:0; }
-
-    .wrap { padding: 12px 20px; }
-    .msg { margin-top: 10px; }
-    .ok { font-weight: 800; }
-    .error { color:#b00020; font-weight: 800; }
-
-    #map {
-      height: 72vh;
-      margin-top: 14px;
-      border: 1px solid #ddd;
-      border-radius: 12px;
-      overflow: hidden;
-    }
-
-    .panelRow {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: center;
-      margin-top: 10px;
-    }
-    .chip {
-      display:inline-block;
-      padding: 6px 10px;
-      border: 1px solid #ddd;
-      border-radius: 999px;
-      background: #fafafa;
-      color:#333;
-      font-size: .95rem;
-    }
-    .actions button {
-      padding: 8px 10px;
-      border: 1px solid #333;
+    :root { color-scheme: light; }
+    body{
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      line-height: 1.5;
+      margin: 0;
+      padding: 24px;
+      max-width: 1100px;
+      margin-inline: auto;
       background: #fff;
-      border-radius: 10px;
-      cursor: pointer;
+      color: #111;
     }
+    a{ color: inherit; text-decoration:none; }
 
-    .coordsBox {
-      margin-top: 10px;
-      padding: 10px 12px;
-      border: 1px solid #ddd;
-      border-radius: 10px;
-      background: #fafafa;
-      max-width: 720px;
-    }
-    .coordsBox code { background:#f0f0f0; padding: 2px 6px; border-radius: 6px; }
-
-    .name-label {
-      background: rgba(255,255,255,0.95);
-      border: 1px solid #ddd;
-      border-radius: 10px;
-      padding: 2px 8px;
-      font-size: 12px;
-      white-space: nowrap;
-      box-shadow: 0 2px 10px rgba(0,0,0,.06);
-    }
-
-    .popup h3 { margin: 0 0 6px; font-size: 1rem; }
-    .popup .meta { margin: 0 0 8px; color:#555; }
-    .popup .sectionTitle { margin: 10px 0 4px; font-weight: 800; }
-    .popup ul { margin: 0; padding-left: 18px; }
-    .popup li { margin: 2px 0; }
-    .popup .submuted { color:#666; font-size: .92rem; }
-
-    .popup .topRow {
+    header{
       display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:18px;
+    }
+    h1{ margin:0 0 6px; font-size:1.6rem; }
+    .muted{ color:#555; margin:0 0 12px; }
+
+    .topbar{
+      display:flex;
+      flex-wrap:wrap;
       gap:10px;
       align-items:center;
-      justify-content: space-between;
-      margin: 0 0 8px;
+      margin: 10px 0 0;
     }
-    .popup .toggleBtn {
-      border: 1px solid #333;
-      background: #fff;
-      border-radius: 10px;
-      padding: 6px 10px;
-      cursor: pointer;
-      font: inherit;
-      font-size: .95rem;
-      white-space: nowrap;
+    .btn, button{
+      display:inline-block;
+      padding:10px 12px;
+      border:1px solid #333;
+      border-radius:10px;
+      background:#fff;
+      font:inherit;
+      cursor:pointer;
+      text-decoration:none;
     }
+    .btn.secondary{ border-color:#bbb; }
+    .btn.danger{ border-color:#b00020; color:#b00020; }
+    .btn.disabled{
+      opacity:.45;
+      cursor:not-allowed;
+      pointer-events:none;
+    }
+
+    .pillRow{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin: 10px 0 18px;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 10px;
+      border:1px solid #ddd;
+      border-radius:999px;
+      background:#fafafa;
+      font-size:.95rem;
+    }
+    .pill strong{ font-weight:900; }
+    .pill.ok{ border-color:#cfe8cf; background:#f5fff5; }
+    .pill.warn{ border-color:#ffe1a6; background:#fff9ee; }
+    .pill.err{ border-color:#ffb3b3; background:#fff2f2; }
+
+    .grid{
+      display:grid;
+      gap:14px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 980px){
+      .grid{ grid-template-columns: 360px 1fr; }
+    }
+
+    .card{
+      border:1px solid #ddd;
+      border-radius:12px;
+      padding:16px;
+      background:#fff;
+    }
+    .card h2{ margin:0 0 6px; font-size:1.15rem; }
+    .small{ font-size:.95rem; color:#555; margin:0 0 10px; }
+
+    label{ display:block; margin:10px 0 6px; font-weight:800; }
+    input, select{
+      width:100%;
+      box-sizing:border-box;
+      padding:10px;
+      border-radius:10px;
+      border:1px solid #bbb;
+      font:inherit;
+      background:#fff;
+    }
+
+    .actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-top: 12px;
+    }
+
+    #map{
+      width:100%;
+      height: 540px;
+      border-radius:12px;
+      border: 1px solid #ddd;
+      overflow:hidden;
+      background:#f4f4f4;
+    }
+    @media (max-width: 520px){
+      #map{ height: 420px; }
+    }
+
+    .error{ color:#b00020; font-weight:900; }
+    .ok{ font-weight:900; }
+
+    .list{
+      margin: 10px 0 0;
+      padding: 0;
+      list-style:none;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      max-height: 360px;
+      overflow:auto;
+      border-top: 1px solid #eee;
+      padding-top: 10px;
+    }
+    .item{
+      border:1px solid #eee;
+      border-radius:12px;
+      padding:10px;
+      background:#fff;
+      cursor:pointer;
+    }
+    .item:hover{ background:#fafafa; }
+    .itemTitle{ font-weight:900; margin:0 0 2px; }
+    .itemMeta{ margin:0; color:#555; font-size:.95rem; }
+    .hintBox{
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid #ffe1a6;
+      background: #fff9ee;
+    }
+    code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
   </style>
 </head>
+
 <body>
-
 <header>
-  <a href="../start.html">← Till startsidan</a>
-  <a href="./slaktkort.html">Släktkort</a>
-  <a href="./create-relation.html">Relationer</a>
-  <a href="./trees.html">Träd</a>
+  <div>
+    <h1>Karta</h1>
+    <p class="muted">Steg 3 i flödet. Visar personer med koordinater i <strong>aktivt träd</strong>.</p>
 
-  <h1>Släktträd – karta</h1>
-  <p class="muted">
-    Markörer + namn. Klicka på en markör för relationer.
-    Linjer: förälder→barn (solid), syskon (streckad), partner med barn ihop (streck-prick).
-  </p>
+    <nav class="topbar" aria-label="Navigation">
+      <a class="btn secondary" href="../start.html">Start</a>
+      <a class="btn secondary" href="./trees.html">Träd</a>
+      <a class="btn secondary" href="./slaktkort.html">Personer</a>
+      <a class="btn secondary" href="./create-relation.html">Relationer</a>
+      <a class="btn" href="./map.html">Karta</a>
+      <a class="btn secondary" href="./place-picker.html">Plats-picker</a>
+    </nav>
+  </div>
+
+  <div class="actions" style="justify-content:flex-end;">
+    <button id="logoutBtn" class="btn secondary" type="button">Logga ut</button>
+  </div>
 </header>
 
-<div class="wrap">
-  <div id="msg" class="msg muted" aria-live="polite"></div>
+<section class="pillRow" aria-label="Status">
+  <span id="pillTree" class="pill warn">Aktivt träd: <strong>—</strong></span>
+  <span id="pillPeople" class="pill">Personer: <strong>0</strong></span>
+  <span id="pillWithCoords" class="pill">Med koordinater: <strong>0</strong></span>
+  <span id="pillMode" class="pill warn">Läge: <strong>Välj träd</strong></span>
+</section>
 
-  <div class="panelRow">
-    <span class="chip">Aktivt träd: <strong id="activeTreeName">—</strong></span>
-    <span class="chip">Släktkort med coords: <strong id="countCards">0</strong></span>
-    <span class="chip">Relationer: <strong id="countRels">0</strong></span>
-    <span class="chip">Linjer: <strong id="countLines">0</strong></span>
+<div class="grid">
+  <section class="card" aria-label="Kontroller">
+    <h2>Filter & lista</h2>
+    <p class="small">Klicka en person för att zooma och öppna markörens info.</p>
 
-    <span class="actions">
-      <button id="reloadBtn" type="button">Ladda om</button>
-      <button id="fitBtn" type="button">Zooma till alla</button>
-      <button id="togglePickerBtn" type="button">Plats-picker: AV</button>
-      <button id="toggleLinesBtn" type="button">Linjer: PÅ</button>
-    </span>
-  </div>
+    <label for="search">Sök</label>
+    <input id="search" placeholder="Sök namn eller plats…" autocomplete="off" />
 
-  <div class="coordsBox">
-    Plats-picker (valfri, för test): <code id="coordsOut">—</code>
-  </div>
+    <div class="actions">
+      <button id="refreshBtn" type="button" class="btn secondary">Uppdatera</button>
+      <button id="fitBtn" type="button" class="btn">Zooma till alla</button>
+      <a class="btn secondary" href="./slaktkort.html">Lägg till koordinater</a>
+    </div>
 
-  <div id="map"></div>
+    <div id="hint" class="hintBox" hidden></div>
+
+    <ul id="list" class="list" aria-label="Personer med koordinater"></ul>
+
+    <div class="actions" style="margin-top:14px;">
+      <a class="btn secondary" href="./create-relation.html">← Tillbaka (Relationer)</a>
+      <a class="btn secondary" href="./slaktkort.html">← Tillbaka (Personer)</a>
+    </div>
+  </section>
+
+  <section class="card" aria-label="Karta">
+    <h2>Karta</h2>
+    <p class="small">OpenStreetMap via Leaflet. Funkar på GitHub Pages.</p>
+    <div id="map" role="application" aria-label="Karta med markörer"></div>
+    <p id="msg" class="muted" aria-live="polite" style="margin-top:10px;"></p>
+  </section>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-
 <script>
-  // =========================
-  // LocalStorage keys
-  // =========================
-  const KEY_TREES  = "slakttradet_trees";
-  const KEY_ACTIVE = "slakttradet_active_tree_id";
-  function cardsKey(treeId){ return "slakttradet_slaktkort_" + String(treeId); }
-  function relKey(treeId){ return "slakttradet_relationer_" + String(treeId); }
+  // ============================
+  // Estetisk auth-guard
+  // ============================
+  (function authGuard(){
+    try{
+      if(sessionStorage.getItem("demo_auth") !== "1"){
+        window.location.href = "../index.html";
+      }
+    }catch{}
+  })();
 
+  // ============================
+  // Keys (måste matcha dina andra sidor)
+  // ============================
+  const KEY_TREES    = "slakttradet_trees";
+  const KEY_ACTIVE   = "slakttradet_active_tree_id";
+  const KEY_LAST_LOC = "slakttradet_last_location";
+
+  const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
+
+  // ============================
   // DOM
+  // ============================
+  const logoutBtn = document.getElementById("logoutBtn");
   const msg = document.getElementById("msg");
-  const coordsOut = document.getElementById("coordsOut");
-  const activeTreeNameEl = document.getElementById("activeTreeName");
-  const countCardsEl = document.getElementById("countCards");
-  const countRelsEl = document.getElementById("countRels");
-  const countLinesEl = document.getElementById("countLines");
+  const hint = document.getElementById("hint");
 
-  const reloadBtn = document.getElementById("reloadBtn");
+  const pillTree = document.getElementById("pillTree");
+  const pillPeople = document.getElementById("pillPeople");
+  const pillWithCoords = document.getElementById("pillWithCoords");
+  const pillMode = document.getElementById("pillMode");
+
+  const searchEl = document.getElementById("search");
+  const refreshBtn = document.getElementById("refreshBtn");
   const fitBtn = document.getElementById("fitBtn");
-  const togglePickerBtn = document.getElementById("togglePickerBtn");
-  const toggleLinesBtn = document.getElementById("toggleLinesBtn");
+  const listEl = document.getElementById("list");
 
-  function setMsg(type, text) {
-    msg.className = "msg " + (type === "error" ? "error" : type === "ok" ? "ok" : "muted");
-    msg.textContent = text;
+  // ============================
+  // Helpers
+  // ============================
+  function safeParse(raw, fallback){ try{ return JSON.parse(raw); }catch{ return fallback; } }
+  function loadJson(key, fallback){
+    const raw = localStorage.getItem(key);
+    return raw ? safeParse(raw, fallback) : fallback;
+  }
+  function activeTreeId(){ return localStorage.getItem(KEY_ACTIVE) || ""; }
+  function getTrees(){
+    const trees = loadJson(KEY_TREES, []);
+    return Array.isArray(trees) ? trees : [];
+  }
+  function activeTreeLabel(){
+    const id = activeTreeId();
+    if(!id) return "—";
+    const t = getTrees().find(x => String(x.id) === String(id));
+    return t ? (t.name || t.id) : id;
+  }
+  function personName(p){
+    const n = `${p.fornamn || ""} ${p.efternamn || ""}`.trim();
+    return n || "(namnlös)";
+  }
+  function coordsFromPerson(p){
+    // vi accepterar både p.coords={lat,lon} och p.coords="lat, lon"
+    if(p && typeof p.coords === "object" && p.coords){
+      const lat = Number(p.coords.lat);
+      const lon = Number(p.coords.lon);
+      if(Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon };
+    }
+    if(typeof p.coords === "string"){
+      const s = p.coords.trim();
+      const parts = s.split(",").map(x => x.trim()).filter(Boolean);
+      if(parts.length === 2){
+        const lat = Number(parts[0]);
+        const lon = Number(parts[1]);
+        if(Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon };
+      }
+    }
+    return null;
   }
 
-  function loadJson(key, fallback){
-    try{
-      const raw = localStorage.getItem(key);
-      if(!raw) return fallback;
-      return JSON.parse(raw);
-    }catch{
-      return fallback;
+  function setPill(el, kind, html){
+    el.className = "pill " + (kind || "");
+    el.innerHTML = html;
+  }
+
+  // ============================
+  // Leaflet setup
+  // ============================
+  const map = L.map("map", { zoomControl: true });
+  const tiles = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap'
+  });
+  tiles.addTo(map);
+
+  // Default: Stockholm-ish (om inget finns)
+  map.setView([59.3293, 18.0686], 5);
+
+  let markerLayer = L.layerGroup().addTo(map);
+  let markersById = new Map(); // personId -> marker
+
+  function clearMarkers(){
+    markerLayer.clearLayers();
+    markersById.clear();
+  }
+
+  function openMarker(personId){
+    const m = markersById.get(personId);
+    if(!m) return;
+    m.openPopup();
+    map.setView(m.getLatLng(), Math.max(map.getZoom(), 10), { animate: true });
+  }
+
+  function fitToMarkers(){
+    const ll = [];
+    markersById.forEach(m => ll.push(m.getLatLng()));
+    if(ll.length === 0) return;
+    const bounds = L.latLngBounds(ll);
+    map.fitBounds(bounds.pad(0.2));
+  }
+
+  // ============================
+  // Data + render
+  // ============================
+  function loadPeople(){
+    const t = activeTreeId();
+    if(!t) return [];
+    const arr = loadJson(cardsKey(t), []);
+    return Array.isArray(arr) ? arr : [];
+  }
+
+  function renderStatus(allPeople, peopleWithCoords){
+    const t = activeTreeId();
+    const hasTrees = getTrees().length > 0;
+    const hasActive = !!t;
+
+    setPill(
+      pillTree,
+      hasActive ? "ok" : (hasTrees ? "warn" : "err"),
+      "Aktivt träd: <strong>" + (hasActive ? activeTreeLabel() : "—") + "</strong>"
+    );
+
+    pillPeople.innerHTML = "Personer: <strong>" + allPeople.length + "</strong>";
+    pillWithCoords.innerHTML = "Med koordinater: <strong>" + peopleWithCoords.length + "</strong>";
+
+    if(!hasTrees){
+      setPill(pillMode, "err", "Läge: <strong>Skapa träd</strong>");
+    }else if(!hasActive){
+      setPill(pillMode, "warn", "Läge: <strong>Välj aktivt träd</strong>");
+    }else if(peopleWithCoords.length === 0){
+      setPill(pillMode, "warn", "Läge: <strong>Lägg koordinater</strong>");
+    }else{
+      setPill(pillMode, "ok", "Läge: <strong>Visa karta</strong>");
     }
   }
 
-  function setCoordsText(lat, lon) {
-    coordsOut.textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+  function renderHint(hasTrees, hasActive, peopleWithCoords){
+    if(!hasTrees){
+      hint.hidden = false;
+      hint.innerHTML = "<strong>🚩 Inga träd:</strong> Gå till <a href='./trees.html'><code>Träd</code></a> och skapa ett träd.";
+      return;
+    }
+    if(!hasActive){
+      hint.hidden = false;
+      hint.innerHTML = "<strong>🚩 Inget aktivt träd:</strong> Välj aktivt träd i <a href='./trees.html'><code>Träd</code></a>.";
+      return;
+    }
+    if(peopleWithCoords.length === 0){
+      hint.hidden = false;
+      hint.innerHTML =
+        "<strong>Tip:</strong> Inga personer har koordinater ännu. " +
+        "Gå till <a href='./slaktkort.html'><code>Personer</code></a> och sätt coords (eller via <a href='./place-picker.html'><code>Plats-picker</code></a>).";
+      return;
+    }
+    hint.hidden = true;
+    hint.innerHTML = "";
   }
 
-  function getActiveTreeId(){
-    return localStorage.getItem(KEY_ACTIVE) || "";
-  }
+  function renderList(people){
+    listEl.innerHTML = "";
+    if(people.length === 0){
+      const li = document.createElement("li");
+      li.className = "item";
+      li.style.cursor = "default";
+      li.innerHTML = "<p class='itemTitle'>Inga personer att visa</p><p class='itemMeta'>Lägg koordinater i Personer.</p>";
+      listEl.appendChild(li);
+      return;
+    }
 
-  function getActiveTreeName(treeId){
-    const trees = loadJson(KEY_TREES, []);
-    const t = Array.isArray(trees) ? trees.find(x => String(x.id) === String(treeId)) : null;
-    return t?.name ? String(t.name) : (treeId ? String(treeId) : "—");
-  }
+    for(const p of people){
+      const c = coordsFromPerson(p);
+      const place = (p.plats || "").trim();
+      const year = [
+        (p.fodelsear != null ? String(p.fodelsear) : ""),
+        (p.dodsar != null ? String(p.dodsar) : "")
+      ].filter(Boolean).join("–");
 
-  function formatName(p){
-    return `${p.fornamn || ""} ${p.efternamn || ""}`.trim() || "(namnlös)";
-  }
+      const li = document.createElement("li");
+      li.className = "item";
+      li.dataset.id = String(p.id);
 
-  function formatYears(p){
-    const a = (p.fodelsear ?? "") !== null && (p.fodelsear ?? "") !== "" ? p.fodelsear : "";
-    const b = (p.dodsar ?? "") !== null && (p.dodsar ?? "") !== "" ? p.dodsar : "";
-    if(!a && !b) return "";
-    return ` (${a || "?"}–${b || "?"})`;
-  }
+      li.innerHTML =
+        "<p class='itemTitle'>" + escapeHtml(personName(p)) + "</p>" +
+        "<p class='itemMeta'>" +
+        (year ? escapeHtml(year) + " · " : "") +
+        (place ? escapeHtml(place) + " · " : "") +
+        (c ? (Number(c.lat).toFixed(4) + ", " + Number(c.lon).toFixed(4)) : "—") +
+        "</p>";
 
-  function parseCoordsObj(p){
-    if(!p || !p.coords) return null;
-    const lat = Number(p.coords.lat);
-    const lon = Number(p.coords.lon);
-    if(!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-    if(lat < -90 || lat > 90) return null;
-    if(lon < -180 || lon > 180) return null;
-    return { lat, lon };
+      li.addEventListener("click", () => openMarker(String(p.id)));
+      listEl.appendChild(li);
+    }
   }
 
   function escapeHtml(s){
-    return String(s)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
+    return String(s || "")
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
   }
 
-  function siblingWord(sibling){
-    const k = String(sibling?.kon || "").toLowerCase();
-    if(k === "kvinna") return "syster";
-    if(k === "man") return "bror";
-    return "syskon";
-  }
+  function renderMap(people){
+    clearMarkers();
 
-  function normPair(a,b){
-    const x = String(a || "");
-    const y = String(b || "");
-    return (x < y) ? (x + "|" + y) : (y + "|" + x);
-  }
-
-  // =========================
-  // Leaflet init
-  // =========================
-  const map = L.map("map").setView([62.0, 15.0], 5);
-
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: "&copy; OpenStreetMap contributors"
-  }).addTo(map);
-
-  const linesLayer = L.layerGroup().addTo(map);
-  const cardsLayer = L.layerGroup().addTo(map);
-
-  // =========================
-  // Plats-picker (valfri)
-  // =========================
-  let pickerEnabled = false;
-  let pickMarker = null;
-
-  function ensurePickMarker(latlng) {
-    if (!pickMarker) {
-      pickMarker = L.marker(latlng, { draggable: true }).addTo(map);
-      pickMarker.bindPopup("Vald punkt (dra och släpp)").openPopup();
-
-      pickMarker.on("dragend", () => {
-        const ll = pickMarker.getLatLng();
-        setCoordsText(ll.lat, ll.lng);
-        setMsg("ok", "Punkt uppdaterad (drag & drop).");
-      });
-    } else {
-      pickMarker.setLatLng(latlng);
-    }
-    const ll = pickMarker.getLatLng();
-    setCoordsText(ll.lat, ll.lng);
-  }
-
-  map.on("click", (e) => {
-    if(!pickerEnabled) return;
-    ensurePickMarker(e.latlng);
-    setMsg("ok", "Punkt satt (plats-picker).");
-  });
-
-  function updatePickerUi(){
-    togglePickerBtn.textContent = "Plats-picker: " + (pickerEnabled ? "PÅ" : "AV");
-  }
-
-  togglePickerBtn.addEventListener("click", () => {
-    pickerEnabled = !pickerEnabled;
-    updatePickerUi();
-    setMsg("", pickerEnabled ? "Plats-picker är PÅ. Klicka i kartan för att sätta punkt." : "Plats-picker är AV.");
-  });
-
-  // =========================
-  // Relation-indexering + AUTO-SYSKON + PARTNER/BARN IHOP
-  // =========================
-  function buildRelationIndex(rels){
-    const parentsOf = {};      // childId -> [parentId]
-    const childrenOf = {};     // parentId -> [childId]
-    const siblingsOf = {};     // personId -> [siblingId] (union)
-    const siblingPairsSet = new Set();
-
-    const partnersOf = {};     // personId -> [{ otherId, status, fromYear, toYear }]
-    const partnerPairs = [];   // [{ pairKey, aId, bId, status, fromYear, toYear }]
-
-    function addSibling(a,b){
-      if(!a || !b || a === b) return;
-      if(!siblingsOf[a]) siblingsOf[a] = [];
-      if(!siblingsOf[b]) siblingsOf[b] = [];
-      if(!siblingsOf[a].includes(b)) siblingsOf[a].push(b);
-      if(!siblingsOf[b].includes(a)) siblingsOf[b].push(a);
-      siblingPairsSet.add(normPair(a,b));
-    }
-
-    function addPartner(a,b,status,fromYear,toYear){
-      if(!a || !b || a === b) return;
-      const aId = String(a), bId = String(b);
-      const pairKey = normPair(aId,bId);
-
-      const itemA = { otherId: bId, status, fromYear, toYear };
-      const itemB = { otherId: aId, status, fromYear, toYear };
-
-      if(!partnersOf[aId]) partnersOf[aId] = [];
-      if(!partnersOf[bId]) partnersOf[bId] = [];
-
-      const existsA = partnersOf[aId].some(x =>
-        String(x.otherId) === bId &&
-        String(x.status) === String(status) &&
-        (x.fromYear ?? null) === (fromYear ?? null) &&
-        (x.toYear ?? null) === (toYear ?? null)
-      );
-      if(!existsA) partnersOf[aId].push(itemA);
-
-      const existsB = partnersOf[bId].some(x =>
-        String(x.otherId) === aId &&
-        String(x.status) === String(status) &&
-        (x.fromYear ?? null) === (fromYear ?? null) &&
-        (x.toYear ?? null) === (toYear ?? null)
-      );
-      if(!existsB) partnersOf[bId].push(itemB);
-
-      partnerPairs.push({
-        pairKey,
-        aId: aId < bId ? aId : bId,
-        bId: aId < bId ? bId : aId,
-        status: String(status || ""),
-        fromYear: fromYear ?? null,
-        toYear: toYear ?? null
-      });
-    }
-
-    // Samla relationer
-    for(const r of (Array.isArray(rels) ? rels : [])){
-      if(!r) continue;
-
-      if(r.typ === "FORALDER_BARN"){
-        const parentId = String(r.franPersonId || "");
-        const childId  = String(r.tillPersonId || "");
-        if(!parentId || !childId) continue;
-
-        if(!parentsOf[childId]) parentsOf[childId] = [];
-        if(!parentsOf[childId].includes(parentId)) parentsOf[childId].push(parentId);
-
-        if(!childrenOf[parentId]) childrenOf[parentId] = [];
-        if(!childrenOf[parentId].includes(childId)) childrenOf[parentId].push(childId);
-      }
-
-      if(r.typ === "SYSKON"){
-        const a = String(r.personAId || "");
-        const b = String(r.personBId || "");
-        if(!a || !b || a === b) continue;
-        addSibling(a,b);
-      }
-
-      if(r.typ === "PARTNER"){
-        const a = String(r.personAId || "");
-        const b = String(r.personBId || "");
-        if(!a || !b || a === b) continue;
-        addPartner(a,b, String(r.status || ""), r.fromYear ?? null, r.toYear ?? null);
-      }
-    }
-
-    // AUTO-SYSKON: barn som delar förälder
-    for(const parentId of Object.keys(childrenOf)){
-      const kids = childrenOf[parentId] || [];
-      for(let i=0; i<kids.length; i++){
-        for(let j=i+1; j<kids.length; j++){
-          addSibling(String(kids[i]), String(kids[j]));
-        }
-      }
-    }
-
-    for(const pid of Object.keys(siblingsOf)){
-      siblingsOf[pid].sort();
-    }
-
-    // dedupe partnerPairs
-    const seenPartner = new Set();
-    const uniquePartnerPairs = [];
-    for(const p of partnerPairs){
-      const key = `${p.pairKey}|${p.status}|${String(p.fromYear ?? "")}|${String(p.toYear ?? "")}`;
-      if(seenPartner.has(key)) continue;
-      seenPartner.add(key);
-      uniquePartnerPairs.push(p);
-    }
-
-    const siblingPairs = Array.from(siblingPairsSet).map(k => k.split("|"));
-    return { parentsOf, childrenOf, siblingsOf, siblingPairs, partnersOf, partnerPairs: uniquePartnerPairs };
-  }
-
-  function renderPersonList(ids, byId, mode){
-    if(!ids || ids.length === 0) return "<div class='muted'>—</div>";
-    const items = ids
-      .map(id => byId[id])
-      .filter(Boolean)
-      .map(p => {
-        if(mode === "siblings"){
-          return `<li>${escapeHtml(formatName(p))}${escapeHtml(formatYears(p))} <span class="submuted">(${escapeHtml(siblingWord(p))})</span></li>`;
-        }
-        return `<li>${escapeHtml(formatName(p))}${escapeHtml(formatYears(p))}</li>`;
-      })
-      .join("");
-    return `<ul>${items}</ul>`;
-  }
-
-  function formatPartnerText(p){
-    const status = (p.status || "").toString().trim();
-    const fy = (p.fromYear ?? null);
-    const ty = (p.toYear ?? null);
-    const yearPart = (fy !== null || ty !== null) ? ` (${fy ?? "?"}–${ty ?? "?"})` : "";
-    return `${status || "Partner"}${yearPart}`;
-  }
-
-  function sharedChildren(aId, bId, childrenOf){
-    const aKids = new Set((childrenOf[aId] || []).map(String));
-    const bKids = new Set((childrenOf[bId] || []).map(String));
-    const shared = [];
-    for(const k of aKids){
-      if(bKids.has(k)) shared.push(k);
-    }
-    shared.sort();
-    return shared;
-  }
-
-  // =========================
-  // Render
-  // =========================
-  let lastBounds = null;
-  let showLines = true;
-
-  // AUTOPATCH: popup-läge per person
-  const popupModeByPersonId = {}; // personId -> "near" | "all"
-
-  function updateLinesUi(){
-    toggleLinesBtn.textContent = "Linjer: " + (showLines ? "PÅ" : "AV");
-  }
-
-  toggleLinesBtn.addEventListener("click", () => {
-    showLines = !showLines;
-    updateLinesUi();
-    renderMap();
-  });
-
-  // Globala “render-context” (uppdateras varje renderMap)
-  let _CTX = null;
-
-  function buildPopupHtml(personId, mode){
-    const ctx = _CTX;
-    const p = ctx.byId[personId];
-    if(!p) return `<div class="popup"><div class="error">Okänd person</div></div>`;
-
-    const parents = ctx.parentsOf[personId] || [];
-    const kids = ctx.childrenOf[personId] || [];
-    const sibs = ctx.siblingsOf[personId] || [];
-    const partners = ctx.partnersOf[personId] || [];
-
-    const isAll = (mode === "all");
-    const btnText = isAll ? "Visa bara närmaste" : "Visa allt";
-
-    // Partnerlista:
-    // - "near": visar endast partners där de har minst 1 gemensamt barn
-    // - "all": visar alla partners oavsett gemensamma barn
-    const partnerItems = partners
-      .map(x => {
-        const other = ctx.byId[x.otherId];
-        if(!other) return null;
-
-        const shared = sharedChildren(String(personId), String(x.otherId), ctx.childrenOf);
-        if(!isAll && shared.length === 0) return null;
-
-        const kidsHtml = shared.length
-          ? `<div class="submuted">Barn ihop: ${shared.map(kidId => escapeHtml(formatName(ctx.byId[kidId] || { id: kidId }))).join(", ")}</div>`
-          : `<div class="submuted">Barn ihop: —</div>`;
-
-        return `
-          <li>
-            ${escapeHtml(formatName(other))}${escapeHtml(formatYears(other))}
-            — <span class="submuted">${escapeHtml(formatPartnerText(x))}</span>
-            ${kidsHtml}
-          </li>
-        `;
-      })
-      .filter(Boolean)
-      .join("");
-
-    const partnersHtml = partnerItems ? `<ul>${partnerItems}</ul>` : "<div class='muted'>—</div>";
-
-    function section(title, html, hasAny){
-      if(!isAll && !hasAny) return "";
-      return `<div class="sectionTitle">${title}</div>${html}`;
-    }
-
-    const html = `
-      <div class="popup">
-        <div class="topRow">
-          <div>
-            <h3 style="margin:0;">${escapeHtml(formatName(p))}${escapeHtml(formatYears(p))}</h3>
-            <div class="meta">${escapeHtml(p.plats || "")}</div>
-          </div>
-          <button class="toggleBtn" type="button" data-action="toggleDetails" data-person-id="${escapeHtml(personId)}">
-            ${escapeHtml(btnText)}
-          </button>
-        </div>
-
-        ${section("Föräldrar", renderPersonList(parents, ctx.byId), parents.length > 0)}
-        ${section("Barn", renderPersonList(kids, ctx.byId), kids.length > 0)}
-        ${section("Syskon", renderPersonList(sibs, ctx.byId, "siblings"), sibs.length > 0)}
-        ${section("Partner", partnersHtml, partnerItems.length > 0)}
-      </div>
-    `;
-    return html;
-  }
-
-  function renderMap(){
-    cardsLayer.clearLayers();
-    linesLayer.clearLayers();
-    lastBounds = null;
-    countLinesEl.textContent = "0";
-
-    const treeId = getActiveTreeId();
-    if(!treeId){
-      activeTreeNameEl.textContent = "—";
-      countCardsEl.textContent = "0";
-      countRelsEl.textContent = "0";
-      setMsg("error", "Inget aktivt träd valt. Gå till 'Träd' och välj ett träd.");
-      return;
-    }
-
-    const treeName = getActiveTreeName(treeId);
-    activeTreeNameEl.textContent = treeName;
-
-    const cards = loadJson(cardsKey(treeId), []);
-    const rels  = loadJson(relKey(treeId), []);
-
-    const safeCards = Array.isArray(cards) ? cards : [];
-    const safeRels  = Array.isArray(rels) ? rels : [];
-    countRelsEl.textContent = String(safeRels.length);
-
-    const byId = {};
-    for(const p of safeCards){
-      if(p && typeof p.id === "string" && p.id.trim()) byId[p.id] = p;
-    }
-
-    const idx = buildRelationIndex(safeRels);
-
-    // spara “render-context” för popup-toggle
-    _CTX = {
-      treeId,
-      treeName,
-      byId,
-      parentsOf: idx.parentsOf,
-      childrenOf: idx.childrenOf,
-      siblingsOf: idx.siblingsOf,
-      partnersOf: idx.partnersOf,
-      partnerPairs: idx.partnerPairs,
-      siblingPairs: idx.siblingPairs
-    };
-
-    const posById = {};
-
-    let countWithCoords = 0;
-    for(const p of safeCards){
-      const c = parseCoordsObj(p);
+    for(const p of people){
+      const c = coordsFromPerson(p);
       if(!c) continue;
 
-      countWithCoords++;
-      posById[p.id] = L.latLng(c.lat, c.lon);
+      const title = personName(p);
+      const place = (p.plats || "").trim();
+      const note = (p.anteckning || "").trim();
 
-      if(!popupModeByPersonId[p.id]) popupModeByPersonId[p.id] = "near";
-      const initialHtml = buildPopupHtml(p.id, popupModeByPersonId[p.id]);
+      const popupHtml =
+        "<strong>" + escapeHtml(title) + "</strong><br/>" +
+        (place ? ("Plats: " + escapeHtml(place) + "<br/>") : "") +
+        "Koordinater: " + Number(c.lat).toFixed(5) + ", " + Number(c.lon).toFixed(5) +
+        (note ? ("<br/><span style='color:#555'>Anteckning: " + escapeHtml(note.slice(0, 140)) + (note.length > 140 ? "…" : "") + "</span>") : "");
 
-      const marker = L.marker([c.lat, c.lon]).addTo(cardsLayer);
-      marker.bindPopup(initialHtml);
-
-      marker.bindTooltip(escapeHtml(formatName(p)), {
-        permanent: true,
-        direction: "top",
-        offset: [0, -14],
-        className: "name-label",
-        opacity: 0.95
-      });
-
-      if(!lastBounds) lastBounds = L.latLngBounds([ [c.lat, c.lon], [c.lat, c.lon] ]);
-      else lastBounds.extend([c.lat, c.lon]);
+      const m = L.marker([c.lat, c.lon]).addTo(markerLayer).bindPopup(popupHtml);
+      markersById.set(String(p.id), m);
     }
 
-    countCardsEl.textContent = String(countWithCoords);
-
-    if(countWithCoords === 0){
-      setMsg("error", "Inga släktkort med koordinater i aktivt träd. Lägg coords i Släktkort.");
-      return;
+    if(markersById.size > 0){
+      fitToMarkers();
+      msg.innerHTML = "<span class='ok'>Klar.</span> Visar " + markersById.size + " markör(er).";
+    }else{
+      msg.innerHTML = "<span class='error'>Inga markörer.</span> Inga personer i aktivt träd har koordinater ännu.";
     }
-
-    let drawnLines = 0;
-
-    if(showLines){
-      // 1) Förälder–barn (solid)
-      for(const r of safeRels){
-        if(!r || r.typ !== "FORALDER_BARN") continue;
-        const parentId = String(r.franPersonId || "");
-        const childId  = String(r.tillPersonId || "");
-        if(!parentId || !childId) continue;
-
-        const p1 = posById[parentId];
-        const p2 = posById[childId];
-        if(!p1 || !p2) continue;
-
-        L.polyline([p1, p2], { weight: 2, opacity: 0.8 }).addTo(linesLayer);
-        drawnLines++;
-      }
-
-      // 2) Syskon (streckad)
-      for(const [a,b] of idx.siblingPairs){
-        const p1 = posById[a];
-        const p2 = posById[b];
-        if(!p1 || !p2) continue;
-
-        L.polyline([p1, p2], { weight: 2, opacity: 0.6, dashArray: "6 6" }).addTo(linesLayer);
-        drawnLines++;
-      }
-
-      // 3) Partnerlinje endast om de har minst 1 gemensamt barn (streck-prick)
-      const drawnPartnerPair = new Set();
-      for(const pr of idx.partnerPairs){
-        const aId = String(pr.aId || "");
-        const bId = String(pr.bId || "");
-        if(!aId || !bId) continue;
-
-        const shared = sharedChildren(aId, bId, idx.childrenOf);
-        if(shared.length === 0) continue;
-
-        const p1 = posById[aId];
-        const p2 = posById[bId];
-        if(!p1 || !p2) continue;
-
-        const key = `${normPair(aId,bId)}|${String(pr.status)}|${String(pr.fromYear ?? "")}|${String(pr.toYear ?? "")}`;
-        if(drawnPartnerPair.has(key)) continue;
-        drawnPartnerPair.add(key);
-
-        L.polyline([p1, p2], { weight: 2, opacity: 0.65, dashArray: "10 6 2 6" }).addTo(linesLayer);
-        drawnLines++;
-      }
-    }
-
-    countLinesEl.textContent = String(drawnLines);
-    setMsg("ok", `Klar: ${countWithCoords} markörer, ${drawnLines} linjer i '${treeName}'.`);
   }
 
-  // AUTOPATCH: popup toggle (Visa allt / Visa bara närmaste)
-  map.on("popupopen", (e) => {
-    const popupEl = e.popup.getElement();
-    if(!popupEl) return;
+  function currentFiltered(peopleWithCoords){
+    const q = String(searchEl.value || "").trim().toLowerCase();
+    if(!q) return peopleWithCoords;
 
-    const btn = popupEl.querySelector('button[data-action="toggleDetails"]');
-    if(!btn) return;
+    return peopleWithCoords.filter(p => {
+      const n = personName(p).toLowerCase();
+      const place = String(p.plats || "").toLowerCase();
+      return n.includes(q) || place.includes(q);
+    });
+  }
 
-    btn.addEventListener("click", () => {
-      const personId = String(btn.getAttribute("data-person-id") || "");
-      if(!personId || !_CTX || !_CTX.byId[personId]) return;
+  function refresh(){
+    const trees = getTrees();
+    const hasTrees = trees.length > 0;
 
-      const current = popupModeByPersonId[personId] || "near";
-      const next = (current === "near") ? "all" : "near";
-      popupModeByPersonId[personId] = next;
+    const t = activeTreeId();
+    const hasActive = !!t;
 
-      const html = buildPopupHtml(personId, next);
-      e.popup.setContent(html);
+    const allPeople = hasActive ? loadPeople() : [];
+    const peopleWithCoords = allPeople.filter(p => !!coordsFromPerson(p));
 
-      // viktigt: Leaflet bygger ny DOM efter setContent → knappen byts ut
-      // så vi låter popupopen-eventet trigga igen när användaren klickar nästa gång
-    }, { once: true });
-  });
+    renderStatus(allPeople, peopleWithCoords);
+    renderHint(hasTrees, hasActive, peopleWithCoords);
 
-  reloadBtn.addEventListener("click", renderMap);
+    const filtered = currentFiltered(peopleWithCoords);
+    renderList(filtered);
+    renderMap(filtered);
+
+    // Extra: om senaste plats finns och det inte finns markörer, zooma dit
+    if(!hasActive || peopleWithCoords.length > 0) return;
+    const last = loadJson(KEY_LAST_LOC, null);
+    if(last && typeof last.lat === "number" && typeof last.lon === "number"){
+      map.setView([last.lat, last.lon], 8);
+    }
+  }
+
+  // ============================
+  // Events
+  // ============================
+  refreshBtn.addEventListener("click", refresh);
   fitBtn.addEventListener("click", () => {
-    if(lastBounds) map.fitBounds(lastBounds.pad(0.2));
-    else setMsg("error", "Inga markörer att zooma till.");
+    if(markersById.size > 0) fitToMarkers();
   });
 
-  updatePickerUi();
-  updateLinesUi();
-  renderMap();
-</script>
+  let searchTimer = null;
+  searchEl.addEventListener("input", () => {
+    if(searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(refresh, 120);
+  });
 
+  logoutBtn.addEventListener("click", () => {
+    try{ sessionStorage.removeItem("demo_auth"); }catch{}
+    window.location.href = "../index.html";
+  });
+
+  // ============================
+  // Start
+  // ============================
+  refresh();
+</script>
 </body>
 </html>
