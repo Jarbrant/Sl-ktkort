@@ -14,7 +14,8 @@
   <style>
     body { font-family: system-ui, Arial, sans-serif; margin: 0; }
     header { padding: 16px 20px; border-bottom: 1px solid #ddd; }
-    h1 { margin: 0 0 6px; font-size: 1.2rem; }
+    header a { margin-right: 12px; color: inherit; }
+    h1 { margin: 8px 0 6px; font-size: 1.2rem; }
     .muted { color:#555; margin:0; }
 
     .wrap { padding: 12px 20px; }
@@ -23,11 +24,35 @@
     .error { color:#b00020; font-weight: 800; }
 
     #map {
-      height: 70vh;
+      height: 72vh;
       margin-top: 14px;
       border: 1px solid #ddd;
       border-radius: 12px;
       overflow: hidden;
+    }
+
+    .panelRow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-top: 10px;
+    }
+    .chip {
+      display:inline-block;
+      padding: 6px 10px;
+      border: 1px solid #ddd;
+      border-radius: 999px;
+      background: #fafafa;
+      color:#333;
+      font-size: .95rem;
+    }
+    .actions button {
+      padding: 8px 10px;
+      border: 1px solid #333;
+      background: #fff;
+      border-radius: 10px;
+      cursor: pointer;
     }
 
     .coordsBox {
@@ -36,23 +61,56 @@
       border: 1px solid #ddd;
       border-radius: 10px;
       background: #fafafa;
-      max-width: 520px;
+      max-width: 720px;
     }
     .coordsBox code { background:#f0f0f0; padding: 2px 6px; border-radius: 6px; }
+
+    /* Enkel label som “flagga” */
+    .name-label {
+      background: rgba(255,255,255,0.95);
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      padding: 2px 8px;
+      font-size: 12px;
+      white-space: nowrap;
+      box-shadow: 0 2px 10px rgba(0,0,0,.06);
+    }
+    .popup h3 { margin: 0 0 6px; font-size: 1rem; }
+    .popup .meta { margin: 0 0 8px; color:#555; }
+    .popup .sectionTitle { margin: 10px 0 4px; font-weight: 800; }
+    .popup ul { margin: 0; padding-left: 18px; }
+    .popup li { margin: 2px 0; }
   </style>
 </head>
 <body>
 
 <header>
+  <a href="../start.html">← Tillbaka</a>
+  <a href="./slaktkort.html">Släktkort</a>
+  <a href="./create-relation.html">Relationer</a>
+  <a href="./trees.html">Träd</a>
+
   <h1>Släktträd – karta</h1>
-  <p class="muted">Klicka för att placera en prick. Dra och släpp pricken för att välja lat/lon.</p>
+  <p class="muted">Visar släktkort i aktivt träd (markörer med namn). Klicka på en markör för relationer.</p>
 </header>
 
 <div class="wrap">
   <div id="msg" class="msg muted" aria-live="polite"></div>
 
+  <div class="panelRow">
+    <span class="chip">Aktivt träd: <strong id="activeTreeName">—</strong></span>
+    <span class="chip">Släktkort med coords: <strong id="countCards">0</strong></span>
+    <span class="chip">Relationer: <strong id="countRels">0</strong></span>
+
+    <span class="actions">
+      <button id="reloadBtn" type="button">Ladda om</button>
+      <button id="fitBtn" type="button">Zooma till alla</button>
+      <button id="togglePickerBtn" type="button">Plats-picker: AV</button>
+    </span>
+  </div>
+
   <div class="coordsBox">
-    Vald punkt: <code id="coordsOut">—</code>
+    Plats-picker (valfri, för test): <code id="coordsOut">—</code>
   </div>
 
   <div id="map"></div>
@@ -61,19 +119,78 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
 <script>
+  // =========================
+  // LocalStorage keys (måste matcha övriga sidor)
+  // =========================
+  const KEY_TREES  = "slakttradet_trees";
+  const KEY_ACTIVE = "slakttradet_active_tree_id";
+  function cardsKey(treeId){ return "slakttradet_slaktkort_" + String(treeId); }
+  function relKey(treeId){ return "slakttradet_relationer_" + String(treeId); }
+
+  // DOM
   const msg = document.getElementById("msg");
   const coordsOut = document.getElementById("coordsOut");
+  const activeTreeNameEl = document.getElementById("activeTreeName");
+  const countCardsEl = document.getElementById("countCards");
+  const countRelsEl = document.getElementById("countRels");
+  const reloadBtn = document.getElementById("reloadBtn");
+  const fitBtn = document.getElementById("fitBtn");
+  const togglePickerBtn = document.getElementById("togglePickerBtn");
 
   function setMsg(type, text) {
     msg.className = "msg " + (type === "error" ? "error" : type === "ok" ? "ok" : "muted");
     msg.textContent = text;
   }
 
+  function loadJson(key, fallback){
+    try{
+      const raw = localStorage.getItem(key);
+      if(!raw) return fallback;
+      return JSON.parse(raw);
+    }catch{
+      return fallback;
+    }
+  }
+
   function setCoordsText(lat, lon) {
     coordsOut.textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
   }
 
-  // Initiera karta (Sverige)
+  function getActiveTreeId(){
+    return localStorage.getItem(KEY_ACTIVE) || "";
+  }
+
+  function getActiveTreeName(treeId){
+    const trees = loadJson(KEY_TREES, []);
+    const t = Array.isArray(trees) ? trees.find(x => String(x.id) === String(treeId)) : null;
+    return t?.name ? String(t.name) : (treeId ? String(treeId) : "—");
+  }
+
+  function formatName(p){
+    return `${p.fornamn || ""} ${p.efternamn || ""}`.trim() || "(namnlös)";
+  }
+
+  function formatYears(p){
+    const a = (p.fodelsear ?? "") !== null && (p.fodelsear ?? "") !== "" ? p.fodelsear : "";
+    const b = (p.dodsar ?? "") !== null && (p.dodsar ?? "") !== "" ? p.dodsar : "";
+    if(!a && !b) return "";
+    return ` (${a || "?"}–${b || "?"})`;
+  }
+
+  function parseCoordsObj(p){
+    // slaktkort.html sparar coords som {lat, lon} eller null
+    if(!p || !p.coords) return null;
+    const lat = Number(p.coords.lat);
+    const lon = Number(p.coords.lon);
+    if(!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    if(lat < -90 || lat > 90) return null;
+    if(lon < -180 || lon > 180) return null;
+    return { lat, lon };
+  }
+
+  // =========================
+  // Leaflet init
+  // =========================
   const map = L.map("map").setView([62.0, 15.0], 5);
 
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -81,7 +198,13 @@
     attribution: "&copy; OpenStreetMap contributors"
   }).addTo(map);
 
-  // Marker som kan dras och släppas
+  // marker-lager för släktkort
+  const cardsLayer = L.layerGroup().addTo(map);
+
+  // =========================
+  // Plats-picker (valfri)
+  // =========================
+  let pickerEnabled = false;
   let pickMarker = null;
 
   function ensurePickMarker(latlng) {
@@ -97,18 +220,162 @@
     } else {
       pickMarker.setLatLng(latlng);
     }
-
     const ll = pickMarker.getLatLng();
     setCoordsText(ll.lat, ll.lng);
   }
 
-  // Klick i kartan = sätt punkt
   map.on("click", (e) => {
+    if(!pickerEnabled) return;
     ensurePickMarker(e.latlng);
-    setMsg("ok", "Punkt satt. Du kan nu dra och släppa pricken.");
+    setMsg("ok", "Punkt satt (plats-picker).");
   });
 
-  setMsg("", "Klicka i kartan för att placera pricken.");
+  function updatePickerUi(){
+    togglePickerBtn.textContent = "Plats-picker: " + (pickerEnabled ? "PÅ" : "AV");
+  }
+
+  togglePickerBtn.addEventListener("click", () => {
+    pickerEnabled = !pickerEnabled;
+    updatePickerUi();
+    setMsg("", pickerEnabled ? "Plats-picker är PÅ. Klicka i kartan för att sätta punkt." : "Plats-picker är AV.");
+  });
+
+  // =========================
+  // Relation-indexering
+  // =========================
+  function buildRelationIndex(rels){
+    const parentsOf = {};  // childId -> [parentId]
+    const childrenOf = {}; // parentId -> [childId]
+
+    for(const r of (Array.isArray(rels) ? rels : [])){
+      if(!r || r.typ !== "FORALDER_BARN") continue;
+      const parentId = String(r.franPersonId || "");
+      const childId  = String(r.tillPersonId || "");
+      if(!parentId || !childId) continue;
+
+      if(!parentsOf[childId]) parentsOf[childId] = [];
+      if(!parentsOf[childId].includes(parentId)) parentsOf[childId].push(parentId);
+
+      if(!childrenOf[parentId]) childrenOf[parentId] = [];
+      if(!childrenOf[parentId].includes(childId)) childrenOf[parentId].push(childId);
+    }
+
+    return { parentsOf, childrenOf };
+  }
+
+  function renderPersonList(ids, byId){
+    if(!ids || ids.length === 0) return "<div class='muted'>—</div>";
+    const items = ids
+      .map(id => byId[id])
+      .filter(Boolean)
+      .map(p => `<li>${escapeHtml(formatName(p))}${escapeHtml(formatYears(p))}</li>`)
+      .join("");
+    return `<ul>${items}</ul>`;
+  }
+
+  function escapeHtml(s){
+    return String(s)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  // =========================
+  // Ladda & rendera
+  // =========================
+  let lastBounds = null;
+
+  function renderMap(){
+    cardsLayer.clearLayers();
+    lastBounds = null;
+
+    const treeId = getActiveTreeId();
+    if(!treeId){
+      activeTreeNameEl.textContent = "—";
+      countCardsEl.textContent = "0";
+      countRelsEl.textContent = "0";
+      setMsg("error", "Inget aktivt träd valt. Gå till 'Träd' och välj ett träd.");
+      return;
+    }
+
+    const treeName = getActiveTreeName(treeId);
+    activeTreeNameEl.textContent = treeName;
+
+    const cards = loadJson(cardsKey(treeId), []);
+    const rels  = loadJson(relKey(treeId), []);
+
+    const safeCards = Array.isArray(cards) ? cards : [];
+    const safeRels  = Array.isArray(rels) ? rels : [];
+
+    countRelsEl.textContent = String(safeRels.length);
+
+    // indexera personer
+    const byId = {};
+    for(const p of safeCards){
+      if(p && typeof p.id === "string" && p.id.trim()) byId[p.id] = p;
+    }
+
+    const { parentsOf, childrenOf } = buildRelationIndex(safeRels);
+
+    // lägg markörer
+    let countWithCoords = 0;
+    for(const p of safeCards){
+      const c = parseCoordsObj(p);
+      if(!c) continue;
+
+      countWithCoords++;
+
+      const title = formatName(p) + formatYears(p);
+      const popupHtml = `
+        <div class="popup">
+          <h3>${escapeHtml(formatName(p))}${escapeHtml(formatYears(p))}</h3>
+          <div class="meta">${escapeHtml(p.plats || "")}</div>
+
+          <div class="sectionTitle">Föräldrar</div>
+          ${renderPersonList(parentsOf[p.id] || [], byId)}
+
+          <div class="sectionTitle">Barn</div>
+          ${renderPersonList(childrenOf[p.id] || [], byId)}
+        </div>
+      `;
+
+      const marker = L.marker([c.lat, c.lon]).addTo(cardsLayer);
+      marker.bindPopup(popupHtml);
+
+      // “flagga” = label med namn
+      marker.bindTooltip(escapeHtml(formatName(p)), {
+        permanent: true,
+        direction: "top",
+        offset: [0, -14],
+        className: "name-label",
+        opacity: 0.95
+      });
+
+      // bounds
+      if(!lastBounds) lastBounds = L.latLngBounds([ [c.lat, c.lon], [c.lat, c.lon] ]);
+      else lastBounds.extend([c.lat, c.lon]);
+    }
+
+    countCardsEl.textContent = String(countWithCoords);
+
+    if(countWithCoords === 0){
+      setMsg("error", "Inga släktkort med koordinater i aktivt träd. Lägg coords i Släktkort.");
+      return;
+    }
+
+    setMsg("ok", `Klar: ${countWithCoords} markörer i '${treeName}'. Klicka på en markör för relationer.`);
+  }
+
+  reloadBtn.addEventListener("click", renderMap);
+  fitBtn.addEventListener("click", () => {
+    if(lastBounds) map.fitBounds(lastBounds.pad(0.2));
+    else setMsg("error", "Inga markörer att zooma till.");
+  });
+
+  updatePickerUi();
+  renderMap();
 </script>
 
 </body>
