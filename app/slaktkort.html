@@ -3,62 +3,219 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Släktkort</title>
+  <title>Personer – Släktkort</title>
+  <meta name="description" content="Skapa och lista släktkort per aktivt träd (localStorage)." />
 
   <style>
-    body { font-family: system-ui, Arial, sans-serif; padding: 24px; max-width: 900px; margin: 0 auto; }
-    a { display:inline-block; margin-bottom: 16px; margin-right: 12px; }
-    h1 { margin-bottom: 6px; }
-    .muted { color:#555; }
-    .card { border:1px solid #ddd; border-radius:12px; padding:16px; margin-top: 16px; }
-    label { display:block; margin-top: 12px; font-weight: 800; }
-    input, select, textarea, button { width:100%; padding:10px; margin-top:6px; font-size:1rem; box-sizing: border-box; }
-    textarea { min-height: 90px; resize: vertical; }
-    button { border:1px solid #333; background:#fff; cursor:pointer; margin-top: 16px; border-radius: 10px; }
-    .error { color:#b00020; font-weight: 800; }
-    .ok { font-weight: 800; }
-    code { background:#f4f4f4; padding:2px 6px; border-radius:6px; }
-    .row { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    @media (max-width: 700px) { .row { grid-template-columns: 1fr; } }
-    .actionsRow { display:flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
-    .actionsRow button { width: auto; padding: 10px 14px; margin-top: 0; }
-    .actionsRow a { margin: 0; }
-    pre { white-space:pre-wrap; background:#f4f4f4; padding:12px; border-radius:10px; overflow:auto; }
+    :root { color-scheme: light; }
+    body{
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      line-height: 1.5;
+      margin: 0;
+      padding: 24px;
+      max-width: 980px;
+      margin-inline: auto;
+      background: #fff;
+      color: #111;
+    }
+    a{ color: inherit; text-decoration: none; }
+    header{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    h1{ margin: 0 0 6px; font-size: 1.6rem; }
+    p{ margin: 0 0 12px; }
+    .muted{ color:#555; }
+
+    .topbar{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin: 10px 0 0;
+    }
+
+    .btn, button{
+      display:inline-block;
+      padding: 10px 12px;
+      border: 1px solid #333;
+      border-radius: 10px;
+      background: #fff;
+      font: inherit;
+      cursor: pointer;
+      text-decoration:none;
+    }
+    .btn.secondary{
+      border-color:#bbb;
+      color:#111;
+    }
+    .btn.danger{
+      border-color:#b00020;
+      color:#b00020;
+    }
+    .btn.disabled{
+      opacity: .45;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .pillRow{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin: 10px 0 18px;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 8px 10px;
+      border: 1px solid #ddd;
+      border-radius: 999px;
+      background: #fafafa;
+      font-size: .95rem;
+    }
+    .pill strong{ font-weight: 900; }
+    .pill.ok{ border-color:#cfe8cf; background:#f5fff5; }
+    .pill.warn{ border-color:#ffe1a6; background:#fff9ee; }
+
+    .note{
+      margin: 0 0 18px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid #ffe1a6;
+      background: #fff9ee;
+    }
+    .note strong{ font-weight: 900; }
+
+    .grid{
+      display:grid;
+      gap: 14px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 860px){
+      .grid{ grid-template-columns: 1fr 1fr; }
+    }
+
+    .card{
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      padding: 16px;
+      background: #fff;
+    }
+    .card h2{
+      margin: 0 0 6px;
+      font-size: 1.15rem;
+    }
+    .small{ font-size: .95rem; color:#555; margin: 0 0 10px; }
+
+    label{ display:block; margin: 10px 0 6px; font-weight: 800; }
+    input, select, textarea{
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid #bbb;
+      font: inherit;
+      background: #fff;
+    }
+    textarea{ min-height: 96px; resize: vertical; }
+
+    .row2{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    @media (min-width: 720px){
+      .row2{ grid-template-columns: 1fr 1fr; }
+    }
+
+    .actionsRow{
+      display:flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    .error{ color:#b00020; font-weight: 900; }
+    .ok{ font-weight: 900; }
+
+    pre{
+      white-space: pre-wrap;
+      background:#f4f4f4;
+      padding: 12px;
+      border-radius: 12px;
+      overflow:auto;
+      margin: 10px 0 0;
+    }
+    code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
+
+    footer{
+      margin-top: 18px;
+      color:#666;
+      font-size: .95rem;
+    }
+    hr{ border:none; border-top:1px solid #eee; margin: 18px 0; }
   </style>
 </head>
 
 <body>
-  <!-- OBS: Denna fil ligger i /app/ så adminpanelen ligger ett steg upp -->
-  <a href="../index.html">← Adminpanel</a>
-  <a href="./trees.html">Skapa/Välj träd</a>
-  <a href="./place-picker.html">Välj plats (karta)</a>
+<header>
+  <div>
+    <h1>👤 Personer – Släktkort</h1>
+    <p class="muted">Steg 2 i flödet. Skapa personer i det aktiva trädet (localStorage-first).</p>
 
-  <h1>Släktkort</h1>
-  <p class="muted">
-    LocalStorage-first (funkar på GitHub Pages). Backend kan kopplas på senare.
-  </p>
+    <nav class="topbar" aria-label="Navigation">
+      <a class="btn secondary" href="start.html">Start</a>
+      <a class="btn secondary" href="trees.html">Träd</a>
+      <a class="btn secondary" href="slaktkort.html">Personer</a>
+      <a class="btn secondary" href="create-relation.html">Relationer</a>
+      <a class="btn secondary" href="map.html">Karta</a>
+    </nav>
+  </div>
 
-  <!-- 1) Välj träd -->
-  <div class="card">
-    <h2>1) Välj träd</h2>
-    <p class="muted">Släktkort sparas per träd i localStorage.</p>
+  <div class="actionsRow" style="justify-content:flex-end; max-width: 360px;">
+    <a class="btn secondary" href="place-picker.html" title="Välj koordinater via karta">Plats-picker</a>
+    <button id="logoutBtn" class="btn secondary" type="button" title="Estetisk utloggning">Logga ut</button>
+  </div>
+</header>
+
+<section class="pillRow" aria-label="Status">
+  <span id="pillTree" class="pill warn">Aktivt träd: <strong>—</strong></span>
+  <span id="pillPeople" class="pill">Personer i trädet: <strong>0</strong></span>
+  <span id="pillNext" class="pill warn">Nästa steg: <strong>Välj träd</strong></span>
+</section>
+
+<div id="noteBox" class="note" hidden></div>
+
+<section class="grid" aria-label="Personfunktioner">
+  <!-- 1) Trädval -->
+  <article class="card">
+    <h2>1) Träd</h2>
+    <p class="small">Personer sparas per träd. Du kan byta aktivt träd här.</p>
 
     <label for="treeSelect">Träd</label>
     <select id="treeSelect" aria-label="Välj träd"></select>
 
     <div class="actionsRow">
-      <button id="reloadTreesBtn" type="button">Ladda träd</button>
-      <a href="./trees.html">Gå till Skapa/Välj träd</a>
+      <button id="reloadTreesBtn" type="button" class="btn secondary">Ladda träd</button>
+      <a class="btn" href="trees.html">Gå till Träd</a>
+      <a id="continueToRelsTop" class="btn disabled" href="create-relation.html" aria-disabled="true" tabindex="-1">Fortsätt → Relationer</a>
     </div>
 
-    <p id="treeMsg" class="muted" aria-live="polite"></p>
-  </div>
+    <p id="treeMsg" class="small" aria-live="polite"></p>
+  </article>
 
-  <!-- 2) Skapa släktkort -->
-  <div class="card">
+  <!-- 2) Skapa person -->
+  <article class="card">
     <h2>2) Skapa släktkort</h2>
 
-    <div class="row">
+    <div class="row2">
       <div>
         <label for="fornamn">Förnamn</label>
         <input id="fornamn" placeholder="t.ex. Anna" />
@@ -76,7 +233,7 @@
       <option>Kvinna</option>
     </select>
 
-    <div class="row">
+    <div class="row2">
       <div>
         <label for="fodelsear">Födelseår (valfritt)</label>
         <input id="fodelsear" type="number" placeholder="t.ex. 1874" />
@@ -94,68 +251,114 @@
     <input id="coords" placeholder="t.ex. 59.3293, 18.0686" />
 
     <div class="actionsRow">
-      <a href="./place-picker.html">Välj koordinater i karta-vyn</a>
-      <button type="button" id="clearCoordsBtn">Rensa koordinater</button>
+      <a class="btn secondary" href="place-picker.html">Välj koordinater via karta</a>
+      <button type="button" class="btn secondary" id="clearCoordsBtn">Rensa koordinater</button>
+      <button type="button" class="btn" id="useLastLocBtn" title="Hämtar senaste platsen från place-picker">Använd senaste plats</button>
     </div>
 
     <label for="anteckning">Anteckning (valfritt)</label>
     <textarea id="anteckning" placeholder="fri text"></textarea>
 
     <div class="actionsRow">
-      <button id="createBtn" type="button">Spara släktkort</button>
+      <button id="createBtn" type="button" class="btn">Spara släktkort</button>
+      <button id="resetFormBtn" type="button" class="btn secondary">Rensa fält</button>
+      <a id="continueToRels" class="btn disabled" href="create-relation.html" aria-disabled="true" tabindex="-1">Fortsätt → Relationer</a>
     </div>
 
-    <p id="createMsg" class="muted" aria-live="polite"></p>
-  </div>
+    <p id="createMsg" class="small" aria-live="polite"></p>
+  </article>
 
-  <!-- 3) Lista släktkort -->
-  <div class="card">
-    <h2>3) Lista släktkort i valt träd</h2>
-    <p class="muted">Visas som JSON (demo).</p>
+  <!-- 3) Lista -->
+  <article class="card" style="grid-column: 1 / -1;">
+    <h2>3) Lista personer i aktivt träd</h2>
+    <p class="small">Visas som JSON (demo).</p>
 
     <div class="actionsRow">
-      <button id="listBtn" type="button">Hämta släktkort</button>
-      <button id="clearOutBtn" type="button">Töm listan</button>
+      <button id="listBtn" type="button" class="btn secondary">Hämta släktkort</button>
+      <button id="clearOutBtn" type="button" class="btn secondary">Töm listan</button>
+      <button id="deleteAllCardsBtn" type="button" class="btn danger" title="Tar bort alla personer i aktivt träd">Radera alla personer i trädet</button>
     </div>
 
     <pre id="out">[]</pre>
-  </div>
+  </article>
+</section>
+
+<footer>
+  Tips: När du har minst <strong>2 personer</strong> kan du gå vidare till <strong>Relationer</strong>.
+</footer>
 
 <script>
+  // ============================
+  // Estetisk "auth" (flow, inte säkerhet)
+  // ============================
+  (function authGuard(){
+    try{
+      if(sessionStorage.getItem("demo_auth") !== "1"){
+        window.location.href = "index.html";
+      }
+    }catch{
+      // Om sessionStorage är låst: tillåt ändå (demo)
+    }
+  })();
+
   // ============================================================
   // LocalStorage keys (måste matcha trees.html + place-picker.html)
   // ============================================================
-  const KEY_TREES = "slakttradet_trees";
-  const KEY_ACTIVE = "slakttradet_active_tree_id";
+  const KEY_TREES    = "slakttradet_trees";
+  const KEY_ACTIVE   = "slakttradet_active_tree_id";
   const KEY_LAST_LOC = "slakttradet_last_location";
 
-  // Per träd: slaktkort lagras under nyckeln "slakttradet_slaktkort_<treeId>"
-  function cardsKey(treeId) { return "slakttradet_slaktkort_" + String(treeId); }
+  function cardsKey(treeId){ return "slakttradet_slaktkort_" + String(treeId); }
 
   // DOM
-  const treeSelect = document.getElementById("treeSelect");
+  const pillTree   = document.getElementById("pillTree");
+  const pillPeople = document.getElementById("pillPeople");
+  const pillNext   = document.getElementById("pillNext");
+  const noteBox    = document.getElementById("noteBox");
+
+  const logoutBtn  = document.getElementById("logoutBtn");
+
+  const treeSelect     = document.getElementById("treeSelect");
   const reloadTreesBtn = document.getElementById("reloadTreesBtn");
-  const treeMsg = document.getElementById("treeMsg");
+  const treeMsg        = document.getElementById("treeMsg");
 
-  const fornamnEl = document.getElementById("fornamn");
+  const fornamnEl   = document.getElementById("fornamn");
   const efternamnEl = document.getElementById("efternamn");
-  const konEl = document.getElementById("kon");
+  const konEl       = document.getElementById("kon");
   const fodelsearEl = document.getElementById("fodelsear");
-  const dodsarEl = document.getElementById("dodsar");
-  const platsEl = document.getElementById("plats");
-  const coordsEl = document.getElementById("coords");
+  const dodsarEl    = document.getElementById("dodsar");
+  const platsEl     = document.getElementById("plats");
+  const coordsEl    = document.getElementById("coords");
   const clearCoordsBtn = document.getElementById("clearCoordsBtn");
-  const anteckningEl = document.getElementById("anteckning");
+  const useLastLocBtn  = document.getElementById("useLastLocBtn");
+  const anteckningEl   = document.getElementById("anteckning");
 
-  const createBtn = document.getElementById("createBtn");
-  const createMsg = document.getElementById("createMsg");
+  const createBtn   = document.getElementById("createBtn");
+  const resetFormBtn= document.getElementById("resetFormBtn");
+  const createMsg   = document.getElementById("createMsg");
 
-  const listBtn = document.getElementById("listBtn");
+  const listBtn     = document.getElementById("listBtn");
   const clearOutBtn = document.getElementById("clearOutBtn");
-  const out = document.getElementById("out");
+  const deleteAllCardsBtn = document.getElementById("deleteAllCardsBtn");
+  const out         = document.getElementById("out");
 
-  // UI helpers
-  function setMsg(el, type, text) {
+  const continueToRels = document.getElementById("continueToRels");
+  const continueToRelsTop = document.getElementById("continueToRelsTop");
+
+  // Helpers
+  function setDisabled(el, disabled){
+    if(disabled){
+      el.classList.add("disabled");
+      el.setAttribute("aria-disabled","true");
+      el.setAttribute("tabindex","-1");
+    }else{
+      el.classList.remove("disabled");
+      el.removeAttribute("aria-disabled");
+      el.removeAttribute("tabindex");
+    }
+  }
+
+  function setMsg(el, type, text){
     el.innerHTML = type === "error"
       ? "<span class='error'>" + text + "</span>"
       : type === "ok"
@@ -163,140 +366,230 @@
         : text;
   }
 
-  function loadJson(key, fallback) {
-    try {
+  function loadJson(key, fallback){
+    try{
       const raw = localStorage.getItem(key);
-      if (!raw) return fallback;
+      if(!raw) return fallback;
       return JSON.parse(raw);
-    } catch {
+    }catch{
       return fallback;
     }
   }
 
-  function saveJson(key, value) {
+  function saveJson(key, value){
     localStorage.setItem(key, JSON.stringify(value));
   }
 
-  function getActiveTreeId() {
+  function getActiveTreeId(){
     return localStorage.getItem(KEY_ACTIVE) || "";
   }
 
-  function setActiveTreeId(id) {
-    localStorage.setItem(KEY_ACTIVE, String(id));
+  function setActiveTreeId(id){
+    localStorage.setItem(KEY_ACTIVE, String(id || ""));
   }
 
-  function getSelectedTreeId() {
+  function getSelectedTreeId(){
     const v = treeSelect.value;
     return v ? v : null;
   }
 
-  function parseOptionalInt(el) {
+  function parseOptionalInt(el){
     const raw = String(el.value || "").trim();
-    if (!raw) return null;
+    if(!raw) return null;
     const n = Number(raw);
     return Number.isFinite(n) ? n : null;
   }
 
-  function parseCoords(text) {
+  function parseCoords(text){
     const raw = String(text || "").trim();
-    if (!raw) return null;
+    if(!raw) return null;
 
     const normalized = raw.replace(/\s+/g, " ");
     const partsComma = normalized.split(",").map(s => s.trim()).filter(Boolean);
 
     let a, b;
-    if (partsComma.length === 2) { a = partsComma[0]; b = partsComma[1]; }
-    else {
+    if(partsComma.length === 2){ a = partsComma[0]; b = partsComma[1]; }
+    else{
       const partsSpace = normalized.split(" ").filter(Boolean);
-      if (partsSpace.length !== 2) return null;
+      if(partsSpace.length !== 2) return null;
       a = partsSpace[0]; b = partsSpace[1];
     }
 
     const lat = Number(a);
     const lon = Number(b);
 
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-    if (lat < -90 || lat > 90) return null;
-    if (lon < -180 || lon > 180) return null;
+    if(!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    if(lat < -90 || lat > 90) return null;
+    if(lon < -180 || lon > 180) return null;
 
     return { lat, lon };
   }
 
-  // ============================================================
-  // Prefill coords från place-picker.html (localStorage)
-  // ============================================================
-  (function prefillCoordsFromLocalStorage() {
+  function normalizeCoordsString(coords){
+    if(!coords) return "";
+    return `${coords.lat}, ${coords.lon}`;
+  }
+
+  function makeCardId(){
+    return "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+
+  function loadCards(treeId){
+    const cards = loadJson(cardsKey(treeId), []);
+    return Array.isArray(cards) ? cards : [];
+  }
+
+  function saveCards(treeId, cards){
+    saveJson(cardsKey(treeId), cards);
+  }
+
+  function countCards(treeId){
+    if(!treeId) return 0;
+    return loadCards(treeId).filter(p => p && p.id).length;
+  }
+
+  function refreshStatus(){
+    const trees = loadJson(KEY_TREES, []);
+    const activeId = getActiveTreeId();
+    const activeTree = Array.isArray(trees) ? trees.find(t => String(t.id) === String(activeId)) : null;
+
+    const treeLabel = activeTree ? (activeTree.name || activeTree.id) : (activeId || "—");
+
+    const peopleCount = activeId ? countCards(activeId) : 0;
+
+    // PILL: tree
+    pillTree.classList.remove("ok","warn");
+    pillTree.classList.add(activeId ? "ok" : "warn");
+    pillTree.innerHTML = 'Aktivt träd: <strong>' + (activeId ? treeLabel : "—") + '</strong>';
+
+    // PILL: people count
+    pillPeople.innerHTML = 'Personer i trädet: <strong>' + peopleCount + '</strong>';
+
+    // Note + Next
+    if(!Array.isArray(trees) || trees.length === 0){
+      noteBox.hidden = false;
+      noteBox.innerHTML = '<strong>🚩 Inga träd sparade:</strong> Gå till <a href="trees.html">Träd</a> och skapa ett träd.';
+      pillNext.classList.remove("ok"); pillNext.classList.add("warn");
+      pillNext.innerHTML = 'Nästa steg: <strong>Skapa träd</strong>';
+      setDisabled(continueToRels, true);
+      setDisabled(continueToRelsTop, true);
+      return;
+    }
+
+    if(!activeId){
+      noteBox.hidden = false;
+      noteBox.innerHTML = '<strong>🚩 Inget aktivt träd valt:</strong> Gå till <a href="trees.html">Träd</a> och välj ett aktivt träd.';
+      pillNext.classList.remove("ok"); pillNext.classList.add("warn");
+      pillNext.innerHTML = 'Nästa steg: <strong>Välj aktivt träd</strong>';
+      setDisabled(continueToRels, true);
+      setDisabled(continueToRelsTop, true);
+      return;
+    }
+
+    // Active tree exists
+    if(peopleCount < 2){
+      noteBox.hidden = false;
+      noteBox.innerHTML = '<strong>Tip:</strong> Lägg till minst <strong>2 personer</strong> innan du går vidare till Relationer.';
+      pillNext.classList.remove("ok"); pillNext.classList.add("warn");
+      pillNext.innerHTML = 'Nästa steg: <strong>Lägg till fler personer</strong>';
+      setDisabled(continueToRels, true);
+      setDisabled(continueToRelsTop, true);
+      return;
+    }
+
+    // Ready for relations
+    noteBox.hidden = true;
+    pillNext.classList.remove("warn"); pillNext.classList.add("ok");
+    pillNext.innerHTML = 'Nästa steg: <strong>Relationer</strong>';
+    setDisabled(continueToRels, false);
+    setDisabled(continueToRelsTop, false);
+  }
+
+  // Prefill coords från place-picker (localStorage)
+  function prefillCoordsFromLocalStorage(){
     const data = loadJson(KEY_LAST_LOC, null);
-    if (!data || typeof data.lat !== "number" || typeof data.lon !== "number") return;
-    coordsEl.value = `${data.lat}, ${data.lon}`;
-  })();
+    if(!data || typeof data.lat !== "number" || typeof data.lon !== "number") return;
+    coordsEl.value = normalizeCoordsString({ lat: data.lat, lon: data.lon });
+  }
 
-  clearCoordsBtn.addEventListener("click", () => {
-    coordsEl.value = "";
-    setMsg(createMsg, "", "Koordinater rensade.");
-  });
-
-  // ============================================================
-  // Trees (localStorage)
-  // ============================================================
-  function loadTrees() {
+  // Trees
+  function loadTrees(){
     setMsg(treeMsg, "", "Laddar…");
+
     const trees = loadJson(KEY_TREES, []);
     const activeId = getActiveTreeId();
 
     treeSelect.innerHTML = "";
 
-    if (!Array.isArray(trees) || trees.length === 0) {
+    if(!Array.isArray(trees) || trees.length === 0){
       treeSelect.innerHTML = "<option value=''>Inga träd ännu</option>";
-      setMsg(treeMsg, "error", "Inga träd sparade. Gå till 'Skapa/Välj träd' och skapa ett träd.");
+      setMsg(treeMsg, "error", "Inga träd sparade. Gå till 'Träd' och skapa ett träd.");
+      refreshStatus();
       return;
     }
 
     treeSelect.innerHTML = "<option value=''>Välj…</option>";
-    for (const t of trees) {
+    for(const t of trees){
       const opt = document.createElement("option");
       opt.value = String(t.id);
-      opt.textContent = `${t.name}${String(t.id) === activeId ? " (aktivt)" : ""}`;
+      opt.textContent = `${t.name}${String(t.id) === String(activeId) ? " (aktivt)" : ""}`;
       treeSelect.appendChild(opt);
     }
 
-    if (activeId) {
+    if(activeId){
       treeSelect.value = activeId;
-    } else {
+    }else{
       const firstId = String(trees[0].id);
       treeSelect.value = firstId;
       setActiveTreeId(firstId);
     }
 
     setMsg(treeMsg, "ok", "Träd laddade (localStorage).");
+    refreshStatus();
   }
 
   treeSelect.addEventListener("change", () => {
-    if (treeSelect.value) setActiveTreeId(treeSelect.value);
+    if(treeSelect.value){
+      setActiveTreeId(treeSelect.value);
+      refreshStatus();
+    }
   });
 
   reloadTreesBtn.addEventListener("click", loadTrees);
 
-  // ============================================================
-  // Släktkort (localStorage per tree)
-  // ============================================================
-  function makeCardId() {
-    return "p" + Date.now().toString().slice(-10);
-  }
+  // Actions
+  clearCoordsBtn.addEventListener("click", () => {
+    coordsEl.value = "";
+    setMsg(createMsg, "", "Koordinater rensade.");
+  });
 
-  function loadCards(treeId) {
-    return loadJson(cardsKey(treeId), []);
-  }
+  useLastLocBtn.addEventListener("click", () => {
+    const data = loadJson(KEY_LAST_LOC, null);
+    if(!data || typeof data.lat !== "number" || typeof data.lon !== "number"){
+      setMsg(createMsg, "error", "Ingen senaste plats hittades. Öppna Plats-picker och välj en punkt först.");
+      return;
+    }
+    coordsEl.value = normalizeCoordsString({ lat: data.lat, lon: data.lon });
+    setMsg(createMsg, "ok", "Senaste platsen användes.");
+  });
 
-  function saveCards(treeId, cards) {
-    saveJson(cardsKey(treeId), cards);
-  }
+  resetFormBtn.addEventListener("click", () => {
+    fornamnEl.value = "";
+    efternamnEl.value = "";
+    konEl.value = "Okänt";
+    fodelsearEl.value = "";
+    dodsarEl.value = "";
+    platsEl.value = "";
+    coordsEl.value = "";
+    anteckningEl.value = "";
+    setMsg(createMsg, "", "");
+  });
 
-  function createSlaktkort() {
+  function createSlaktkort(){
     createMsg.textContent = "";
 
-    const treeId = getSelectedTreeId();
-    if (!treeId) return setMsg(createMsg, "error", "Välj ett träd först.");
+    const treeId = getSelectedTreeId() || getActiveTreeId();
+    if(!treeId) return setMsg(createMsg, "error", "Välj ett träd först.");
 
     const coords = parseCoords(coordsEl.value);
 
@@ -313,10 +606,10 @@
       createdAt: new Date().toISOString()
     };
 
-    if (!payload.fornamn && !payload.efternamn) {
+    if(!payload.fornamn && !payload.efternamn){
       return setMsg(createMsg, "error", "Fyll i minst förnamn eller efternamn.");
     }
-    if (coordsEl.value.trim() && !coords) {
+    if(coordsEl.value.trim() && !coords){
       return setMsg(createMsg, "error", "Koordinater måste vara 'lat, lon' (ex: 59.3293, 18.0686).");
     }
 
@@ -325,11 +618,12 @@
     saveCards(treeId, cards);
 
     setMsg(createMsg, "ok", `Släktkort sparat lokalt (id: ${payload.id}).`);
+    refreshStatus();
   }
 
-  function listSlaktkort() {
-    const treeId = getSelectedTreeId();
-    if (!treeId) {
+  function listSlaktkort(){
+    const treeId = getSelectedTreeId() || getActiveTreeId();
+    if(!treeId){
       out.textContent = "[]";
       return setMsg(treeMsg, "error", "Välj ett träd först.");
     }
@@ -337,11 +631,32 @@
     const cards = loadCards(treeId);
     out.textContent = JSON.stringify({ slaktkort: cards }, null, 2);
     setMsg(treeMsg, "ok", `Hämtade ${cards.length} släktkort (localStorage).`);
+    refreshStatus();
+  }
+
+  function deleteAllCardsInTree(){
+    const treeId = getSelectedTreeId() || getActiveTreeId();
+    if(!treeId) return setMsg(treeMsg, "error", "Välj ett träd först.");
+
+    saveCards(treeId, []);
+    out.textContent = "[]";
+    setMsg(treeMsg, "ok", "Alla personer i aktivt träd raderade.");
+    refreshStatus();
   }
 
   createBtn.addEventListener("click", createSlaktkort);
   listBtn.addEventListener("click", listSlaktkort);
   clearOutBtn.addEventListener("click", () => { out.textContent = "[]"; });
+  deleteAllCardsBtn.addEventListener("click", deleteAllCardsInTree);
+
+  // Prefill coords on load (om senaste plats finns)
+  prefillCoordsFromLocalStorage();
+
+  // Logout
+  logoutBtn.addEventListener("click", () => {
+    try{ sessionStorage.removeItem("demo_auth"); }catch{}
+    window.location.href = "index.html";
+  });
 
   // Start
   loadTrees();
