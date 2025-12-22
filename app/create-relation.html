@@ -105,7 +105,7 @@
 <body>
 <header>
   <h1>🔗 Skapa relation</h1>
-  <p class="muted">Steg 3 i flödet. Fokusperson först → relationstyp → välj motpart.</p>
+  <p class="muted">Steg 3 i flödet. <strong>Fokusperson</strong> → <strong>relationstyp</strong> → <strong>motpart</strong>.</p>
 
   <nav class="topbar" aria-label="Navigation">
     <a class="btn secondary" href="../start.html">Start</a>
@@ -126,8 +126,11 @@
 </header>
 
 <section class="card">
-  <h2>1) Välj fokusperson</h2>
-  <p class="small">Fokuspersonen blir “Barn” i Förälder→Barn, eller “Partner A” i Partner.</p>
+  <h2>1) Skapa relation</h2>
+  <p class="small">
+    Rekommendation: spara bara grundrelationer (Förälder→Barn och Partner).
+    Syskon/kusin/morbror kan räknas fram senare från dessa.
+  </p>
 
   <form id="form">
     <div class="row three">
@@ -189,9 +192,6 @@
 </section>
 
 <script>
-  // ============================
-  // Estetisk auth-guard
-  // ============================
   (function authGuard(){
     try{
       if(sessionStorage.getItem("demo_auth") !== "1"){
@@ -200,15 +200,11 @@
     }catch{}
   })();
 
-  // ============================
-  // Keys (MÅSTE matcha övriga sidor)
-  // ============================
   const KEY_TREES  = "slakttradet_trees";
   const KEY_ACTIVE = "slakttradet_active_tree_id";
   const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
   const relKey   = (treeId) => "slakttradet_relationer_" + String(treeId);
 
-  // DOM
   const logoutBtn = document.getElementById("logoutBtn");
 
   const pillTree = document.getElementById("pillTree");
@@ -229,7 +225,6 @@
 
   const msg = document.getElementById("msg");
 
-  // Utils
   function safeParse(raw, fallback){ try{ return JSON.parse(raw); }catch{ return fallback; } }
   function loadJson(key, fallback){
     const raw = localStorage.getItem(key);
@@ -291,7 +286,6 @@
     saveJson(relKey(t), rels);
   }
 
-  // Parent limit helpers
   function parentsOfChild(rels, childId){
     return new Set(
       rels
@@ -300,7 +294,6 @@
     );
   }
 
-  // Duplicate detection
   function hasSameParentChild(rels, parentId, childId){
     return rels.some(r =>
       r.typ === "FORALDER_BARN" &&
@@ -308,6 +301,7 @@
       String(r.tillPersonId) === String(childId)
     );
   }
+
   function hasSamePartner(rels, aId, bId){
     const A = String(aId), B = String(bId);
     return rels.some(r => {
@@ -317,7 +311,6 @@
     });
   }
 
-  // UI fill
   function fillPeopleSelects(){
     const people = loadPeople();
 
@@ -357,7 +350,6 @@
     }
   }
 
-  // Relation type behavior
   function applyTypeUI(){
     const typ = relationType.value;
     const focus = String(focusSelect.value || "").trim();
@@ -370,10 +362,7 @@
       aHelp.textContent = "Välj en förälder som kopplas till fokuspersonen (barnet). Max 2 föräldrar per barn.";
       bHelp.textContent = "Barn = fokuspersonen (låst för enkel röd tråd).";
 
-      // Fokus -> Barn (låst)
       if(focus) bSelect.value = focus;
-
-      // Förälder ska väljas manuellt (ingen auto)
       if(aSelect.value === focus) aSelect.value = "";
 
       aSelect.required = true;
@@ -388,7 +377,6 @@
       aHelp.textContent = "Partner A = fokuspersonen (låst för enkel röd tråd).";
       bHelp.textContent = "Välj andra personen.";
 
-      // Fokus -> Partner A (låst)
       if(focus) aSelect.value = focus;
       if(bSelect.value === focus) bSelect.value = "";
 
@@ -398,18 +386,15 @@
   }
 
   focusSelect.addEventListener("change", () => {
-    // När fokus ändras: uppdatera default för A/B
     applyTypeUI();
   });
 
   relationType.addEventListener("change", () => {
-    // reset val så man inte råkar spara fel typ med gamla val
     aSelect.value = "";
     bSelect.value = "";
     applyTypeUI();
   });
 
-  // Save relation
   document.getElementById("form").addEventListener("submit", (e) => {
     e.preventDefault();
     const t = activeTreeId();
@@ -430,7 +415,6 @@
       const parentId = a;
       const childId = b;
 
-      // Lås fokus = barn (röd tråd)
       if(childId !== focusId) return setMsg("error", "I Förälder→Barn måste fokusperson vara Barn (byt fokus eller barn).");
 
       if(hasSameParentChild(rels, parentId, childId)) return setMsg("error", "Redan kopplad.");
@@ -453,7 +437,6 @@
       const personAId = a;
       const personBId = b;
 
-      // Lås fokus = Partner A (röd tråd)
       if(personAId !== focusId) return setMsg("error", "I Partner måste fokusperson vara Partner A (byt fokus eller Partner A).");
 
       if(hasSamePartner(rels, personAId, personBId)) return setMsg("error", "Partnerrelation finns redan.");
@@ -474,7 +457,6 @@
     pillRels.textContent = String(loadRels().length);
   });
 
-  // Buttons
   document.getElementById("resetBtn").addEventListener("click", () => {
     document.getElementById("form").reset();
     setMsg("", "");
@@ -487,7 +469,6 @@
     window.location.href = "../index.html";
   });
 
-  // Init
   fillPeopleSelects();
   applyTypeUI();
 </script>
