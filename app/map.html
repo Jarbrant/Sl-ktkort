@@ -75,6 +75,7 @@
       white-space: nowrap;
       box-shadow: 0 2px 10px rgba(0,0,0,.06);
     }
+
     .popup h3 { margin: 0 0 6px; font-size: 1rem; }
     .popup .meta { margin: 0 0 8px; color:#555; }
     .popup .sectionTitle { margin: 10px 0 4px; font-weight: 800; }
@@ -85,13 +86,13 @@
 <body>
 
 <header>
-  <a href="../start.html">← Tillbaka</a>
+  <a href="../start.html">← Till startsidan</a>
   <a href="./slaktkort.html">Släktkort</a>
   <a href="./create-relation.html">Relationer</a>
   <a href="./trees.html">Träd</a>
 
   <h1>Släktträd – karta</h1>
-  <p class="muted">Visar släktkort i aktivt träd (markörer med namn). Klicka på en markör för relationer.</p>
+  <p class="muted">Markörer + namn. Klicka på en markör för relationer. Linjer visar förälder ↔ barn.</p>
 </header>
 
 <div class="wrap">
@@ -101,11 +102,13 @@
     <span class="chip">Aktivt träd: <strong id="activeTreeName">—</strong></span>
     <span class="chip">Släktkort med coords: <strong id="countCards">0</strong></span>
     <span class="chip">Relationer: <strong id="countRels">0</strong></span>
+    <span class="chip">Linjer: <strong id="countLines">0</strong></span>
 
     <span class="actions">
       <button id="reloadBtn" type="button">Ladda om</button>
       <button id="fitBtn" type="button">Zooma till alla</button>
       <button id="togglePickerBtn" type="button">Plats-picker: AV</button>
+      <button id="toggleLinesBtn" type="button">Linjer: PÅ</button>
     </span>
   </div>
 
@@ -120,7 +123,7 @@
 
 <script>
   // =========================
-  // LocalStorage keys (måste matcha övriga sidor)
+  // LocalStorage keys
   // =========================
   const KEY_TREES  = "slakttradet_trees";
   const KEY_ACTIVE = "slakttradet_active_tree_id";
@@ -133,9 +136,12 @@
   const activeTreeNameEl = document.getElementById("activeTreeName");
   const countCardsEl = document.getElementById("countCards");
   const countRelsEl = document.getElementById("countRels");
+  const countLinesEl = document.getElementById("countLines");
+
   const reloadBtn = document.getElementById("reloadBtn");
   const fitBtn = document.getElementById("fitBtn");
   const togglePickerBtn = document.getElementById("togglePickerBtn");
+  const toggleLinesBtn = document.getElementById("toggleLinesBtn");
 
   function setMsg(type, text) {
     msg.className = "msg " + (type === "error" ? "error" : type === "ok" ? "ok" : "muted");
@@ -178,7 +184,6 @@
   }
 
   function parseCoordsObj(p){
-    // slaktkort.html sparar coords som {lat, lon} eller null
     if(!p || !p.coords) return null;
     const lat = Number(p.coords.lat);
     const lon = Number(p.coords.lon);
@@ -186,6 +191,15 @@
     if(lat < -90 || lat > 90) return null;
     if(lon < -180 || lon > 180) return null;
     return { lat, lon };
+  }
+
+  function escapeHtml(s){
+    return String(s)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
   }
 
   // =========================
@@ -198,7 +212,8 @@
     attribution: "&copy; OpenStreetMap contributors"
   }).addTo(map);
 
-  // marker-lager för släktkort
+  // lager
+  const linesLayer = L.layerGroup().addTo(map);
   const cardsLayer = L.layerGroup().addTo(map);
 
   // =========================
@@ -241,23 +256,32 @@
   });
 
   // =========================
-  // Relation-indexering
+  // Relation-indexering (FAS 2: bara FORALDER_BARN)
+  // Partner/gift/sambo/skilda kommer senare som egen relationstyp.
   // =========================
   function buildRelationIndex(rels){
     const parentsOf = {};  // childId -> [parentId]
     const childrenOf = {}; // parentId -> [childId]
 
     for(const r of (Array.isArray(rels) ? rels : [])){
-      if(!r || r.typ !== "FORALDER_BARN") continue;
-      const parentId = String(r.franPersonId || "");
-      const childId  = String(r.tillPersonId || "");
-      if(!parentId || !childId) continue;
+      if(!r) continue;
 
-      if(!parentsOf[childId]) parentsOf[childId] = [];
-      if(!parentsOf[childId].includes(parentId)) parentsOf[childId].push(parentId);
+      if(r.typ === "FORALDER_BARN"){
+        const parentId = String(r.franPersonId || "");
+        const childId  = String(r.tillPersonId || "");
+        if(!parentId || !childId) continue;
 
-      if(!childrenOf[parentId]) childrenOf[parentId] = [];
-      if(!childrenOf[parentId].includes(childId)) childrenOf[parentId].push(childId);
+        if(!parentsOf[childId]) parentsOf[childId] = [];
+        if(!parentsOf[childId].includes(parentId)) parentsOf[childId].push(parentId);
+
+        if(!childrenOf[parentId]) childrenOf[parentId] = [];
+        if(!childrenOf[parentId].includes(childId)) childrenOf[parentId].push(childId);
+      }
+
+      // Exempel för framtiden (FAS 3/4):
+      // if(r.typ === "PARTNER"){ ... }
+      // r.status: "GIFT" | "SAMBO" | "SARBO" | "SKILDA"
+      // r.fromYear, r.toYear
     }
 
     return { parentsOf, childrenOf };
@@ -273,23 +297,27 @@
     return `<ul>${items}</ul>`;
   }
 
-  function escapeHtml(s){
-    return String(s)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
-  }
-
   // =========================
-  // Ladda & rendera
+  // Render
   // =========================
   let lastBounds = null;
+  let showLines = true;
+
+  function updateLinesUi(){
+    toggleLinesBtn.textContent = "Linjer: " + (showLines ? "PÅ" : "AV");
+  }
+
+  toggleLinesBtn.addEventListener("click", () => {
+    showLines = !showLines;
+    updateLinesUi();
+    renderMap(); // rita om allt enkelt
+  });
 
   function renderMap(){
     cardsLayer.clearLayers();
+    linesLayer.clearLayers();
     lastBounds = null;
+    countLinesEl.textContent = "0";
 
     const treeId = getActiveTreeId();
     if(!treeId){
@@ -319,6 +347,9 @@
 
     const { parentsOf, childrenOf } = buildRelationIndex(safeRels);
 
+    // skapa marker-index (personId -> LatLng)
+    const posById = {};
+
     // lägg markörer
     let countWithCoords = 0;
     for(const p of safeCards){
@@ -326,8 +357,8 @@
       if(!c) continue;
 
       countWithCoords++;
+      posById[p.id] = L.latLng(c.lat, c.lon);
 
-      const title = formatName(p) + formatYears(p);
       const popupHtml = `
         <div class="popup">
           <h3>${escapeHtml(formatName(p))}${escapeHtml(formatYears(p))}</h3>
@@ -344,7 +375,6 @@
       const marker = L.marker([c.lat, c.lon]).addTo(cardsLayer);
       marker.bindPopup(popupHtml);
 
-      // “flagga” = label med namn
       marker.bindTooltip(escapeHtml(formatName(p)), {
         permanent: true,
         direction: "top",
@@ -353,7 +383,6 @@
         opacity: 0.95
       });
 
-      // bounds
       if(!lastBounds) lastBounds = L.latLngBounds([ [c.lat, c.lon], [c.lat, c.lon] ]);
       else lastBounds.extend([c.lat, c.lon]);
     }
@@ -365,7 +394,31 @@
       return;
     }
 
-    setMsg("ok", `Klar: ${countWithCoords} markörer i '${treeName}'. Klicka på en markör för relationer.`);
+    // rita linjer (FAS 2: bara FORALDER_BARN och bara om båda har coords)
+    let drawnLines = 0;
+    if(showLines){
+      for(const r of safeRels){
+        if(!r || r.typ !== "FORALDER_BARN") continue;
+
+        const parentId = String(r.franPersonId || "");
+        const childId  = String(r.tillPersonId || "");
+        if(!parentId || !childId) continue;
+
+        const p1 = posById[parentId];
+        const p2 = posById[childId];
+        if(!p1 || !p2) continue; // hoppa över relationer utan coords
+
+        // enkel linje
+        L.polyline([p1, p2], { weight: 2, opacity: 0.8 }).addTo(linesLayer);
+        drawnLines++;
+      }
+    }
+
+    countLinesEl.textContent = String(drawnLines);
+
+    setMsg("ok",
+      `Klar: ${countWithCoords} markörer, ${drawnLines} linjer i '${treeName}'.`
+    );
   }
 
   reloadBtn.addEventListener("click", renderMap);
@@ -375,6 +428,7 @@
   });
 
   updatePickerUi();
+  updateLinesUi();
   renderMap();
 </script>
 
