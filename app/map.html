@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Karta – Släktkort</title>
-  <meta name="description" content="Steg 3: Visa personer med koordinater i aktivt träd (GitHub Pages / localStorage)." />
+  <meta name="description" content="Visa personer med koordinater och kopplingar (relationer) i aktivt träd." />
 
   <!-- Leaflet (CDN) -->
   <link
@@ -61,7 +61,6 @@
       text-decoration:none;
     }
     .btn.secondary{ border-color:#bbb; }
-    .btn.danger{ border-color:#b00020; color:#b00020; }
     .btn.disabled{
       opacity:.45;
       cursor:not-allowed;
@@ -96,7 +95,7 @@
       grid-template-columns: 1fr;
     }
     @media (min-width: 980px){
-      .grid{ grid-template-columns: 360px 1fr; }
+      .grid{ grid-template-columns: 380px 1fr; }
     }
 
     .card{
@@ -109,7 +108,7 @@
     .small{ font-size:.95rem; color:#555; margin:0 0 10px; }
 
     label{ display:block; margin:10px 0 6px; font-weight:800; }
-    input, select{
+    input{
       width:100%;
       box-sizing:border-box;
       padding:10px;
@@ -127,16 +126,37 @@
       margin-top: 12px;
     }
 
+    .toggleRow{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-top: 10px;
+    }
+    .toggleRow label{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-weight:700;
+      margin:0;
+    }
+    .toggleRow input[type="checkbox"]{
+      width:auto;
+      padding:0;
+      margin:0;
+      accent-color: auto;
+    }
+
     #map{
       width:100%;
-      height: 540px;
+      height: 560px;
       border-radius:12px;
       border: 1px solid #ddd;
       overflow:hidden;
       background:#f4f4f4;
     }
     @media (max-width: 520px){
-      #map{ height: 420px; }
+      #map{ height: 440px; }
     }
 
     .error{ color:#b00020; font-weight:900; }
@@ -164,6 +184,7 @@
     .item:hover{ background:#fafafa; }
     .itemTitle{ font-weight:900; margin:0 0 2px; }
     .itemMeta{ margin:0; color:#555; font-size:.95rem; }
+
     .hintBox{
       margin-top: 10px;
       padding: 10px 12px;
@@ -179,7 +200,7 @@
 <header>
   <div>
     <h1>Karta</h1>
-    <p class="muted">Steg 3 i flödet. Visar personer med koordinater i <strong>aktivt träd</strong>.</p>
+    <p class="muted">Visar <strong>personer</strong> och <strong>kopplingar</strong> (Förälder→Barn) i aktivt träd.</p>
 
     <nav class="topbar" aria-label="Navigation">
       <a class="btn secondary" href="../start.html">Start</a>
@@ -200,16 +221,23 @@
   <span id="pillTree" class="pill warn">Aktivt träd: <strong>—</strong></span>
   <span id="pillPeople" class="pill">Personer: <strong>0</strong></span>
   <span id="pillWithCoords" class="pill">Med koordinater: <strong>0</strong></span>
-  <span id="pillMode" class="pill warn">Läge: <strong>Välj träd</strong></span>
+  <span id="pillLinks" class="pill">Kopplingar ritade: <strong>0</strong></span>
 </section>
 
 <div class="grid">
   <section class="card" aria-label="Kontroller">
-    <h2>Filter & lista</h2>
-    <p class="small">Klicka en person för att zooma och öppna markörens info.</p>
+    <h2>Filter & vy</h2>
+    <p class="small">Klicka en person för att zooma och öppna popup.</p>
 
     <label for="search">Sök</label>
     <input id="search" placeholder="Sök namn eller plats…" autocomplete="off" />
+
+    <div class="toggleRow" role="group" aria-label="Visningsval">
+      <label>
+        <input id="toggleLinks" type="checkbox" checked />
+        Visa kopplingar (Förälder→Barn)
+      </label>
+    </div>
 
     <div class="actions">
       <button id="refreshBtn" type="button" class="btn secondary">Uppdatera</button>
@@ -229,8 +257,8 @@
 
   <section class="card" aria-label="Karta">
     <h2>Karta</h2>
-    <p class="small">OpenStreetMap via Leaflet. Funkar på GitHub Pages.</p>
-    <div id="map" role="application" aria-label="Karta med markörer"></div>
+    <p class="small">OpenStreetMap via Leaflet. Kopplingar ritas när båda har coords.</p>
+    <div id="map" role="application" aria-label="Karta med markörer och kopplingar"></div>
     <p id="msg" class="muted" aria-live="polite" style="margin-top:10px;"></p>
   </section>
 </div>
@@ -250,11 +278,11 @@
   // ============================
   // Keys (måste matcha dina andra sidor)
   // ============================
-  const KEY_TREES    = "slakttradet_trees";
-  const KEY_ACTIVE   = "slakttradet_active_tree_id";
-  const KEY_LAST_LOC = "slakttradet_last_location";
+  const KEY_TREES  = "slakttradet_trees";
+  const KEY_ACTIVE = "slakttradet_active_tree_id";
 
   const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
+  const relKey   = (treeId) => "slakttradet_relationer_" + String(treeId);
 
   // ============================
   // DOM
@@ -266,9 +294,10 @@
   const pillTree = document.getElementById("pillTree");
   const pillPeople = document.getElementById("pillPeople");
   const pillWithCoords = document.getElementById("pillWithCoords");
-  const pillMode = document.getElementById("pillMode");
+  const pillLinks = document.getElementById("pillLinks");
 
   const searchEl = document.getElementById("search");
+  const toggleLinksEl = document.getElementById("toggleLinks");
   const refreshBtn = document.getElementById("refreshBtn");
   const fitBtn = document.getElementById("fitBtn");
   const listEl = document.getElementById("list");
@@ -296,8 +325,17 @@
     const n = `${p.fornamn || ""} ${p.efternamn || ""}`.trim();
     return n || "(namnlös)";
   }
+  function escapeHtml(s){
+    return String(s || "")
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+
   function coordsFromPerson(p){
-    // vi accepterar både p.coords={lat,lon} och p.coords="lat, lon"
+    // accepterar p.coords={lat,lon} eller p.coords="lat, lon"
     if(p && typeof p.coords === "object" && p.coords){
       const lat = Number(p.coords.lat);
       const lon = Number(p.coords.lon);
@@ -324,21 +362,27 @@
   // Leaflet setup
   // ============================
   const map = L.map("map", { zoomControl: true });
-  const tiles = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     attribution: '&copy; OpenStreetMap'
-  });
-  tiles.addTo(map);
+  }).addTo(map);
 
-  // Default: Stockholm-ish (om inget finns)
+  // Default: Stockholm-ish
   map.setView([59.3293, 18.0686], 5);
 
-  let markerLayer = L.layerGroup().addTo(map);
-  let markersById = new Map(); // personId -> marker
+  const markerLayer = L.layerGroup().addTo(map);
+  const linkLayer = L.layerGroup().addTo(map);
+
+  const markersById = new Map(); // personId -> marker
+  const coordsById = new Map();  // personId -> {lat,lon}
 
   function clearMarkers(){
     markerLayer.clearLayers();
     markersById.clear();
+    coordsById.clear();
+  }
+  function clearLinks(){
+    linkLayer.clearLayers();
   }
 
   function openMarker(personId){
@@ -348,16 +392,15 @@
     map.setView(m.getLatLng(), Math.max(map.getZoom(), 10), { animate: true });
   }
 
-  function fitToMarkers(){
+  function fitToAll(){
     const ll = [];
     markersById.forEach(m => ll.push(m.getLatLng()));
     if(ll.length === 0) return;
-    const bounds = L.latLngBounds(ll);
-    map.fitBounds(bounds.pad(0.2));
+    map.fitBounds(L.latLngBounds(ll).pad(0.2));
   }
 
   // ============================
-  // Data + render
+  // Data loaders
   // ============================
   function loadPeople(){
     const t = activeTreeId();
@@ -365,32 +408,16 @@
     const arr = loadJson(cardsKey(t), []);
     return Array.isArray(arr) ? arr : [];
   }
-
-  function renderStatus(allPeople, peopleWithCoords){
+  function loadRelations(){
     const t = activeTreeId();
-    const hasTrees = getTrees().length > 0;
-    const hasActive = !!t;
-
-    setPill(
-      pillTree,
-      hasActive ? "ok" : (hasTrees ? "warn" : "err"),
-      "Aktivt träd: <strong>" + (hasActive ? activeTreeLabel() : "—") + "</strong>"
-    );
-
-    pillPeople.innerHTML = "Personer: <strong>" + allPeople.length + "</strong>";
-    pillWithCoords.innerHTML = "Med koordinater: <strong>" + peopleWithCoords.length + "</strong>";
-
-    if(!hasTrees){
-      setPill(pillMode, "err", "Läge: <strong>Skapa träd</strong>");
-    }else if(!hasActive){
-      setPill(pillMode, "warn", "Läge: <strong>Välj aktivt träd</strong>");
-    }else if(peopleWithCoords.length === 0){
-      setPill(pillMode, "warn", "Läge: <strong>Lägg koordinater</strong>");
-    }else{
-      setPill(pillMode, "ok", "Läge: <strong>Visa karta</strong>");
-    }
+    if(!t) return [];
+    const arr = loadJson(relKey(t), []);
+    return Array.isArray(arr) ? arr : [];
   }
 
+  // ============================
+  // Render
+  // ============================
   function renderHint(hasTrees, hasActive, peopleWithCoords){
     if(!hasTrees){
       hint.hidden = false;
@@ -449,21 +476,14 @@
     }
   }
 
-  function escapeHtml(s){
-    return String(s || "")
-      .replaceAll("&","&amp;")
-      .replaceAll("<","&lt;")
-      .replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;")
-      .replaceAll("'","&#039;");
-  }
-
-  function renderMap(people){
+  function renderMarkers(people){
     clearMarkers();
 
     for(const p of people){
       const c = coordsFromPerson(p);
       if(!c) continue;
+
+      coordsById.set(String(p.id), c);
 
       const title = personName(p);
       const place = (p.plats || "").trim();
@@ -478,13 +498,42 @@
       const m = L.marker([c.lat, c.lon]).addTo(markerLayer).bindPopup(popupHtml);
       markersById.set(String(p.id), m);
     }
+  }
 
-    if(markersById.size > 0){
-      fitToMarkers();
-      msg.innerHTML = "<span class='ok'>Klar.</span> Visar " + markersById.size + " markör(er).";
-    }else{
-      msg.innerHTML = "<span class='error'>Inga markörer.</span> Inga personer i aktivt träd har koordinater ännu.";
+  function renderLinks(relations){
+    clearLinks();
+
+    if(!toggleLinksEl.checked) {
+      pillLinks.innerHTML = "Kopplingar ritade: <strong>0</strong>";
+      return 0;
     }
+
+    let drawn = 0;
+
+    // Vi ritar bara FORALDER_BARN, och bara om båda har coords
+    for(const r of relations){
+      if(!r || r.typ !== "FORALDER_BARN") continue;
+
+      const fromId = String(r.franPersonId || "");
+      const toId   = String(r.tillPersonId || "");
+      if(!fromId || !toId) continue;
+
+      const a = coordsById.get(fromId);
+      const b = coordsById.get(toId);
+      if(!a || !b) continue;
+
+      // Standard Leaflet polyline (ingen färgspec här — enkel)
+      const line = L.polyline([[a.lat, a.lon], [b.lat, b.lon]], {
+        weight: 3,
+        opacity: 0.75
+      });
+
+      line.addTo(linkLayer);
+      drawn++;
+    }
+
+    pillLinks.innerHTML = "Kopplingar ritade: <strong>" + drawn + "</strong>";
+    return drawn;
   }
 
   function currentFiltered(peopleWithCoords){
@@ -506,20 +555,35 @@
     const hasActive = !!t;
 
     const allPeople = hasActive ? loadPeople() : [];
-    const peopleWithCoords = allPeople.filter(p => !!coordsFromPerson(p));
+    const allRelations = hasActive ? loadRelations() : [];
 
-    renderStatus(allPeople, peopleWithCoords);
+    const peopleWithCoords = allPeople.filter(p => !!coordsFromPerson(p));
+    const filtered = currentFiltered(peopleWithCoords);
+
+    // Status pills
+    setPill(
+      pillTree,
+      hasActive ? "ok" : (hasTrees ? "warn" : "err"),
+      "Aktivt träd: <strong>" + (hasActive ? activeTreeLabel() : "—") + "</strong>"
+    );
+    pillPeople.innerHTML = "Personer: <strong>" + allPeople.length + "</strong>";
+    pillWithCoords.innerHTML = "Med koordinater: <strong>" + peopleWithCoords.length + "</strong>";
+
     renderHint(hasTrees, hasActive, peopleWithCoords);
 
-    const filtered = currentFiltered(peopleWithCoords);
     renderList(filtered);
-    renderMap(filtered);
+    renderMarkers(filtered);
 
-    // Extra: om senaste plats finns och det inte finns markörer, zooma dit
-    if(!hasActive || peopleWithCoords.length > 0) return;
-    const last = loadJson(KEY_LAST_LOC, null);
-    if(last && typeof last.lat === "number" && typeof last.lon === "number"){
-      map.setView([last.lat, last.lon], 8);
+    const drawn = renderLinks(allRelations);
+
+    if(markersById.size > 0){
+      fitToAll();
+      msg.innerHTML =
+        "<span class='ok'>Klar.</span> Visar " + markersById.size +
+        " markör(er) och " + drawn + " koppling(ar).";
+    }else{
+      msg.innerHTML =
+        "<span class='error'>Inga markörer.</span> Inga personer i aktivt träd har koordinater (eller matchar filtret).";
     }
   }
 
@@ -528,7 +592,7 @@
   // ============================
   refreshBtn.addEventListener("click", refresh);
   fitBtn.addEventListener("click", () => {
-    if(markersById.size > 0) fitToMarkers();
+    if(markersById.size > 0) fitToAll();
   });
 
   let searchTimer = null;
@@ -536,6 +600,8 @@
     if(searchTimer) clearTimeout(searchTimer);
     searchTimer = setTimeout(refresh, 120);
   });
+
+  toggleLinksEl.addEventListener("change", refresh);
 
   logoutBtn.addEventListener("click", () => {
     try{ sessionStorage.removeItem("demo_auth"); }catch{}
