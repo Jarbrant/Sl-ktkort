@@ -202,6 +202,22 @@
       .replaceAll("'", "&#039;");
   }
 
+  function formatPartnerYears(r){
+    const fy = (r && r.fromYear !== undefined) ? r.fromYear : null;
+    const ty = (r && r.toYear !== undefined) ? r.toYear : null;
+    if(fy === null && ty === null) return "";
+    return ` (${fy ?? "?"}–${ty ?? "?"})`;
+  }
+
+  function formatPartnerStatus(status){
+    const s = String(status || "").toUpperCase();
+    if(s === "GIFT") return "Gift";
+    if(s === "SAMBO") return "Sambo";
+    if(s === "SARBO") return "Särbo";
+    if(s === "SKILDA") return "Skilda";
+    return status ? String(status) : "Partner";
+  }
+
   // =========================
   // Leaflet init
   // =========================
@@ -256,12 +272,14 @@
   });
 
   // =========================
-  // Relation-indexering (FAS 2: bara FORALDER_BARN)
-  // Partner/gift/sambo/skilda kommer senare som egen relationstyp.
+  // Relation-indexering
+  // - FORALDER_BARN: parentsOf/childrenOf
+  // - PARTNER: partnersOf
   // =========================
   function buildRelationIndex(rels){
-    const parentsOf = {};  // childId -> [parentId]
-    const childrenOf = {}; // parentId -> [childId]
+    const parentsOf = {};   // childId -> [parentId]
+    const childrenOf = {};  // parentId -> [childId]
+    const partnersOf = {};  // personId -> [{ otherId, status, fromYear, toYear }]
 
     for(const r of (Array.isArray(rels) ? rels : [])){
       if(!r) continue;
@@ -278,13 +296,37 @@
         if(!childrenOf[parentId].includes(childId)) childrenOf[parentId].push(childId);
       }
 
-      // Exempel för framtiden (FAS 3/4):
-      // if(r.typ === "PARTNER"){ ... }
-      // r.status: "GIFT" | "SAMBO" | "SARBO" | "SKILDA"
-      // r.fromYear, r.toYear
+      if(r.typ === "PARTNER"){
+        const a = String(r.personAId || "");
+        const b = String(r.personBId || "");
+        if(!a || !b || a === b) continue;
+
+        const entryA = { otherId: b, status: r.status, fromYear: r.fromYear ?? null, toYear: r.toYear ?? null };
+        const entryB = { otherId: a, status: r.status, fromYear: r.fromYear ?? null, toYear: r.toYear ?? null };
+
+        if(!partnersOf[a]) partnersOf[a] = [];
+        if(!partnersOf[b]) partnersOf[b] = [];
+
+        // undvik dubletter
+        const existsA = partnersOf[a].some(x =>
+          String(x.otherId) === b &&
+          String(x.status || "") === String(entryA.status || "") &&
+          (x.fromYear ?? null) === (entryA.fromYear ?? null) &&
+          (x.toYear ?? null) === (entryA.toYear ?? null)
+        );
+        if(!existsA) partnersOf[a].push(entryA);
+
+        const existsB = partnersOf[b].some(x =>
+          String(x.otherId) === a &&
+          String(x.status || "") === String(entryB.status || "") &&
+          (x.fromYear ?? null) === (entryB.fromYear ?? null) &&
+          (x.toYear ?? null) === (entryB.toYear ?? null)
+        );
+        if(!existsB) partnersOf[b].push(entryB);
+      }
     }
 
-    return { parentsOf, childrenOf };
+    return { parentsOf, childrenOf, partnersOf };
   }
 
   function renderPersonList(ids, byId){
@@ -294,6 +336,23 @@
       .filter(Boolean)
       .map(p => `<li>${escapeHtml(formatName(p))}${escapeHtml(formatYears(p))}</li>`)
       .join("");
+    return `<ul>${items}</ul>`;
+  }
+
+  function renderPartnerList(personId, partnersOf, byId){
+    const list = partnersOf[personId] || [];
+    if(!list || list.length === 0) return "<div class='muted'>—</div>";
+
+    const items = list
+      .map(x => {
+        const other = byId[x.otherId];
+        const otherName = other ? `${formatName(other)}${formatYears(other)}` : `(okänd) — ${x.otherId}`;
+        const status = formatPartnerStatus(x.status);
+        const years = formatPartnerYears(x);
+        return `<li>${escapeHtml(otherName)} — ${escapeHtml(status)}${escapeHtml(years)}</li>`;
+      })
+      .join("");
+
     return `<ul>${items}</ul>`;
   }
 
@@ -310,7 +369,7 @@
   toggleLinesBtn.addEventListener("click", () => {
     showLines = !showLines;
     updateLinesUi();
-    renderMap(); // rita om allt enkelt
+    renderMap();
   });
 
   function renderMap(){
@@ -345,12 +404,12 @@
       if(p && typeof p.id === "string" && p.id.trim()) byId[p.id] = p;
     }
 
-    const { parentsOf, childrenOf } = buildRelationIndex(safeRels);
+    const { parentsOf, childrenOf, partnersOf } = buildRelationIndex(safeRels);
 
-    // skapa marker-index (personId -> LatLng)
+    // marker-index (personId -> LatLng)
     const posById = {};
 
-    // lägg markörer
+    // markörer
     let countWithCoords = 0;
     for(const p of safeCards){
       const c = parseCoordsObj(p);
@@ -363,6 +422,9 @@
         <div class="popup">
           <h3>${escapeHtml(formatName(p))}${escapeHtml(formatYears(p))}</h3>
           <div class="meta">${escapeHtml(p.plats || "")}</div>
+
+          <div class="sectionTitle">Partner</div>
+          ${renderPartnerList(p.id, partnersOf, byId)}
 
           <div class="sectionTitle">Föräldrar</div>
           ${renderPersonList(parentsOf[p.id] || [], byId)}
@@ -394,7 +456,7 @@
       return;
     }
 
-    // rita linjer (FAS 2: bara FORALDER_BARN och bara om båda har coords)
+    // linjer (bara FORALDER_BARN, om coords finns)
     let drawnLines = 0;
     if(showLines){
       for(const r of safeRels){
@@ -406,9 +468,8 @@
 
         const p1 = posById[parentId];
         const p2 = posById[childId];
-        if(!p1 || !p2) continue; // hoppa över relationer utan coords
+        if(!p1 || !p2) continue;
 
-        // enkel linje
         L.polyline([p1, p2], { weight: 2, opacity: 0.8 }).addTo(linesLayer);
         drawnLines++;
       }
@@ -416,9 +477,7 @@
 
     countLinesEl.textContent = String(drawnLines);
 
-    setMsg("ok",
-      `Klar: ${countWithCoords} markörer, ${drawnLines} linjer i '${treeName}'.`
-    );
+    setMsg("ok", `Klar: ${countWithCoords} markörer, ${drawnLines} linjer i '${treeName}'.`);
   }
 
   reloadBtn.addEventListener("click", renderMap);
