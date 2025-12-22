@@ -102,7 +102,7 @@
     .error{ color:#b00020; font-weight:950; }
     .ok{ font-weight:950; }
 
-    /* Sökresultat-lista (ersätter dropdown för fokusperson) */
+    /* Sökresultat */
     .list{
       margin: 10px 0 0;
       padding: 0;
@@ -130,7 +130,6 @@
     .item.active{ border-color:#333; background:#f7f7f7; }
     .itemTitle{ font-weight:950; margin:0 0 2px; }
     .itemMeta{ margin:0; color:#555; font-size:.95rem; }
-    .itemActions{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
 
     code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
   </style>
@@ -147,7 +146,6 @@
     <a class="btn secondary" href="./slaktkort.html">Personer</a>
     <a class="btn" href="./create-relation.html" aria-current="page">Relationer</a>
     <a class="btn secondary" href="./map.html">Karta</a>
-    <!-- AUTOPATCH: borttagen Plats-picker -->
     <button id="logoutBtn" class="btn secondary" type="button">Logga ut</button>
   </nav>
 
@@ -168,11 +166,6 @@
       <label for="focusSearch">Sök fokusperson *</label>
       <input id="focusSearch" placeholder="minst 3 bokstäver…" autocomplete="off" />
       <ul id="focusList" class="list" aria-label="Fokusperson-förslag"></ul>
-
-      <div class="actions">
-        <a class="btn secondary" href="./slaktkort.html">Skapa person</a>
-        <button id="reloadBtn" class="btn secondary" type="button">Ladda om</button>
-      </div>
     </div>
 
     <div>
@@ -245,8 +238,6 @@
   </form>
 </section>
 
-<!-- AUTOPATCH: borttagen sektion 3) Relationer för vald fokusperson -->
-
 <script>
   (function authGuard(){
     try{
@@ -286,7 +277,6 @@
   const previewLine = document.getElementById("previewLine");
   const msgSave = document.getElementById("msgSave");
 
-  const reloadBtn = document.getElementById("reloadBtn");
   const resetBtn = document.getElementById("resetBtn");
   const form = document.getElementById("form");
 
@@ -351,7 +341,6 @@
     return people.find(x => String(x.id) === String(id)) || null;
   }
 
-  // Relation meta
   const REL_META = {
     PARENT_OF:          { label:"Förälder till",         otherLabel:"Barn *",            help:"Fokuspersonen är förälder. Den andra är barn.", symmetric:false, type:"PARENTCHILD" },
     CHILD_OF:           { label:"Barn till",             otherLabel:"Förälder *",        help:"Fokuspersonen är barn. Den andra är förälder.", symmetric:false, type:"PARENTCHILD" },
@@ -372,7 +361,6 @@
     STEP_CHILD_OF:      { label:"Styvbarn till",         otherLabel:"Styvförälder *",    help:"Relation via omgifte/ny partner.", symmetric:false, type:"GENERIC" }
   };
 
-  // Variant options (shown only for selected keys)
   const VARIANTS = {
     PARENT_OF:     { label:"Föräldervariant", help:"Valfritt: mamma eller pappa.", options:[
       {v:"MAMMA", t:"Mamma"}, {v:"PAPPA", t:"Pappa"}
@@ -518,13 +506,10 @@
 
     applyVariantUI();
 
-    // Motpart-select får aldrig innehålla fokuspersonen
     const people = loadPeople();
     const prevOther = String(otherSelect.value || "");
     fillSelect(otherSelect, people, true, focusId);
     if(prevOther && prevOther !== focusId) otherSelect.value = prevOther;
-
-    // Fail-safe
     if(otherSelect.value === focusId) otherSelect.value = "";
 
     renderPreview();
@@ -554,29 +539,14 @@
     if(!ok) return;
 
     const q = String(focusSearch.value || "").trim().toLowerCase();
+    if(q.length < 3) return; // AUTOPATCH: visa inget innan 3 tecken
+
     const people = loadPeople();
-
-    if(q.length < 3){
-      const li = document.createElement("li");
-      li.className = "item";
-      li.style.cursor = "default";
-      li.innerHTML = "<div><p class='itemTitle'>Sök</p><p class='itemMeta'>Skriv minst 3 bokstäver.</p></div>";
-      focusList.appendChild(li);
-      return;
-    }
-
     const hits = people
       .filter(p => personName(p).toLowerCase().includes(q))
       .slice(0, 40);
 
-    if(hits.length === 0){
-      const li = document.createElement("li");
-      li.className = "item";
-      li.style.cursor = "default";
-      li.innerHTML = "<div><p class='itemTitle'>Inga träffar</p><p class='itemMeta'>Prova ett annat namn.</p></div>";
-      focusList.appendChild(li);
-      return;
-    }
+    if(hits.length === 0) return;
 
     for(const p of hits){
       const li = document.createElement("li");
@@ -592,7 +562,7 @@
         setMsg(msgSave, "", "");
         renderFocusSummary();
         applyRelationUI();
-        renderFocusResults(); // uppdatera highlight
+        renderFocusResults();
       });
 
       focusList.appendChild(li);
@@ -604,7 +574,6 @@
     const ok = renderStatus();
     if(!ok) return;
 
-    // Om fokusId inte finns längre, nollställ
     const people = loadPeople();
     if(focusId && !getPersonById(people, focusId)) focusId = "";
 
@@ -631,7 +600,6 @@
     const rels = loadRels();
     const meta = REL_META[key] || { symmetric:false, type:"GENERIC" };
 
-    // Förälder/Barn: spara kompatibelt
     if(meta.type === "PARENTCHILD"){
       const parentId = (key === "PARENT_OF") ? focusId : otherId;
       const childId  = (key === "PARENT_OF") ? otherId : focusId;
@@ -657,7 +625,6 @@
       return;
     }
 
-    // Partner: spara kompatibelt
     if(meta.type === "PARTNER"){
       if(hasSamePartner(rels, focusId, otherId)) return setMsg(msgSave, "error", "Partnerrelation finns redan.");
 
@@ -678,7 +645,6 @@
       return;
     }
 
-    // Övriga: GENERIC
     if(hasSameGeneric(rels, key, focusId, otherId, !!meta.symmetric, variant)) {
       return setMsg(msgSave, "error", "Relationen finns redan.");
     }
@@ -712,21 +678,19 @@
     renderPreview();
   });
 
-  reloadBtn.addEventListener("click", () => refreshAll());
-
   logoutBtn.addEventListener("click", () => {
     try{ sessionStorage.removeItem("demo_auth"); }catch{}
     window.location.href = "../index.html";
   });
 
-  // Debounce för sök
   let t1 = null;
   focusSearch.addEventListener("input", () => {
     if(t1) clearTimeout(t1);
     t1 = setTimeout(renderFocusResults, 120);
   });
 
-  // Start
+  window.addEventListener("focus", () => refreshAll());
+
   refreshAll();
 </script>
 </body>
