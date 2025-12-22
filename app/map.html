@@ -5,11 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Karta – Släktträd</title>
 
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    crossorigin=""
-  />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 
   <style>
     body { font-family: system-ui, Arial, sans-serif; margin: 0; }
@@ -65,7 +61,6 @@
     }
     .coordsBox code { background:#f0f0f0; padding: 2px 6px; border-radius: 6px; }
 
-    /* Enkel label som “flagga” */
     .name-label {
       background: rgba(255,255,255,0.95);
       border: 1px solid #ddd;
@@ -81,7 +76,6 @@
     .popup .sectionTitle { margin: 10px 0 4px; font-weight: 800; }
     .popup ul { margin: 0; padding-left: 18px; }
     .popup li { margin: 2px 0; }
-    .popup .submuted { color:#666; font-size: .92rem; margin: 0 0 8px; }
   </style>
 </head>
 <body>
@@ -93,7 +87,7 @@
   <a href="./trees.html">Träd</a>
 
   <h1>Släktträd – karta</h1>
-  <p class="muted">Markörer + namn. Klicka på en markör för relationer. Linjer visar förälder ↔ barn.</p>
+  <p class="muted">Markörer + namn. Klicka på en markör för relationer. Linjer visar förälder↔barn och syskon (streckad).</p>
 </header>
 
 <div class="wrap">
@@ -203,6 +197,14 @@
       .replaceAll("'", "&#039;");
   }
 
+  function siblingWord(sibling){
+    // använd syskonets kön för ordval
+    const k = String(sibling?.kon || "").toLowerCase();
+    if(k === "kvinna") return "syster";
+    if(k === "man") return "bror";
+    return "syskon";
+  }
+
   // =========================
   // Leaflet init
   // =========================
@@ -213,7 +215,6 @@
     attribution: "&copy; OpenStreetMap contributors"
   }).addTo(map);
 
-  // lager
   const linesLayer = L.layerGroup().addTo(map);
   const cardsLayer = L.layerGroup().addTo(map);
 
@@ -262,7 +263,8 @@
   function buildRelationIndex(rels){
     const parentsOf = {};   // childId -> [parentId]
     const childrenOf = {};  // parentId -> [childId]
-    const partnersOf = {};  // personId -> [{ otherId, status, fromYear, toYear }]
+    const siblingsOf = {};  // personId -> [siblingId]
+    const siblingPairs = []; // [[a,b]] för linjer
 
     for(const r of (Array.isArray(rels) ? rels : [])){
       if(!r) continue;
@@ -279,71 +281,36 @@
         if(!childrenOf[parentId].includes(childId)) childrenOf[parentId].push(childId);
       }
 
-      if(r.typ === "PARTNER"){
+      if(r.typ === "SYSKON"){
         const a = String(r.personAId || "");
         const b = String(r.personBId || "");
         if(!a || !b || a === b) continue;
 
-        const status = String(r.status || "");
-        const fromYear = (r.fromYear ?? null);
-        const toYear = (r.toYear ?? null);
+        if(!siblingsOf[a]) siblingsOf[a] = [];
+        if(!siblingsOf[b]) siblingsOf[b] = [];
+        if(!siblingsOf[a].includes(b)) siblingsOf[a].push(b);
+        if(!siblingsOf[b].includes(a)) siblingsOf[b].push(a);
 
-        if(!partnersOf[a]) partnersOf[a] = [];
-        if(!partnersOf[b]) partnersOf[b] = [];
-
-        partnersOf[a].push({ otherId: b, status, fromYear, toYear });
-        partnersOf[b].push({ otherId: a, status, fromYear, toYear });
+        siblingPairs.push([a, b]);
       }
     }
 
-    return { parentsOf, childrenOf, partnersOf };
+    return { parentsOf, childrenOf, siblingsOf, siblingPairs };
   }
 
-  function relationBadgeText(pr, byId){
-    const other = byId[pr.otherId];
-    const name = other ? `${formatName(other)}${formatYears(other)}` : pr.otherId;
-
-    const status = pr.status ? pr.status : "PARTNER";
-    const fy = (pr.fromYear ?? null);
-    const ty = (pr.toYear ?? null);
-    const yearText = (fy !== null || ty !== null) ? ` (${fy ?? "?"}–${ty ?? "?"})` : "";
-
-    // stillsamt: "Gift (1924–1938) — Namn"
-    const statusText =
-      status === "GIFT" ? "Gift" :
-      status === "SAMBO" ? "Sambo" :
-      status === "SARBO" ? "Särbo" :
-      status === "SKILDA" ? "Skilda" :
-      status;
-
-    return `${statusText}${yearText} — ${name}`;
-  }
-
-  function renderPersonList(ids, byId){
+  function renderPersonList(ids, byId, mode){
     if(!ids || ids.length === 0) return "<div class='muted'>—</div>";
     const items = ids
       .map(id => byId[id])
       .filter(Boolean)
-      .map(p => `<li>${escapeHtml(formatName(p))}${escapeHtml(formatYears(p))}</li>`)
+      .map(p => {
+        if(mode === "siblings"){
+          return `<li>${escapeHtml(formatName(p))}${escapeHtml(formatYears(p))} <span class="muted">(${escapeHtml(siblingWord(p))})</span></li>`;
+        }
+        return `<li>${escapeHtml(formatName(p))}${escapeHtml(formatYears(p))}</li>`;
+      })
       .join("");
     return `<ul>${items}</ul>`;
-  }
-
-  function renderPartnerList(personId, partnersOf, byId){
-    const list = partnersOf?.[personId] || [];
-    if(!list || list.length === 0) return "<div class='muted'>—</div>";
-
-    // avdupning (samma otherId+status+år kan finnas flera gånger om man skapar dubletter)
-    const seen = new Set();
-    const items = [];
-    for(const pr of list){
-      const key = `${pr.otherId}|${pr.status}|${pr.fromYear ?? ""}|${pr.toYear ?? ""}`;
-      if(seen.has(key)) continue;
-      seen.add(key);
-      items.push(`<li>${escapeHtml(relationBadgeText(pr, byId))}</li>`);
-    }
-
-    return `<ul>${items.join("")}</ul>`;
   }
 
   // =========================
@@ -385,7 +352,6 @@
 
     const safeCards = Array.isArray(cards) ? cards : [];
     const safeRels  = Array.isArray(rels) ? rels : [];
-
     countRelsEl.textContent = String(safeRels.length);
 
     // indexera personer
@@ -394,9 +360,9 @@
       if(p && typeof p.id === "string" && p.id.trim()) byId[p.id] = p;
     }
 
-    const { parentsOf, childrenOf, partnersOf } = buildRelationIndex(safeRels);
+    const { parentsOf, childrenOf, siblingsOf, siblingPairs } = buildRelationIndex(safeRels);
 
-    // skapa marker-index (personId -> LatLng)
+    // marker-index (personId -> LatLng)
     const posById = {};
 
     // lägg markörer
@@ -408,28 +374,19 @@
       countWithCoords++;
       posById[p.id] = L.latLng(c.lat, c.lon);
 
-      const parents = parentsOf[p.id] || [];
-      const kids = childrenOf[p.id] || [];
-      const partners = partnersOf[p.id] || [];
-
       const popupHtml = `
         <div class="popup">
           <h3>${escapeHtml(formatName(p))}${escapeHtml(formatYears(p))}</h3>
           <div class="meta">${escapeHtml(p.plats || "")}</div>
-          <div class="submuted">
-            Föräldrar: <strong>${parents.length}</strong> ·
-            Barn: <strong>${kids.length}</strong> ·
-            Partner: <strong>${partners.length}</strong>
-          </div>
 
-          <div class="sectionTitle">Föräldrar (${parents.length})</div>
-          ${renderPersonList(parents, byId)}
+          <div class="sectionTitle">Föräldrar</div>
+          ${renderPersonList(parentsOf[p.id] || [], byId)}
 
-          <div class="sectionTitle">Barn (${kids.length})</div>
-          ${renderPersonList(kids, byId)}
+          <div class="sectionTitle">Barn</div>
+          ${renderPersonList(childrenOf[p.id] || [], byId)}
 
-          <div class="sectionTitle">Partner (${partners.length})</div>
-          ${renderPartnerList(p.id, partnersOf, byId)}
+          <div class="sectionTitle">Syskon</div>
+          ${renderPersonList(siblingsOf[p.id] || [], byId, "siblings")}
         </div>
       `;
 
@@ -455,9 +412,11 @@
       return;
     }
 
-    // rita linjer (FAS 2: bara FORALDER_BARN och bara om båda har coords)
+    // rita linjer (enkla)
     let drawnLines = 0;
+
     if(showLines){
+      // Förälder–barn (solid)
       for(const r of safeRels){
         if(!r || r.typ !== "FORALDER_BARN") continue;
 
@@ -470,6 +429,16 @@
         if(!p1 || !p2) continue;
 
         L.polyline([p1, p2], { weight: 2, opacity: 0.8 }).addTo(linesLayer);
+        drawnLines++;
+      }
+
+      // Syskon (streckad)
+      for(const [a,b] of siblingPairs){
+        const p1 = posById[a];
+        const p2 = posById[b];
+        if(!p1 || !p2) continue;
+
+        L.polyline([p1, p2], { weight: 2, opacity: 0.6, dashArray: "6 6" }).addTo(linesLayer);
         drawnLines++;
       }
     }
