@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Skapa person – Släktkort</title>
-  <meta name="description" content="Skapa en person (släktkort) i aktivt träd (localStorage)." />
+  <title>Relationer – Släktkort</title>
+  <meta name="description" content="Skapa relationer i aktivt träd (localStorage-first). Fokusperson → relationstyp → variant → kommentar → annan person." />
 
   <style>
     :root { color-scheme: light; }
@@ -18,43 +18,30 @@
       background: #fff;
       color: #111;
     }
-    a{ color: inherit; text-decoration: none; }
-    header{
-      display:flex;
-      align-items:flex-start;
-      justify-content:space-between;
-      gap: 12px;
-      margin-bottom: 18px;
-    }
-    h1{ margin: 0 0 6px; font-size: 1.6rem; }
-    p{ margin: 0 0 12px; }
-    .muted{ color:#555; }
+    a{ color: inherit; text-decoration:none; }
+    header{ margin-bottom: 14px; }
+    h1{ margin:0 0 6px; font-size:1.6rem; }
+    .muted{ color:#555; margin:0 0 12px; }
 
     .topbar{
       display:flex;
       flex-wrap:wrap;
       gap:10px;
       align-items:center;
-      margin: 10px 0 0;
+      margin: 10px 0 16px;
     }
-
     .btn, button{
       display:inline-block;
-      padding: 10px 12px;
-      border: 1px solid #333;
-      border-radius: 10px;
-      background: #fff;
-      font: inherit;
-      cursor: pointer;
+      padding:10px 12px;
+      border:1px solid #333;
+      border-radius:10px;
+      background:#fff;
+      font:inherit;
+      cursor:pointer;
       text-decoration:none;
     }
     .btn.secondary{ border-color:#bbb; }
     .btn.danger{ border-color:#b00020; color:#b00020; }
-    .btn.disabled{
-      opacity:.45;
-      cursor:not-allowed;
-      pointer-events:none;
-    }
 
     .pillRow{
       display:flex;
@@ -67,402 +54,778 @@
       display:inline-flex;
       align-items:center;
       gap:8px;
-      padding: 8px 10px;
-      border: 1px solid #ddd;
-      border-radius: 999px;
-      background: #fafafa;
-      font-size: .95rem;
+      padding:8px 10px;
+      border:1px solid #ddd;
+      border-radius:999px;
+      background:#fafafa;
+      font-size:.95rem;
     }
-    .pill strong{ font-weight: 900; }
-    .pill.ok{ border-color:#cfe8cf; background:#f5fff5; }
-    .pill.warn{ border-color:#ffe1a6; background:#fff9ee; }
-
-    .note{
-      margin: 0 0 18px;
-      padding: 12px;
-      border-radius: 12px;
-      border: 1px solid #ffe1a6;
-      background: #fff9ee;
-    }
-    .note strong{ font-weight: 900; }
-
-    .grid{
-      display:grid;
-      gap: 14px;
-      grid-template-columns: 1fr;
-    }
-    @media (min-width: 860px){
-      .grid{ grid-template-columns: 1fr 1fr; }
-    }
+    .pill strong{ font-weight:950; }
 
     .card{
-      border: 1px solid #ddd;
-      border-radius: 12px;
-      padding: 16px;
-      background: #fff;
-    }
-    .card h2{ margin: 0 0 6px; font-size: 1.15rem; }
-
-    label{ display:block; margin: 10px 0 6px; font-weight: 800; }
-    input, select, textarea{
-      width: 100%;
-      box-sizing:border-box;
-      padding: 10px;
-      border-radius: 10px;
-      border: 1px solid #bbb;
-      font: inherit;
+      border:1px solid #ddd;
+      border-radius:12px;
+      padding:16px;
+      margin: 14px 0;
       background:#fff;
     }
-    textarea{ min-height: 120px; resize: vertical; }
+    .card h2{ margin:0 0 6px; font-size:1.15rem; }
+    .small{ font-size:.95rem; color:#555; margin:0 0 10px; }
 
-    .row2{ display:grid; grid-template-columns: 1fr; gap: 12px; }
-    @media (min-width: 720px){
-      .row2{ grid-template-columns: 1fr 1fr; }
+    label{ display:block; margin:10px 0 6px; font-weight:900; }
+    select, textarea{
+      width:100%;
+      box-sizing:border-box;
+      padding:10px;
+      border-radius:10px;
+      border:1px solid #bbb;
+      font:inherit;
+      background:#fff;
+    }
+    textarea{
+      min-height: 90px;
+      resize: vertical;
+    }
+
+    .row{ display:grid; gap:12px; grid-template-columns: 1fr; }
+    @media (min-width: 740px){
+      .row.two{ grid-template-columns: 1fr 1fr; }
+      .row.three{ grid-template-columns: 1fr 1fr 1fr; }
+      .row.four{ grid-template-columns: 1fr 1fr 1fr 1fr; }
     }
 
     .actions{
       display:flex;
       gap:10px;
       flex-wrap:wrap;
-      margin-top: 12px;
       align-items:center;
+      margin-top: 12px;
     }
 
-    .error{ color:#b00020; font-weight: 900; }
-    .ok{ font-weight: 900; }
+    .error{ color:#b00020; font-weight:950; }
+    .ok{ font-weight:950; }
 
-    pre{
-      background:#f4f4f4;
-      padding: 12px;
-      border-radius: 12px;
-      overflow:auto;
-      white-space: pre-wrap;
+    .list{
       margin: 10px 0 0;
+      padding: 0;
+      list-style:none;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
     }
+    .item{
+      border:1px solid #eee;
+      border-radius:12px;
+      padding:10px;
+      background:#fff;
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .itemTitle{ font-weight:950; margin:0 0 2px; }
+    .itemMeta{ margin:0; color:#555; font-size:.95rem; }
+    .itemNote{
+      margin: 6px 0 0;
+      color:#333;
+      font-size:.95rem;
+      white-space: pre-wrap;
+    }
+    .itemActions{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+
     code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
-    footer{ margin-top: 18px; color:#666; font-size:.95rem; }
   </style>
 </head>
 
 <body>
 <header>
-  <div>
-    <h1>➕ Skapa person</h1>
-    <p class="muted">Snabbform för att lägga in en person i <strong>aktivt träd</strong> (localStorage).</p>
+  <h1>🔗 Relationer</h1>
+  <p class="muted">Fokusperson → Relationstyp → Variant (ibland) → Kommentar → Välj person.</p>
 
-    <nav class="topbar" aria-label="Navigation">
-      <a class="btn secondary" href="start.html">Start</a>
-      <a class="btn secondary" href="trees.html">Träd</a>
-      <a class="btn secondary" href="slaktkort.html">Personer</a>
-      <a class="btn secondary" href="create-relation.html">Relationer</a>
-      <a class="btn secondary" href="map.html">Karta</a>
-    </nav>
-  </div>
-
-  <div class="actions" style="justify-content:flex-end; max-width: 360px;">
+  <nav class="topbar" aria-label="Navigation">
+    <a class="btn secondary" href="../start.html">Start</a>
+    <a class="btn secondary" href="./trees.html">Träd</a>
+    <a class="btn secondary" href="./slaktkort.html">Personer</a>
+    <a class="btn" href="./create-relation.html">Relationer</a>
+    <a class="btn secondary" href="./map.html">Karta</a>
+    <a class="btn secondary" href="./place-picker.html">Plats-picker</a>
     <button id="logoutBtn" class="btn secondary" type="button">Logga ut</button>
+  </nav>
+
+  <div class="pillRow" aria-label="Status">
+    <span class="pill">Aktivt träd: <strong id="pillTree">—</strong></span>
+    <span class="pill">Personer: <strong id="pillPeople">0</strong></span>
+    <span class="pill">Relationer: <strong id="pillRels">0</strong></span>
+    <span class="pill">Nästa steg: <strong>🗺️ Karta</strong></span>
   </div>
 </header>
 
-<section class="pillRow" aria-label="Status">
-  <span id="pillTree" class="pill warn">Aktivt träd: <strong>—</strong></span>
-  <span id="pillCount" class="pill">Personer i trädet: <strong>0</strong></span>
-  <span id="pillNext" class="pill warn">Nästa steg: <strong>Välj träd</strong></span>
+<section class="card">
+  <h2>1) Välj fokusperson</h2>
+  <p class="small">Fokuspersonen är “jag” i relationen.</p>
+
+  <div class="row.two row">
+    <div>
+      <label for="focusSelect">Fokusperson *</label>
+      <select id="focusSelect" required>
+        <option value="">Välj…</option>
+      </select>
+      <div class="actions">
+        <a class="btn secondary" href="./slaktkort.html">Skapa person</a>
+        <button id="reloadBtn" class="btn secondary" type="button">Ladda om</button>
+      </div>
+    </div>
+
+    <div>
+      <label>Vald fokusperson</label>
+      <p class="small" id="focusSummary">—</p>
+    </div>
+  </div>
+
+  <p id="msgTop" class="muted" aria-live="polite"></p>
 </section>
 
-<div id="noteBox" class="note" hidden></div>
+<section class="card">
+  <h2>2) Skapa relation</h2>
+  <p class="small">Variant-rutan visas bara när den gör nytta (t.ex. farmor/farfar/mormor/morfar). Kommentar är valfri.</p>
 
-<section class="grid">
-  <section class="card" aria-label="Formulär">
-    <h2>Formulär</h2>
+  <form id="form">
+    <div class="row four">
+      <div>
+        <label for="relationKey">Relationstyp *</label>
+        <select id="relationKey" required>
+          <option value="PARENT_OF" selected>Förälder till</option>
+          <option value="CHILD_OF">Barn till</option>
 
-    <form id="form">
-      <div class="row2">
-        <div>
-          <label for="fornamn">Förnamn *</label>
-          <input id="fornamn" name="fornamn" required maxlength="80" autocomplete="given-name" />
-        </div>
-        <div>
-          <label for="efternamn">Efternamn *</label>
-          <input id="efternamn" name="efternamn" required maxlength="80" autocomplete="family-name" />
-        </div>
+          <option value="SIBLING_OF">Syskon med</option>
+
+          <option value="GRANDPARENT_OF">Far-/morförälder till</option>
+          <option value="GRANDCHILD_OF">Barnbarn till</option>
+
+          <option value="PARTNER_OF">Partner med</option>
+
+          <option value="AUNTUNCLE_MATERNAL">Moster/Morbror till</option>
+          <option value="AUNTUNCLE_PATERNAL">Faster/Farbror till</option>
+
+          <option value="COUSIN_OF">Kusin med</option>
+
+          <option value="STEP_PARENT_OF">Styvförälder till</option>
+          <option value="STEP_CHILD_OF">Styvbarn till</option>
+        </select>
       </div>
 
-      <div class="row2">
-        <div>
-          <label for="kon">Kön</label>
-          <select id="kon" name="kon">
-            <option value="Okänt" selected>Okänt</option>
-            <option value="Kvinna">Kvinna</option>
-            <option value="Man">Man</option>
-          </select>
-        </div>
-        <div>
-          <label for="plats">Plats</label>
-          <input id="plats" name="plats" maxlength="120" placeholder="t.ex. Småland" />
-        </div>
-      </div>
-
-      <div class="row2">
-        <div>
-          <label for="fodelsear">Födelseår</label>
-          <input id="fodelsear" name="fodelsear" inputmode="numeric" placeholder="t.ex. 1874" />
-        </div>
-        <div>
-          <label for="dodsar">Dödsår</label>
-          <input id="dodsar" name="dodsar" inputmode="numeric" placeholder="t.ex. 1932 (eller tomt)" />
-        </div>
+      <div id="variantWrap" hidden>
+        <label for="variantSelect" id="variantLabel">Variant (valfri)</label>
+        <select id="variantSelect">
+          <option value="">Ingen</option>
+        </select>
+        <p class="small" id="variantHelp">—</p>
       </div>
 
       <div>
-        <label for="anteckning">Anteckning</label>
-        <textarea id="anteckning" name="anteckning" maxlength="2000" placeholder="Fri text…"></textarea>
+        <label for="otherSelect" id="otherLabel">Person *</label>
+        <select id="otherSelect" required>
+          <option value="">Välj…</option>
+        </select>
+        <p class="small" id="otherHelp">—</p>
       </div>
 
-      <div class="actions">
-        <button type="submit" class="btn">Spara person</button>
-        <button type="button" id="resetBtn" class="btn secondary">Rensa</button>
-        <button type="button" id="exportBtn" class="btn secondary">Exportera JSON</button>
-        <button type="button" id="clearBtn" class="btn danger" title="Rensar personer + relationer i aktivt träd">Rensa data i aktivt träd</button>
-        <a id="continueBtn" class="btn disabled" href="create-relation.html" aria-disabled="true" tabindex="-1">Fortsätt → Relationer</a>
+      <div>
+        <label>Förhandsvisning</label>
+        <p class="small" id="previewLine">Välj fokusperson först.</p>
       </div>
-
-      <p id="msg" class="muted" aria-live="polite"></p>
-    </form>
-  </section>
-
-  <section class="card" aria-label="Senast sparat">
-    <h2>Senast sparat</h2>
-    <pre><code id="out">{}</code></pre>
-    <p class="muted" style="margin:10px 0 0;">
-      Relationer skapas i <code>create-relation.html</code> och använder personer i aktivt träd.
-    </p>
-    <div class="actions">
-      <a class="btn secondary" href="slaktkort.html">Öppna Personer</a>
-      <a class="btn secondary" href="trees.html">Byt träd</a>
     </div>
-  </section>
+
+    <div class="row" style="margin-top:10px;">
+      <div>
+        <label for="note">Kommentar (valfri)</label>
+        <textarea id="note" placeholder="Skriv en kort notis om relationen… (t.ex. 'osäker källa', 'adopterad', 'troligen' osv)"></textarea>
+        <p class="small">Tips: håll det kort. Du kan använda detta senare för kvalitet/källor.</p>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button type="submit" class="btn">Spara relation</button>
+      <button type="button" id="resetBtn" class="btn secondary">Rensa val</button>
+      <a class="btn secondary" href="./map.html">Fortsätt → Karta</a>
+    </div>
+
+    <p id="msgSave" class="muted" aria-live="polite"></p>
+  </form>
 </section>
 
-<footer>
-  Rekommendation: använd helst bara <strong>slaktkort.html</strong> som personsida och ta bort denna sida om du inte behöver en snabbform.
-</footer>
+<section class="card">
+  <h2>3) Relationer för vald fokusperson</h2>
+  <p class="small">Visar allt där fokuspersonen ingår. Du kan ta bort.</p>
+
+  <ul id="relsList" class="list" aria-label="Relationer"></ul>
+
+  <div class="actions" style="margin-top:14px;">
+    <a class="btn secondary" href="./slaktkort.html">← Tillbaka (Personer)</a>
+    <a class="btn secondary" href="./map.html">Gå till (Karta)</a>
+  </div>
+</section>
 
 <script>
-  // Estetisk auth
   (function authGuard(){
     try{
       if(sessionStorage.getItem("demo_auth") !== "1"){
-        window.location.href = "index.html";
+        window.location.href = "../index.html";
       }
     }catch{}
   })();
 
   const KEY_TREES  = "slakttradet_trees";
   const KEY_ACTIVE = "slakttradet_active_tree_id";
-  function cardsKey(treeId){ return "slakttradet_slaktkort_" + String(treeId); }
-  function relKey(treeId){ return "slakttradet_relationer_" + String(treeId); }
+  const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
+  const relKey   = (treeId) => "slakttradet_relationer_" + String(treeId);
 
-  const form = document.getElementById("form");
-  const out = document.getElementById("out");
-  const msg = document.getElementById("msg");
-  const resetBtn = document.getElementById("resetBtn");
-  const exportBtn = document.getElementById("exportBtn");
-  const clearBtn = document.getElementById("clearBtn");
   const logoutBtn = document.getElementById("logoutBtn");
-  const continueBtn = document.getElementById("continueBtn");
 
   const pillTree = document.getElementById("pillTree");
-  const pillCount = document.getElementById("pillCount");
-  const pillNext = document.getElementById("pillNext");
-  const noteBox = document.getElementById("noteBox");
+  const pillPeople = document.getElementById("pillPeople");
+  const pillRels = document.getElementById("pillRels");
 
-  function safeParse(json, fallback){
-    try { return JSON.parse(json); } catch { return fallback; }
-  }
+  const focusSelect = document.getElementById("focusSelect");
+  const focusSummary = document.getElementById("focusSummary");
+  const msgTop = document.getElementById("msgTop");
+
+  const relationKeyEl = document.getElementById("relationKey");
+
+  const variantWrap = document.getElementById("variantWrap");
+  const variantSelect = document.getElementById("variantSelect");
+  const variantLabel = document.getElementById("variantLabel");
+  const variantHelp = document.getElementById("variantHelp");
+
+  const otherSelect = document.getElementById("otherSelect");
+  const otherLabel = document.getElementById("otherLabel");
+  const otherHelp = document.getElementById("otherHelp");
+
+  const noteEl = document.getElementById("note");
+
+  const previewLine = document.getElementById("previewLine");
+  const msgSave = document.getElementById("msgSave");
+  const relsList = document.getElementById("relsList");
+
+  const reloadBtn = document.getElementById("reloadBtn");
+  const resetBtn = document.getElementById("resetBtn");
+  const form = document.getElementById("form");
+
+  function safeParse(raw, fallback){ try{ return JSON.parse(raw); }catch{ return fallback; } }
   function loadJson(key, fallback){
     const raw = localStorage.getItem(key);
     return raw ? safeParse(raw, fallback) : fallback;
   }
-  function saveJson(key, value){
-    localStorage.setItem(key, JSON.stringify(value));
+  function saveJson(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
+
+  function escapeHtml(s){
+    return String(s || "")
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
   }
-  function getActiveTreeId(){
-    return localStorage.getItem(KEY_ACTIVE) || "";
+  function setMsg(el, type, text){
+    el.innerHTML = type === "error"
+      ? "<span class='error'>" + escapeHtml(text) + "</span>"
+      : type === "ok"
+        ? "<span class='ok'>" + escapeHtml(text) + "</span>"
+        : escapeHtml(text || "");
   }
-  function getActiveTreeLabel(){
-    const activeId = getActiveTreeId();
+
+  function getTrees(){
     const trees = loadJson(KEY_TREES, []);
-    if(!activeId) return "—";
-    const t = Array.isArray(trees) ? trees.find(x => String(x.id) === String(activeId)) : null;
-    return t ? (t.name || t.id) : activeId;
+    return Array.isArray(trees) ? trees : [];
   }
-  function loadPersons(treeId){
-    const arr = loadJson(cardsKey(treeId), []);
+  function activeTreeId(){ return localStorage.getItem(KEY_ACTIVE) || ""; }
+  function activeTreeLabel(){
+    const id = activeTreeId();
+    if(!id) return "—";
+    const t = getTrees().find(x => String(x.id) === String(id));
+    return t ? (t.name || t.id) : id;
+  }
+
+  function loadPeople(){
+    const t = activeTreeId();
+    if(!t) return [];
+    const arr = loadJson(cardsKey(t), []);
     return Array.isArray(arr) ? arr : [];
   }
-  function savePersons(treeId, arr){
-    saveJson(cardsKey(treeId), arr);
+  function loadRels(){
+    const t = activeTreeId();
+    if(!t) return [];
+    const arr = loadJson(relKey(t), []);
+    return Array.isArray(arr) ? arr : [];
   }
-  function setDisabled(el, disabled){
-    if(disabled){
-      el.classList.add("disabled");
-      el.setAttribute("aria-disabled","true");
-      el.setAttribute("tabindex","-1");
-    }else{
-      el.classList.remove("disabled");
-      el.removeAttribute("aria-disabled");
-      el.removeAttribute("tabindex");
-    }
-  }
-  function toYearOrNull(value){
-    const v = String(value || "").trim();
-    if(!v) return null;
-    if(!/^\d{3,4}$/.test(v)) return "__INVALID_YEAR__";
-    const n = Number(v);
-    if(n < 0 || n > 9999) return "__INVALID_YEAR__";
-    return n;
-  }
-  function makeId(){
-    return "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  function saveRels(rels){
+    const t = activeTreeId();
+    if(!t) return;
+    saveJson(relKey(t), rels);
   }
 
-  function refreshStatus(){
-    const activeId = getActiveTreeId();
-    if(!activeId){
-      pillTree.classList.remove("ok"); pillTree.classList.add("warn");
-      pillTree.innerHTML = 'Aktivt träd: <strong>—</strong>';
-      pillCount.innerHTML = 'Personer i trädet: <strong>0</strong>';
-      pillNext.classList.remove("ok"); pillNext.classList.add("warn");
-      pillNext.innerHTML = 'Nästa steg: <strong>Välj träd</strong>';
-      noteBox.hidden = false;
-      noteBox.innerHTML = '<strong>🚩 Inget aktivt träd valt:</strong> Gå till <a href="trees.html">Träd</a> och välj/skapa ett träd.';
-      setDisabled(continueBtn, true);
+  function personName(p){
+    const n = `${p.fornamn || ""} ${p.efternamn || ""}`.trim();
+    return n || "(namnlös)";
+  }
+  function getPersonById(people, id){
+    return people.find(x => String(x.id) === String(id)) || null;
+  }
+
+  const REL_META = {
+    PARENT_OF:          { label:"Förälder till",         otherLabel:"Barn *",            help:"Fokuspersonen är förälder. Den andra är barn.", symmetric:false, type:"PARENTCHILD" },
+    CHILD_OF:           { label:"Barn till",             otherLabel:"Förälder *",        help:"Fokuspersonen är barn. Den andra är förälder.", symmetric:false, type:"PARENTCHILD" },
+
+    SIBLING_OF:         { label:"Syskon med",            otherLabel:"Syskon *",          help:"Syskonrelation (symmetrisk).", symmetric:true,  type:"GENERIC" },
+
+    GRANDPARENT_OF:     { label:"Far-/morförälder till", otherLabel:"Barnbarn *",        help:"Fokuspersonen är far-/morförälder. Den andra är barnbarn.", symmetric:false, type:"GENERIC" },
+    GRANDCHILD_OF:      { label:"Barnbarn till",         otherLabel:"Far-/morförälder *",help:"Fokuspersonen är barnbarn. Den andra är far-/morförälder.", symmetric:false, type:"GENERIC" },
+
+    PARTNER_OF:         { label:"Partner med",           otherLabel:"Partner *",         help:"Partnerrelation (symmetrisk).", symmetric:true,  type:"PARTNER" },
+
+    AUNTUNCLE_MATERNAL: { label:"Moster/Morbror till",   otherLabel:"Syskonbarn *",      help:"Fokuspersonen är moster/morbror. Den andra är syskonbarn.", symmetric:false, type:"GENERIC" },
+    AUNTUNCLE_PATERNAL: { label:"Faster/Farbror till",   otherLabel:"Syskonbarn *",      help:"Fokuspersonen är faster/farbror. Den andra är syskonbarn.", symmetric:false, type:"GENERIC" },
+
+    COUSIN_OF:          { label:"Kusin med",             otherLabel:"Kusin *",           help:"Kusinrelation (symmetrisk).", symmetric:true,  type:"GENERIC" },
+
+    STEP_PARENT_OF:     { label:"Styvförälder till",     otherLabel:"Styvbarn *",        help:"Relation via omgifte/ny partner.", symmetric:false, type:"GENERIC" },
+    STEP_CHILD_OF:      { label:"Styvbarn till",         otherLabel:"Styvförälder *",    help:"Relation via omgifte/ny partner.", symmetric:false, type:"GENERIC" }
+  };
+
+  const VARIANTS = {
+    PARENT_OF:     { label:"Föräldervariant", help:"Valfritt: mamma eller pappa.", options:[
+      {v:"Mamma", t:"Mamma"}, {v:"Pappa", t:"Pappa"}
+    ]},
+    CHILD_OF:      { label:"Barnvariant", help:"Valfritt: son eller dotter.", options:[
+      {v:"Son", t:"Son"}, {v:"Dotter", t:"Dotter"}
+    ]},
+    GRANDPARENT_OF:{ label:"Variant", help:"Valfritt: farmor/farfar/mormor/morfar.", options:[
+      {v:"Farmor", t:"Farmor"}, {v:"Farfar", t:"Farfar"}, {v:"Mormor", t:"Mormor"}, {v:"Morfar", t:"Morfar"}
+    ]},
+    AUNTUNCLE_MATERNAL:{ label:"Variant", help:"Valfritt: moster eller morbror.", options:[
+      {v:"Moster", t:"Moster"}, {v:"Morbror", t:"Morbror"}
+    ]},
+    AUNTUNCLE_PATERNAL:{ label:"Variant", help:"Valfritt: faster eller farbror.", options:[
+      {v:"Faster", t:"Faster"}, {v:"Farbror", t:"Farbror"}
+    ]},
+    PARTNER_OF: { label:"Partnerstatus", help:"Valfritt: typ av partnerrelation.", options:[
+      {v:"Make/Maka", t:"Make/Maka"}, {v:"Sambo", t:"Sambo"}, {v:"Särbo", t:"Särbo"}, {v:"Skilda", t:"Skilda"}
+    ]},
+    STEP_PARENT_OF:{ label:"Variant", help:"Valfritt: styvförälder.", options:[
+      {v:"Styvförälder", t:"Styvförälder"}
+    ]},
+    STEP_CHILD_OF:{ label:"Variant", help:"Valfritt: styvbarn.", options:[
+      {v:"Styvbarn", t:"Styvbarn"}
+    ]}
+  };
+
+  function relLabel(key){
+    return (REL_META[key] && REL_META[key].label) ? REL_META[key].label : key;
+  }
+
+  function hasSameParentChild(rels, parentId, childId){
+    return rels.some(r =>
+      r && r.typ === "FORALDER_BARN" &&
+      String(r.franPersonId) === String(parentId) &&
+      String(r.tillPersonId) === String(childId)
+    );
+  }
+  function parentsOfChild(rels, childId){
+    return rels
+      .filter(r => r && r.typ === "FORALDER_BARN" && String(r.tillPersonId) === String(childId))
+      .map(r => String(r.franPersonId));
+  }
+  function hasSamePartner(rels, aId, bId){
+    const A = String(aId), B = String(bId);
+    return rels.some(r => {
+      if(!r || r.typ !== "PARTNER") return false;
+      const x = String(r.personAId), y = String(r.personBId);
+      return (x === A && y === B) || (x === B && y === A);
+    });
+  }
+  function hasSameGeneric(rels, relationKey, aId, bId, symmetric, variant){
+    const A = String(aId), B = String(bId);
+    const V = String(variant || "");
+    return rels.some(r => {
+      if(!r || r.typ !== "GENERIC") return false;
+      if(String(r.relationKey) !== String(relationKey)) return false;
+      if(String(r.variant || "") !== V) return false;
+
+      const x = String(r.personAId), y = String(r.personBId);
+      if(symmetric) return (x === A && y === B) || (x === B && y === A);
+      return (x === A && y === B);
+    });
+  }
+
+  function fillSelect(select, people, includeEmpty=true){
+    select.innerHTML = includeEmpty ? "<option value=''>Välj…</option>" : "";
+    for(const p of people){
+      if(!p || !p.id) continue;
+      const opt = document.createElement("option");
+      opt.value = String(p.id);
+      opt.textContent = personName(p);
+      select.appendChild(opt);
+    }
+  }
+
+  function renderStatus(){
+    const t = activeTreeId();
+    const people = loadPeople();
+    const rels = loadRels();
+
+    pillTree.textContent = activeTreeLabel();
+    pillPeople.textContent = String(people.length);
+    pillRels.textContent = String(rels.length);
+
+    if(!t){
+      setMsg(msgTop, "error", "Välj ett aktivt träd först (Träd).");
+      return false;
+    }
+    if(people.length === 0){
+      setMsg(msgTop, "error", "Inga personer än. Skapa personer först.");
+      return false;
+    }
+    setMsg(msgTop, "", "");
+    return true;
+  }
+
+  function applyVariantUI(){
+    const key = String(relationKeyEl.value || "");
+    const v = VARIANTS[key];
+
+    if(!v){
+      variantWrap.hidden = true;
+      variantSelect.innerHTML = "<option value=''>Ingen</option>";
+      variantHelp.textContent = "—";
       return;
     }
 
-    const label = getActiveTreeLabel();
-    const count = loadPersons(activeId).length;
+    variantWrap.hidden = false;
+    variantLabel.textContent = (v.label || "Variant") + " (valfri)";
+    variantHelp.textContent = v.help || "—";
 
-    pillTree.classList.remove("warn"); pillTree.classList.add("ok");
-    pillTree.innerHTML = 'Aktivt träd: <strong>' + label + '</strong>';
-    pillCount.innerHTML = 'Personer i trädet: <strong>' + count + '</strong>';
+    const prev = String(variantSelect.value || "");
+    variantSelect.innerHTML = "<option value=''>Ingen</option>";
+    for(const o of v.options || []){
+      const opt = document.createElement("option");
+      opt.value = o.v;
+      opt.textContent = o.t;
+      variantSelect.appendChild(opt);
+    }
+    if(prev) variantSelect.value = prev;
+  }
 
-    if(count < 2){
-      pillNext.classList.remove("ok"); pillNext.classList.add("warn");
-      pillNext.innerHTML = 'Nästa steg: <strong>Lägg till fler personer</strong>';
-      noteBox.hidden = false;
-      noteBox.innerHTML = '<strong>Tip:</strong> Lägg in minst <strong>2 personer</strong> innan du går vidare till Relationer.';
-      setDisabled(continueBtn, true);
+  function applyRelationUI(){
+    const k = String(relationKeyEl.value || "");
+    const meta = REL_META[k] || { otherLabel:"Person *", help:"—" };
+
+    otherLabel.textContent = meta.otherLabel || "Person *";
+    otherHelp.textContent = meta.help || "—";
+
+    const focusId = String(focusSelect.value || "");
+    if(otherSelect.value && otherSelect.value === focusId){
+      otherSelect.value = "";
+    }
+
+    applyVariantUI();
+    renderPreview();
+  }
+
+  function renderFocusSummary(){
+    const people = loadPeople();
+    const focusId = String(focusSelect.value || "");
+    const p = focusId ? getPersonById(people, focusId) : null;
+    focusSummary.textContent = p ? personName(p) : "—";
+
+    if(otherSelect.value && otherSelect.value === focusId) otherSelect.value = "";
+    renderPreview();
+  }
+
+  function renderPreview(){
+    const people = loadPeople();
+    const focusId = String(focusSelect.value || "");
+    const otherId = String(otherSelect.value || "");
+    const relK = String(relationKeyEl.value || "");
+    const variant = String(variantSelect.value || "");
+    const note = String(noteEl.value || "").trim();
+
+    const a = focusId ? getPersonById(people, focusId) : null;
+    const b = otherId ? getPersonById(people, otherId) : null;
+
+    if(!a){
+      previewLine.textContent = "Välj fokusperson först.";
       return;
     }
 
-    pillNext.classList.remove("warn"); pillNext.classList.add("ok");
-    pillNext.innerHTML = 'Nästa steg: <strong>Relationer</strong>';
-    noteBox.hidden = true;
-    setDisabled(continueBtn, false);
+    let mid = relLabel(relK);
+    if(variant) mid += " (" + variant + ")";
+    let line = personName(a) + " — " + mid + " — " + (b ? personName(b) : "…");
+    if(note) line += " · “" + note + "”";
+    previewLine.textContent = line;
+  }
+
+  function makeRow(title, meta, note, onRemove){
+    const li = document.createElement("li");
+    li.className = "item";
+
+    const left = document.createElement("div");
+    left.style.minWidth = "0";
+    left.innerHTML =
+      "<p class='itemTitle'>" + escapeHtml(title) + "</p>" +
+      (meta ? "<p class='itemMeta'>" + escapeHtml(meta) + "</p>" : "<p class='itemMeta'>—</p>") +
+      (note ? "<p class='itemNote'>" + escapeHtml(note) + "</p>" : "");
+
+    const right = document.createElement("div");
+    right.className = "itemActions";
+
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "btn danger";
+    del.textContent = "Ta bort";
+    del.addEventListener("click", onRemove);
+
+    right.appendChild(del);
+    li.appendChild(left);
+    li.appendChild(right);
+    return li;
+  }
+
+  function renderList(){
+    relsList.innerHTML = "";
+
+    const ok = renderStatus();
+    if(!ok) return;
+
+    const people = loadPeople();
+    const rels = loadRels();
+    const focusId = String(focusSelect.value || "");
+
+    if(!focusId){
+      relsList.innerHTML =
+        "<li class='item' style='cursor:default;'><div><p class='itemTitle'>Välj fokusperson</p><p class='itemMeta'>För att se relationer.</p></div></li>";
+      return;
+    }
+
+    const focus = getPersonById(people, focusId);
+    const focusName = focus ? personName(focus) : "Fokus";
+
+    const mine = rels.filter(r => {
+      if(!r) return false;
+      if(r.typ === "FORALDER_BARN") return String(r.franPersonId) === focusId || String(r.tillPersonId) === focusId;
+      if(r.typ === "PARTNER") return String(r.personAId) === focusId || String(r.personBId) === focusId;
+      if(r.typ === "GENERIC") return String(r.personAId) === focusId || String(r.personBId) === focusId;
+      return false;
+    });
+
+    if(mine.length === 0){
+      relsList.innerHTML =
+        "<li class='item' style='cursor:default;'><div><p class='itemTitle'>—</p><p class='itemMeta'>Inga relationer ännu.</p></div></li>";
+      return;
+    }
+
+    for(const r of mine){
+      let title = "Relation";
+      let meta = "";
+      const note = String(r.note || "").trim();
+      const variant = String(r.variant || "").trim();
+      const variantTxt = variant ? (" · " + variant) : "";
+
+      if(r.typ === "FORALDER_BARN"){
+        const parentId = String(r.franPersonId);
+        const childId  = String(r.tillPersonId);
+
+        if(focusId === parentId){
+          const other = getPersonById(people, childId);
+          title = "Förälder till";
+          meta = focusName + " → " + (other ? personName(other) : childId) + variantTxt;
+        }else{
+          const other = getPersonById(people, parentId);
+          title = "Barn till";
+          meta = focusName + " ← " + (other ? personName(other) : parentId) + variantTxt;
+        }
+      }
+
+      if(r.typ === "PARTNER"){
+        const A = String(r.personAId), B = String(r.personBId);
+        const otherId = (A === focusId) ? B : A;
+        const other = getPersonById(people, otherId);
+        title = "Partner med";
+        meta = focusName + " ↔ " + (other ? personName(other) : otherId) + variantTxt;
+      }
+
+      if(r.typ === "GENERIC"){
+        const A = String(r.personAId), B = String(r.personBId);
+        const otherId = (A === focusId) ? B : A;
+        const other = getPersonById(people, otherId);
+        title = relLabel(String(r.relationKey || "GENERIC"));
+        meta = focusName + " — " + title + " — " + (other ? personName(other) : otherId) + variantTxt;
+      }
+
+      const li = makeRow(title, meta, note, () => {
+        const yes = confirm("Ta bort relationen?");
+        if(!yes) return;
+        const all = loadRels();
+        const next = all.filter(x => String(x.id) !== String(r.id));
+        saveRels(next);
+        pillRels.textContent = String(next.length);
+        setMsg(msgSave, "ok", "Relation borttagen.");
+        renderList();
+      });
+
+      relsList.appendChild(li);
+    }
+  }
+
+  function refreshAll(keepFocus=true){
+    setMsg(msgSave, "", "");
+
+    const people = loadPeople();
+
+    const prevFocus = keepFocus ? String(focusSelect.value || "") : "";
+    const prevOther = keepFocus ? String(otherSelect.value || "") : "";
+
+    fillSelect(focusSelect, people, true);
+    fillSelect(otherSelect, people, true);
+
+    if(prevFocus) focusSelect.value = prevFocus;
+    if(prevOther) otherSelect.value = prevOther;
+
+    renderStatus();
+    renderFocusSummary();
+    applyRelationUI();
+    renderList();
   }
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();
-    msg.textContent = "";
 
-    const activeId = getActiveTreeId();
-    if(!activeId){
-      msg.innerHTML = '<span class="error">Välj ett aktivt träd först.</span>';
-      refreshStatus();
+    const t = activeTreeId();
+    if(!t) return setMsg(msgSave, "error", "Välj ett aktivt träd först.");
+
+    const focusId = String(focusSelect.value || "").trim();
+    const otherId = String(otherSelect.value || "").trim();
+    const key = String(relationKeyEl.value || "").trim();
+    const variant = String(variantSelect.value || "").trim();
+    const note = String(noteEl.value || "").trim();
+
+    if(!focusId) return setMsg(msgSave, "error", "Välj fokusperson först.");
+    if(!key) return setMsg(msgSave, "error", "Välj relationstyp.");
+    if(!otherId) return setMsg(msgSave, "error", "Välj den andra personen.");
+    if(otherId === focusId) return setMsg(msgSave, "error", "Du kan inte välja samma person.");
+
+    const rels = loadRels();
+    const meta = REL_META[key] || { symmetric:false, type:"GENERIC" };
+
+    if(meta.type === "PARENTCHILD"){
+      const parentId = (key === "PARENT_OF") ? focusId : otherId;
+      const childId  = (key === "PARENT_OF") ? otherId : focusId;
+
+      if(hasSameParentChild(rels, parentId, childId)) return setMsg(msgSave, "error", "Redan kopplad.");
+      const parents = new Set(parentsOfChild(rels, childId));
+      if(parents.size >= 2) return setMsg(msgSave, "error", "Barnet har redan 2 föräldrar.");
+
+      rels.push({
+        id: "r" + Date.now(),
+        typ: "FORALDER_BARN",
+        franPersonId: parentId,
+        tillPersonId: childId,
+        variant: variant || "",
+        note: note || "",
+        createdAt: new Date().toISOString()
+      });
+
+      saveRels(rels);
+      pillRels.textContent = String(rels.length);
+      otherSelect.value = "";
+      noteEl.value = "";
+      setMsg(msgSave, "ok", "Sparat: Förälder ↔ Barn.");
+      renderList();
+      renderPreview();
       return;
     }
 
-    const fornamn = form.fornamn.value.trim();
-    const efternamn = form.efternamn.value.trim();
-    if(!fornamn || !efternamn){
-      msg.innerHTML = '<span class="error">Förnamn och efternamn krävs.</span>';
+    if(meta.type === "PARTNER"){
+      if(hasSamePartner(rels, focusId, otherId)) return setMsg(msgSave, "error", "Partnerrelation finns redan.");
+
+      rels.push({
+        id: "r" + Date.now(),
+        typ: "PARTNER",
+        personAId: focusId,
+        personBId: otherId,
+        variant: variant || "",
+        note: note || "",
+        createdAt: new Date().toISOString()
+      });
+
+      saveRels(rels);
+      pillRels.textContent = String(rels.length);
+      otherSelect.value = "";
+      noteEl.value = "";
+      setMsg(msgSave, "ok", "Sparat: Partner.");
+      renderList();
+      renderPreview();
       return;
     }
 
-    const fodelsear = toYearOrNull(form.fodelsear.value);
-    const dodsar = toYearOrNull(form.dodsar.value);
-    if(fodelsear === "__INVALID_YEAR__" || dodsar === "__INVALID_YEAR__"){
-      msg.innerHTML = '<span class="error">Födelseår/Dödsår måste vara tomt eller 3–4 siffror (t.ex. 1874).</span>';
-      return;
+    if(hasSameGeneric(rels, key, focusId, otherId, !!meta.symmetric, variant)) {
+      return setMsg(msgSave, "error", "Relationen finns redan.");
     }
 
-    const person = {
-      id: makeId(),
-      fornamn,
-      efternamn,
-      kon: form.kon.value,
-      fodelsear,
-      dodsar,
-      plats: form.plats.value.trim(),
-      anteckning: form.anteckning.value.trim(),
+    rels.push({
+      id: "r" + Date.now(),
+      typ: "GENERIC",
+      relationKey: key,
+      personAId: focusId,
+      personBId: otherId,
+      symmetric: !!meta.symmetric,
+      variant: variant || "",
+      note: note || "",
       createdAt: new Date().toISOString()
-    };
+    });
 
-    const persons = loadPersons(activeId);
-    persons.push(person);
-    savePersons(activeId, persons);
+    saveRels(rels);
+    pillRels.textContent = String(rels.length);
+    otherSelect.value = "";
+    noteEl.value = "";
+    setMsg(msgSave, "ok", "Sparat: " + relLabel(key) + ".");
+    renderList();
+    renderPreview();
+  });
 
-    out.textContent = JSON.stringify(person, null, 2);
-    msg.innerHTML = '<span class="ok">Sparat.</span> Personen sparades i aktivt träd.';
-    form.reset();
-    refreshStatus();
+  reloadBtn.addEventListener("click", () => refreshAll(true));
+
+  focusSelect.addEventListener("change", () => {
+    renderFocusSummary();
+    applyRelationUI();
+    renderList();
+  });
+
+  relationKeyEl.addEventListener("change", () => {
+    applyRelationUI();
+    renderList();
+  });
+
+  variantSelect.addEventListener("change", renderPreview);
+  otherSelect.addEventListener("change", renderPreview);
+  noteEl.addEventListener("input", () => {
+    // lätt debounce-känsla utan timer: bara uppdatera preview
+    renderPreview();
   });
 
   resetBtn.addEventListener("click", () => {
-    form.reset();
-    msg.textContent = "";
-  });
-
-  exportBtn.addEventListener("click", () => {
-    const activeId = getActiveTreeId();
-    if(!activeId){
-      msg.innerHTML = '<span class="error">Välj ett aktivt träd först.</span>';
-      refreshStatus();
-      return;
-    }
-    const persons = loadPersons(activeId);
-    const payload = { activeTreeId: activeId, slaktkort: persons };
-
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "slaktkort.export.json";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-
-    URL.revokeObjectURL(url);
-    msg.innerHTML = '<span class="ok">Export klar.</span> En JSON-fil laddades ner.';
-  });
-
-  clearBtn.addEventListener("click", () => {
-    const activeId = getActiveTreeId();
-    if(!activeId){
-      msg.innerHTML = '<span class="error">Välj ett aktivt träd först.</span>';
-      refreshStatus();
-      return;
-    }
-    const yes = confirm("Rensa personer + relationer i aktivt träd?\n\nDetta tar bort data lokalt i webbläsaren för just detta träd.");
-    if(!yes) return;
-
-    savePersons(activeId, []);
-    saveJson(relKey(activeId), []);
-
-    out.textContent = "{}";
-    msg.innerHTML = '<span class="ok">Rensat.</span> Aktivt träd är nu tomt.';
-    refreshStatus();
+    otherSelect.value = "";
+    variantSelect.value = "";
+    noteEl.value = "";
+    setMsg(msgSave, "", "");
+    renderPreview();
   });
 
   logoutBtn.addEventListener("click", () => {
     try{ sessionStorage.removeItem("demo_auth"); }catch{}
-    window.location.href = "index.html";
+    window.location.href = "../index.html";
   });
 
-  refreshStatus();
+  refreshAll(false);
 </script>
 </body>
 </html>
