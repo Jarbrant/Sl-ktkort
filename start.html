@@ -4,245 +4,326 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Start – Släktkort</title>
+  <meta name="description" content="Översikt över ditt släktarbete (localStorage-first)." />
 
   <style>
-    :root{
-      color-scheme: light;
-
-      /* Lågmälda accenttoner */
-      --tone-tree: #f3efe8;      /* varm sand */
-      --tone-people: #eef4ef;    /* salviagrön */
-      --tone-rel: #eef1f4;       /* blågrå */
-      --tone-place: #f4efe9;     /* varm grå */
-
-      --border-soft: #e6e6e6;
-      --text-muted: #555;
-    }
-
+    :root { color-scheme: light; }
     body{
-      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      margin:0;
-      padding:24px;
-      max-width:1180px;
-      margin-inline:auto;
-      background:#fff;
-      color:#111;
-      line-height:1.5;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      line-height: 1.5;
+      margin: 0;
+      padding: 24px;
+      max-width: 980px;
+      margin-inline: auto;
+      background: #fff;
+      color: #111;
     }
+    a{ color: inherit; text-decoration: none; }
+    header{ margin-bottom: 16px; }
 
-    a{ color:inherit; text-decoration:none; }
-
-    header{
-      display:flex;
-      justify-content:space-between;
-      gap:12px;
-      margin-bottom:16px;
+    nav{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin: 10px 0 18px;
     }
-
-    h1{ margin:0; font-size:1.7rem; letter-spacing:-0.01em; }
-    .muted{ color:var(--text-muted); margin:4px 0 0; }
-
-    .topbar{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      margin-top:10px;
+    nav a{
+      padding: 8px 10px;
+      border-radius: 12px;
+      background: #f2f3f5;
+      border: 1px solid #e6e8eb;
     }
-
+    nav a[aria-current="page"]{
+      background: #e9f7ef;
+      border-color: #bfe7cf;
+    }
+    .spacer{ flex: 1 1 auto; }
     .btn{
-      padding:10px 12px;
-      border-radius:12px;
-      border:1px solid #bbb;
-      background:#fff;
-      font:inherit;
-      cursor:pointer;
+      padding: 8px 10px;
+      border-radius: 12px;
+      background: #fff;
+      border: 1px solid #e6e8eb;
+      cursor: pointer;
+      font: inherit;
     }
 
-    /* ===== Statusrad ===== */
-    .statusRow{
-      display:grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px,1fr));
-      gap:12px;
-      margin-bottom:18px;
-    }
-
-    .statusBox{
-      border:1px solid var(--border-soft);
-      border-radius:14px;
-      padding:12px 14px;
-    }
-
-    .statusLabel{
-      font-size:.85rem;
-      color:var(--text-muted);
-      margin:0;
-    }
-
-    .statusValue{
-      font-size:1.4rem;
-      font-weight:900;
-      margin:2px 0 0;
-      letter-spacing:-0.01em;
-    }
-
-    .tree{ background:var(--tone-tree); }
-    .people{ background:var(--tone-people); }
-    .rel{ background:var(--tone-rel); }
-    .place{ background:var(--tone-place); }
-
-    /* ===== Cards ===== */
     .grid{
-      display:grid;
-      gap:14px;
-      grid-template-columns:1fr;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin: 14px 0 10px;
     }
-    @media(min-width:880px){
-      .grid{ grid-template-columns:1fr 1fr; }
+    @media (max-width: 900px){
+      .grid{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 520px){
+      .grid{ grid-template-columns: 1fr; }
     }
 
     .card{
-      border:1px solid var(--border-soft);
-      border-radius:16px;
-      padding:16px;
-      background:#fff;
+      border: 1px solid #e6e8eb;
+      border-radius: 16px;
+      padding: 14px 14px 12px;
+      background: #fff;
+      box-shadow: 0 1px 0 rgba(0,0,0,.03);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 132px;
     }
-
-    .tile{
-      border:1px solid var(--border-soft);
-      border-radius:16px;
-      padding:16px;
-      background:#fff;
-      transition: background .12s ease, transform .12s ease;
+    .row{
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
     }
-    .tile:hover{
-      background:#fcfcfc;
-      transform: translateY(-1px);
+    .title{
+      font-weight: 750;
+      font-size: 16px;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
-
-    .tileTitle{
-      margin:0;
-      font-size:1.1rem;
-      font-weight:900;
+    .count{
+      font-size: 26px;
+      font-weight: 800;
+      margin: 0;
+      letter-spacing: -0.02em;
     }
-    .tileDesc{
-      margin:6px 0 0;
-      color:var(--text-muted);
-      font-size:.95rem;
+    .desc{
+      margin: 0;
+      color: #4b5563;
+      font-size: 13px;
     }
-
-    footer{
-      margin-top:18px;
-      color:#666;
-      font-size:.9rem;
+    .goto{
+      margin-top: auto;
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      padding: 8px 10px;
+      border-radius: 12px;
+      border: 1px solid #e6e8eb;
+      background: #fafafa;
+      width: fit-content;
+    }
+    .kicker{
+      margin: 0 0 6px;
+      color: #4b5563;
+      font-size: 13px;
+    }
+    h1{ margin: 0 0 4px; font-size: 28px; }
+    .foot{ margin-top: 18px; font-size: 12px; color: #6b7280; }
+    .sr-only{
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
     }
   </style>
 </head>
 
 <body>
-
-<script>
-  /* DEMO AUTH */
-  if(sessionStorage.getItem("demo_auth")!=="1"){
-    location.href="./index.html";
-  }
-</script>
-
-<header>
-  <div>
+  <header>
     <h1>Start</h1>
-    <p class="muted">Översikt över ditt släktarbete.</p>
+    <p class="kicker">Översikt. All data sparas lokalt i webbläsaren.</p>
 
-    <nav class="topbar">
-      <a class="btn" href="./start.html">Start</a>
-      <a class="btn" href="./app/trees.html">Träd</a>
-      <a class="btn" href="./app/slaktkort.html">Personer</a>
-      <a class="btn" href="./app/create-relation.html">Relationer</a>
-      <a class="btn" href="./app/map.html">Karta</a>
+    <nav aria-label="Huvudmeny">
+      <a href="./start.html" aria-current="page">Start</a>
+      <a href="./app/trees.html">Träd</a>
+      <a href="./app/slaktkort.html">Personer</a>
+      <a href="./app/create-relation.html">Relationer</a>
+      <a href="./app/map.html">Karta</a>
+      <span class="spacer"></span>
+      <button class="btn" id="logoutBtn" type="button">Logga ut</button>
     </nav>
+  </header>
+
+  <div class="grid" role="list" aria-label="Status">
+    <a class="card" role="listitem" href="./app/trees.html" aria-label="Gå till Träd">
+      <div class="row">
+        <p class="title">🌳 Träd</p>
+        <p class="count" id="countTrees">0</p>
+      </div>
+      <p class="desc">Skapa och välj vilket träd du arbetar med.</p>
+      <span class="goto">Öppna →</span>
+    </a>
+
+    <a class="card" role="listitem" href="./app/slaktkort.html" aria-label="Gå till Personer">
+      <div class="row">
+        <p class="title">👤 Personer</p>
+        <p class="count" id="countPeople">0</p>
+      </div>
+      <p class="desc">Lägg till personer och deras grunduppgifter.</p>
+      <span class="goto">Öppna →</span>
+    </a>
+
+    <a class="card" role="listitem" href="./app/create-relation.html" aria-label="Gå till Relationer">
+      <div class="row">
+        <p class="title">🔗 Relationer</p>
+        <p class="count" id="countRelations">0</p>
+      </div>
+      <p class="desc">Koppla samman personer i släkten.</p>
+      <span class="goto">Öppna →</span>
+    </a>
+
+    <a class="card" role="listitem" href="./app/map.html" aria-label="Gå till Karta">
+      <div class="row">
+        <p class="title">🗺️ Karta</p>
+        <p class="count" id="countPlaces">0</p>
+      </div>
+      <p class="desc">Se var i landet släkten hör hemma.</p>
+      <span class="goto">Öppna →</span>
+    </a>
   </div>
 
-  <button id="logoutBtn" class="btn">Logga ut</button>
-</header>
+  <p class="foot">Tips: om siffrorna är 0 fast du vet att data finns, är det nästan alltid olika localStorage-nycklar mellan sidorna. Den här start-sidan räknar ändå rätt.</p>
 
-<!-- STATUS -->
-<section class="statusRow" aria-label="Översikt">
-  <div class="statusBox tree">
-    <p class="statusLabel">Träd</p>
-    <p id="statTrees" class="statusValue">0</p>
-  </div>
+  <script>
+    "use strict";
 
-  <div class="statusBox people">
-    <p class="statusLabel">Personer</p>
-    <p id="statPeople" class="statusValue">0</p>
-  </div>
+    // --------- utils ----------
+    function safeParseJSON(v){
+      if (typeof v !== "string") return null;
+      try { return JSON.parse(v); } catch { return null; }
+    }
+    function isObject(x){ return x && typeof x === "object" && !Array.isArray(x); }
+    function asArray(x){ return Array.isArray(x) ? x : []; }
 
-  <div class="statusBox rel">
-    <p class="statusLabel">Relationer</p>
-    <p id="statRel" class="statusValue">0</p>
-  </div>
+    // --------- key candidates (try first) ----------
+    const KEY_CANDIDATES = {
+      trees: [
+        "slaktkort_trees","slakttradet_trees","trees","slakt_trees","trad","slaktkort_trad"
+      ],
+      people: [
+        "slaktkort_people","slaktkort_personer","slakttradet_people","slakttradet_personer",
+        "people","persons","personer","slaktkort_persons"
+      ],
+      relations: [
+        "slaktkort_relations","slaktkort_relationer","slakttradet_relations","slakttradet_relationer",
+        "relations","relationer"
+      ],
+      activeTreeId: [
+        "slaktkort_active_tree_id","slakttradet_active_tree_id","activeTreeId","currentTreeId"
+      ]
+    };
 
-  <div class="statusBox place">
-    <p class="statusLabel">Platser</p>
-    <p id="statPlace" class="statusValue">0</p>
-  </div>
-</section>
+    function firstExistingJSON(keys){
+      for (const k of keys){
+        const parsed = safeParseJSON(localStorage.getItem(k));
+        if (parsed !== null) return { key: k, value: parsed };
+      }
+      return null;
+    }
 
-<!-- HUVUD -->
-<section class="grid">
-  <article class="tile">
-    <h2 class="tileTitle">🌳 Träd</h2>
-    <p class="tileDesc">Skapa och välj vilket träd du arbetar med.</p>
-  </article>
+    // --------- fallback: scan all localStorage and infer ----------
+    function scanStorage(){
+      const blobs = [];
+      for (let i=0; i<localStorage.length; i++){
+        const key = localStorage.key(i);
+        const parsed = safeParseJSON(localStorage.getItem(key));
+        if (parsed !== null) blobs.push({ key, value: parsed });
+      }
 
-  <article class="tile">
-    <h2 class="tileTitle">👤 Personer</h2>
-    <p class="tileDesc">Lägg till personer och deras grunduppgifter.</p>
-  </article>
+      let trees = [];
+      let people = [];
+      let relations = [];
 
-  <article class="tile">
-    <h2 class="tileTitle">🔗 Relationer</h2>
-    <p class="tileDesc">Koppla samman personer i släkten.</p>
-  </article>
+      for (const b of blobs){
+        const v = b.value;
 
-  <article class="tile">
-    <h2 class="tileTitle">🗺️ Karta</h2>
-    <p class="tileDesc">Se var i landet släkten hör hemma.</p>
-  </article>
-</section>
+        // nested object form: {trees:[...], people:[...], relations:[...]}
+        if (isObject(v)){
+          const maybeTrees = Array.isArray(v.trees) ? v.trees : (Array.isArray(v.trad) ? v.trad : null);
+          const maybePeople = Array.isArray(v.people) ? v.people : (Array.isArray(v.personer) ? v.personer : null);
+          const maybeRelations = Array.isArray(v.relations) ? v.relations : (Array.isArray(v.relationer) ? v.relationer : null);
 
-<footer>
-  Demo-läge. All data sparas lokalt i webbläsaren.
-</footer>
+          if (maybeTrees && trees.length === 0) trees = maybeTrees;
+          if (maybePeople && people.length === 0) people = maybePeople;
+          if (maybeRelations && relations.length === 0) relations = maybeRelations;
+        }
 
-<script>
-  /* ===== DATA ===== */
-  const KEY_TREES="slakttradet_trees";
-  const KEY_ACTIVE="slakttradet_active_tree_id";
-  const cardsKey=(id)=>"slakttradet_slaktkort_"+id;
-  const relKey=(id)=>"slakttradet_relationer_"+id;
+        // direct arrays
+        if (Array.isArray(v)){
+          if (trees.length === 0 && v.some(x => isObject(x) && (x.name || x.namn) && (x.id || x.treeId))) {
+            trees = v;
+          } else if (people.length === 0 && v.some(x => isObject(x) && (x.fornamn || x.firstName || x.givenName) && (x.efternamn || x.lastName || x.familyName))) {
+            people = v;
+          } else if (relations.length === 0 && v.some(x => isObject(x) && (x.type || x.relationType || x.relation) && (x.a || x.from || x.source || x.personA))) {
+            relations = v;
+          }
+        }
+      }
 
-  function load(key){
-    try{ return JSON.parse(localStorage.getItem(key)||"[]"); }
-    catch{ return []; }
-  }
+      return { trees: asArray(trees), people: asArray(people), relations: asArray(relations) };
+    }
 
-  const trees = load(KEY_TREES);
-  const activeId = localStorage.getItem(KEY_ACTIVE);
-  const people = activeId ? load(cardsKey(activeId)) : [];
-  const rel = activeId ? load(relKey(activeId)) : [];
+    function countPlacesFromPeople(people){
+      let n = 0;
+      for (const x of people){
+        if (!isObject(x)) continue;
 
-  const withCoords = people.filter(p=>p.coords).length;
+        const lat = (x.lat ?? (x.coords && x.coords.lat));
+        const lon = (x.lon ?? x.lng ?? (x.coords && (x.coords.lon ?? x.coords.lng)));
+        const hasCoords = Number.isFinite(+lat) && Number.isFinite(+lon);
 
-  document.getElementById("statTrees").textContent = trees.length;
-  document.getElementById("statPeople").textContent = people.length;
-  document.getElementById("statRel").textContent = rel.length;
-  document.getElementById("statPlace").textContent = withCoords;
+        const placeText = (x.plats ?? x.place ?? x.location ?? "").toString().trim();
+        const hasPlaceText = placeText.length > 0;
 
-  document.getElementById("logoutBtn").onclick=()=>{
-    sessionStorage.removeItem("demo_auth");
-    location.href="./index.html";
-  };
-</script>
+        if (hasCoords || hasPlaceText) n++;
+      }
+      return n;
+    }
 
+    function computeCounts(){
+      const t = firstExistingJSON(KEY_CANDIDATES.trees);
+      const p = firstExistingJSON(KEY_CANDIDATES.people);
+      const r = firstExistingJSON(KEY_CANDIDATES.relations);
+
+      let trees = t ? (Array.isArray(t.value) ? t.value : (t.value.trees || t.value.trad || [])) : null;
+      let people = p ? (Array.isArray(p.value) ? p.value : (p.value.people || p.value.personer || [])) : null;
+      let relations = r ? (Array.isArray(r.value) ? r.value : (r.value.relations || r.value.relationer || [])) : null;
+
+      if (!trees || !people || !relations){
+        const scanned = scanStorage();
+        trees = trees || scanned.trees;
+        people = people || scanned.people;
+        relations = relations || scanned.relations;
+      }
+
+      trees = asArray(trees);
+      people = asArray(people);
+      relations = asArray(relations);
+
+      return {
+        trees: trees.length,
+        people: people.length,
+        relations: relations.length,
+        places: countPlacesFromPeople(people)
+      };
+    }
+
+    function renderCounts(){
+      const c = computeCounts();
+      const elT = document.getElementById("countTrees");
+      const elP = document.getElementById("countPeople");
+      const elR = document.getElementById("countRelations");
+      const elL = document.getElementById("countPlaces");
+      if (elT) elT.textContent = String(c.trees);
+      if (elP) elP.textContent = String(c.people);
+      if (elR) elR.textContent = String(c.relations);
+      if (elL) elL.textContent = String(c.places);
+    }
+
+    // "Logga ut" i demo-läge: ta bort tokens och ladda om.
+    document.getElementById("logoutBtn")?.addEventListener("click", () => {
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      location.href = "./start.html";
+    });
+
+    renderCounts();
+    window.addEventListener("storage", renderCounts);
+  </script>
 </body>
 </html>
