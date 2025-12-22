@@ -73,7 +73,7 @@
     .small{ font-size:.95rem; color:#555; margin:0 0 10px; }
 
     label{ display:block; margin:10px 0 6px; font-weight:900; }
-    select{
+    select, input{
       width:100%;
       box-sizing:border-box;
       padding:10px;
@@ -81,6 +81,7 @@
       border:1px solid #bbb;
       font:inherit;
       background:#fff;
+      color:#111;
     }
 
     .row{ display:grid; gap:12px; grid-template-columns: 1fr; }
@@ -101,6 +102,7 @@
     .error{ color:#b00020; font-weight:950; }
     .ok{ font-weight:950; }
 
+    /* Sökresultat-lista (ersätter dropdown för fokusperson) */
     .list{
       margin: 10px 0 0;
       padding: 0;
@@ -108,6 +110,10 @@
       display:flex;
       flex-direction:column;
       gap:10px;
+      max-height: 320px;
+      overflow:auto;
+      border-top:1px solid #eee;
+      padding-top:10px;
     }
     .item{
       border:1px solid #eee;
@@ -118,7 +124,10 @@
       align-items:flex-start;
       justify-content:space-between;
       gap:10px;
+      cursor:pointer;
     }
+    .item:hover{ background:#fafafa; }
+    .item.active{ border-color:#333; background:#f7f7f7; }
     .itemTitle{ font-weight:950; margin:0 0 2px; }
     .itemMeta{ margin:0; color:#555; font-size:.95rem; }
     .itemActions{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
@@ -136,9 +145,9 @@
     <a class="btn secondary" href="../start.html">Start</a>
     <a class="btn secondary" href="./trees.html">Träd</a>
     <a class="btn secondary" href="./slaktkort.html">Personer</a>
-    <a class="btn" href="./create-relation.html">Relationer</a>
+    <a class="btn" href="./create-relation.html" aria-current="page">Relationer</a>
     <a class="btn secondary" href="./map.html">Karta</a>
-    <a class="btn secondary" href="./place-picker.html">Plats-picker</a>
+    <!-- AUTOPATCH: borttagen Plats-picker -->
     <button id="logoutBtn" class="btn secondary" type="button">Logga ut</button>
   </nav>
 
@@ -152,14 +161,14 @@
 
 <section class="card">
   <h2>1) Välj fokusperson</h2>
-  <p class="small">Fokuspersonen är “jag” i relationen.</p>
+  <p class="small">Sök person genom att skriva minst 3 bokstäver.</p>
 
   <div class="row two">
     <div>
-      <label for="focusSelect">Fokusperson *</label>
-      <select id="focusSelect" required>
-        <option value="">Välj…</option>
-      </select>
+      <label for="focusSearch">Sök fokusperson *</label>
+      <input id="focusSearch" placeholder="minst 3 bokstäver…" autocomplete="off" />
+      <ul id="focusList" class="list" aria-label="Fokusperson-förslag"></ul>
+
       <div class="actions">
         <a class="btn secondary" href="./slaktkort.html">Skapa person</a>
         <button id="reloadBtn" class="btn secondary" type="button">Ladda om</button>
@@ -236,17 +245,7 @@
   </form>
 </section>
 
-<section class="card">
-  <h2>3) Relationer för vald fokusperson</h2>
-  <p class="small">Visar allt där fokuspersonen ingår. Du kan ta bort.</p>
-
-  <ul id="relsList" class="list" aria-label="Relationer"></ul>
-
-  <div class="actions" style="margin-top:14px;">
-    <a class="btn secondary" href="./slaktkort.html">← Tillbaka (Personer)</a>
-    <a class="btn secondary" href="./map.html">Gå till (Karta)</a>
-  </div>
-</section>
+<!-- AUTOPATCH: borttagen sektion 3) Relationer för vald fokusperson -->
 
 <script>
   (function authGuard(){
@@ -268,7 +267,8 @@
   const pillPeople = document.getElementById("pillPeople");
   const pillRels = document.getElementById("pillRels");
 
-  const focusSelect = document.getElementById("focusSelect");
+  const focusSearch = document.getElementById("focusSearch");
+  const focusList = document.getElementById("focusList");
   const focusSummary = document.getElementById("focusSummary");
   const msgTop = document.getElementById("msgTop");
 
@@ -285,7 +285,6 @@
 
   const previewLine = document.getElementById("previewLine");
   const msgSave = document.getElementById("msgSave");
-  const relsList = document.getElementById("relsList");
 
   const reloadBtn = document.getElementById("reloadBtn");
   const resetBtn = document.getElementById("resetBtn");
@@ -434,26 +433,11 @@
     return rels.some(r => {
       if(!r || r.typ !== "GENERIC") return false;
       if(String(r.relationKey) !== String(relationKey)) return false;
-
-      // Om du vill att samma relationtyp men olika variant ska tillåtas:
-      // kommentera bort nästa rad.
       if(String(r.variant || "") !== V) return false;
-
       const x = String(r.personAId), y = String(r.personBId);
       if(symmetric) return (x === A && y === B) || (x === B && y === A);
       return (x === A && y === B);
     });
-  }
-
-  function fillSelect(select, people, includeEmpty=true){
-    select.innerHTML = includeEmpty ? "<option value=''>Välj…</option>" : "";
-    for(const p of people){
-      if(!p || !p.id) continue;
-      const opt = document.createElement("option");
-      opt.value = String(p.id);
-      opt.textContent = personName(p);
-      select.appendChild(opt);
-    }
   }
 
   function renderStatus(){
@@ -477,6 +461,28 @@
     return true;
   }
 
+  function fillSelect(select, people, includeEmpty=true, excludeId=""){
+    const ex = String(excludeId || "");
+    select.innerHTML = includeEmpty ? "<option value=''>Välj…</option>" : "";
+    for(const p of people){
+      if(!p || !p.id) continue;
+      if(ex && String(p.id) === ex) continue;
+      const opt = document.createElement("option");
+      opt.value = String(p.id);
+      opt.textContent = personName(p);
+      select.appendChild(opt);
+    }
+  }
+
+  let focusId = "";
+
+  function renderFocusSummary(){
+    const people = loadPeople();
+    const p = focusId ? getPersonById(people, focusId) : null;
+    focusSummary.textContent = p ? personName(p) : "—";
+    renderPreview();
+  }
+
   function applyVariantUI(){
     const key = String(relationKeyEl.value || "");
     const v = VARIANTS[key];
@@ -489,7 +495,7 @@
     }
 
     variantWrap.hidden = false;
-    variantLabel.textContent = (v.label || "Variant (valfri)") + " (valfri)";
+    variantLabel.textContent = (v.label || "Variant") + " (valfri)";
     variantHelp.textContent = v.help || "—";
 
     const prev = String(variantSelect.value || "");
@@ -510,28 +516,22 @@
     otherLabel.textContent = meta.otherLabel || "Person *";
     otherHelp.textContent = meta.help || "—";
 
-    const focusId = String(focusSelect.value || "");
-    if(otherSelect.value && otherSelect.value === focusId){
-      otherSelect.value = "";
-    }
-
     applyVariantUI();
-    renderPreview();
-  }
 
-  function renderFocusSummary(){
+    // Motpart-select får aldrig innehålla fokuspersonen
     const people = loadPeople();
-    const focusId = String(focusSelect.value || "");
-    const p = focusId ? getPersonById(people, focusId) : null;
-    focusSummary.textContent = p ? personName(p) : "—";
+    const prevOther = String(otherSelect.value || "");
+    fillSelect(otherSelect, people, true, focusId);
+    if(prevOther && prevOther !== focusId) otherSelect.value = prevOther;
 
-    if(otherSelect.value && otherSelect.value === focusId) otherSelect.value = "";
+    // Fail-safe
+    if(otherSelect.value === focusId) otherSelect.value = "";
+
     renderPreview();
   }
 
   function renderPreview(){
     const people = loadPeople();
-    const focusId = String(focusSelect.value || "");
     const otherId = String(otherSelect.value || "");
     const relK = String(relationKeyEl.value || "");
     const variant = String(variantSelect.value || "");
@@ -548,134 +548,69 @@
     previewLine.textContent = personName(a) + " — " + mid + " — " + (b ? personName(b) : "…");
   }
 
-  function makeRow(title, meta, onRemove){
-    const li = document.createElement("li");
-    li.className = "item";
-
-    const left = document.createElement("div");
-    left.style.minWidth = "0";
-    left.innerHTML =
-      "<p class='itemTitle'>" + escapeHtml(title) + "</p>" +
-      (meta ? "<p class='itemMeta'>" + escapeHtml(meta) + "</p>" : "<p class='itemMeta'>—</p>");
-
-    const right = document.createElement("div");
-    right.className = "itemActions";
-
-    const del = document.createElement("button");
-    del.type = "button";
-    del.className = "btn danger";
-    del.textContent = "Ta bort";
-    del.addEventListener("click", onRemove);
-
-    right.appendChild(del);
-    li.appendChild(left);
-    li.appendChild(right);
-    return li;
-  }
-
-  function renderList(){
-    relsList.innerHTML = "";
-
+  function renderFocusResults(){
+    focusList.innerHTML = "";
     const ok = renderStatus();
     if(!ok) return;
 
+    const q = String(focusSearch.value || "").trim().toLowerCase();
     const people = loadPeople();
-    const rels = loadRels();
-    const focusId = String(focusSelect.value || "");
 
-    if(!focusId){
-      relsList.innerHTML =
-        "<li class='item' style='cursor:default;'><div><p class='itemTitle'>Välj fokusperson</p><p class='itemMeta'>För att se relationer.</p></div></li>";
+    if(q.length < 3){
+      const li = document.createElement("li");
+      li.className = "item";
+      li.style.cursor = "default";
+      li.innerHTML = "<div><p class='itemTitle'>Sök</p><p class='itemMeta'>Skriv minst 3 bokstäver.</p></div>";
+      focusList.appendChild(li);
       return;
     }
 
-    const focus = getPersonById(people, focusId);
-    const focusName = focus ? personName(focus) : "Fokus";
+    const hits = people
+      .filter(p => personName(p).toLowerCase().includes(q))
+      .slice(0, 40);
 
-    const mine = rels.filter(r => {
-      if(!r) return false;
-      if(r.typ === "FORALDER_BARN") return String(r.franPersonId) === focusId || String(r.tillPersonId) === focusId;
-      if(r.typ === "PARTNER") return String(r.personAId) === focusId || String(r.personBId) === focusId;
-      if(r.typ === "GENERIC") return String(r.personAId) === focusId || String(r.personBId) === focusId;
-      return false;
-    });
-
-    if(mine.length === 0){
-      relsList.innerHTML =
-        "<li class='item' style='cursor:default;'><div><p class='itemTitle'>—</p><p class='itemMeta'>Inga relationer ännu.</p></div></li>";
+    if(hits.length === 0){
+      const li = document.createElement("li");
+      li.className = "item";
+      li.style.cursor = "default";
+      li.innerHTML = "<div><p class='itemTitle'>Inga träffar</p><p class='itemMeta'>Prova ett annat namn.</p></div>";
+      focusList.appendChild(li);
       return;
     }
 
-    for(const r of mine){
-      let title = "Relation";
-      let meta = "";
-      let variant = String(r.variant || "");
-      const variantTxt = variant ? (" · " + variant) : "";
+    for(const p of hits){
+      const li = document.createElement("li");
+      li.className = "item" + (String(p.id) === String(focusId) ? " active" : "");
+      li.innerHTML =
+        "<div style='min-width:0;'>" +
+          "<p class='itemTitle'>" + escapeHtml(personName(p)) + "</p>" +
+          "<p class='itemMeta'>ID: " + escapeHtml(String(p.id)) + "</p>" +
+        "</div>";
 
-      if(r.typ === "FORALDER_BARN"){
-        const parentId = String(r.franPersonId);
-        const childId  = String(r.tillPersonId);
-
-        if(focusId === parentId){
-          const other = getPersonById(people, childId);
-          title = "Förälder till";
-          meta = focusName + " → " + (other ? personName(other) : childId) + variantTxt;
-        }else{
-          const other = getPersonById(people, parentId);
-          title = "Barn till";
-          meta = focusName + " ← " + (other ? personName(other) : parentId) + variantTxt;
-        }
-      }
-
-      if(r.typ === "PARTNER"){
-        const A = String(r.personAId), B = String(r.personBId);
-        const otherId = (A === focusId) ? B : A;
-        const other = getPersonById(people, otherId);
-        title = "Partner med";
-        meta = focusName + " ↔ " + (other ? personName(other) : otherId) + variantTxt;
-      }
-
-      if(r.typ === "GENERIC"){
-        const A = String(r.personAId), B = String(r.personBId);
-        const otherId = (A === focusId) ? B : A;
-        const other = getPersonById(people, otherId);
-        title = relLabel(String(r.relationKey || "GENERIC"));
-        meta = focusName + " — " + title + " — " + (other ? personName(other) : otherId) + variantTxt;
-      }
-
-      const li = makeRow(title, meta, () => {
-        const yes = confirm("Ta bort relationen?");
-        if(!yes) return;
-        const all = loadRels();
-        const next = all.filter(x => String(x.id) !== String(r.id));
-        saveRels(next);
-        pillRels.textContent = String(next.length);
-        setMsg(msgSave, "ok", "Relation borttagen.");
-        renderList();
+      li.addEventListener("click", () => {
+        focusId = String(p.id);
+        setMsg(msgSave, "", "");
+        renderFocusSummary();
+        applyRelationUI();
+        renderFocusResults(); // uppdatera highlight
       });
 
-      relsList.appendChild(li);
+      focusList.appendChild(li);
     }
   }
 
-  function refreshAll(keepFocus=true){
+  function refreshAll(){
     setMsg(msgSave, "", "");
-
     const ok = renderStatus();
+    if(!ok) return;
+
+    // Om fokusId inte finns längre, nollställ
     const people = loadPeople();
-
-    const prevFocus = keepFocus ? String(focusSelect.value || "") : "";
-    const prevOther = keepFocus ? String(otherSelect.value || "") : "";
-
-    fillSelect(focusSelect, people, true);
-    fillSelect(otherSelect, people, true);
-
-    if(prevFocus) focusSelect.value = prevFocus;
-    if(prevOther) otherSelect.value = prevOther;
+    if(focusId && !getPersonById(people, focusId)) focusId = "";
 
     renderFocusSummary();
     applyRelationUI();
-    renderList();
+    renderFocusResults();
   }
 
   form.addEventListener("submit", (e) => {
@@ -684,7 +619,6 @@
     const t = activeTreeId();
     if(!t) return setMsg(msgSave, "error", "Välj ett aktivt träd först.");
 
-    const focusId = String(focusSelect.value || "").trim();
     const otherId = String(otherSelect.value || "").trim();
     const key = String(relationKeyEl.value || "").trim();
     const variant = String(variantSelect.value || "");
@@ -719,7 +653,6 @@
       pillRels.textContent = String(rels.length);
       otherSelect.value = "";
       setMsg(msgSave, "ok", "Sparat: Förälder ↔ Barn.");
-      renderList();
       renderPreview();
       return;
     }
@@ -741,7 +674,6 @@
       pillRels.textContent = String(rels.length);
       otherSelect.value = "";
       setMsg(msgSave, "ok", "Sparat: Partner.");
-      renderList();
       renderPreview();
       return;
     }
@@ -766,23 +698,10 @@
     pillRels.textContent = String(rels.length);
     otherSelect.value = "";
     setMsg(msgSave, "ok", "Sparat: " + relLabel(key) + ".");
-    renderList();
     renderPreview();
   });
 
-  reloadBtn.addEventListener("click", () => refreshAll(true));
-
-  focusSelect.addEventListener("change", () => {
-    renderFocusSummary();
-    applyRelationUI();
-    renderList();
-  });
-
-  relationKeyEl.addEventListener("change", () => {
-    applyRelationUI();
-    renderList();
-  });
-
+  relationKeyEl.addEventListener("change", () => applyRelationUI());
   variantSelect.addEventListener("change", () => renderPreview());
   otherSelect.addEventListener("change", () => renderPreview());
 
@@ -793,12 +712,22 @@
     renderPreview();
   });
 
+  reloadBtn.addEventListener("click", () => refreshAll());
+
   logoutBtn.addEventListener("click", () => {
     try{ sessionStorage.removeItem("demo_auth"); }catch{}
     window.location.href = "../index.html";
   });
 
-  refreshAll(false);
+  // Debounce för sök
+  let t1 = null;
+  focusSearch.addEventListener("input", () => {
+    if(t1) clearTimeout(t1);
+    t1 = setTimeout(renderFocusResults, 120);
+  });
+
+  // Start
+  refreshAll();
 </script>
 </body>
 </html>
