@@ -1,1 +1,244 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Översikt relationer – Släktkort</title>
+  <meta name="description" content="Översikt: relationer i aktivt träd (localStorage). Visa, töm och felsök." />
+
+  <style>
+    :root { color-scheme: light; }
+    body{
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      line-height: 1.5;
+      margin: 0;
+      padding: 24px;
+      max-width: 980px;
+      margin-inline: auto;
+      background: #fff;
+      color: #111;
+    }
+    a{ color: inherit; text-decoration:none; }
+    header{ margin-bottom: 14px; }
+    h1{ margin: 0 0 6px; font-size: 1.6rem; }
+    .muted{ color:#555; margin: 0 0 12px; }
+
+    .topbar{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin: 10px 0 16px;
+    }
+    .btn, button{
+      display:inline-block;
+      padding:10px 12px;
+      border:1px solid #333;
+      border-radius:10px;
+      background:#fff;
+      font:inherit;
+      cursor:pointer;
+      text-decoration:none;
+    }
+    .btn.secondary{ border-color:#bbb; }
+    .btn.danger{ border-color:#b00020; color:#b00020; }
+
+    .pillRow{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin: 10px 0 18px;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 10px;
+      border:1px solid #ddd;
+      border-radius:999px;
+      background:#fafafa;
+      font-size:.95rem;
+    }
+    .pill strong{ font-weight:950; }
+
+    .card{
+      border:1px solid #ddd;
+      border-radius:12px;
+      padding:16px;
+      margin: 14px 0;
+      background:#fff;
+    }
+    .card h2{ margin:0 0 6px; font-size:1.15rem; }
+    .small{ font-size:.95rem; color:#555; margin:0 0 10px; }
+
+    .actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-top: 12px;
+    }
+
+    .error{ color:#b00020; font-weight:950; }
+    .ok{ font-weight:950; }
+
+    pre{ white-space:pre-wrap; background:#f4f4f4; padding:12px; border-radius:12px; overflow:auto; }
+    code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
+  </style>
+</head>
+
+<body>
+<header>
+  <h1>📚 Översikt relationer</h1>
+  <p class="muted">Här ligger listan för aktivt träd. Inte i “Skapa relation”.</p>
+
+  <nav class="topbar" aria-label="Navigation">
+    <a class="btn secondary" href="../start.html">Start</a>
+    <a class="btn secondary" href="./trees.html">Träd</a>
+    <a class="btn secondary" href="./slaktkort.html">Personer</a>
+    <a class="btn secondary" href="./create-relation.html">Skapa relation</a>
+    <a class="btn" href="./relations.html">Översikt relationer</a>
+    <a class="btn secondary" href="./map.html">Karta</a>
+    <button id="logoutBtn" class="btn secondary" type="button">Logga ut</button>
+  </nav>
+
+  <div class="pillRow" aria-label="Status">
+    <span class="pill">Aktivt träd: <strong id="pillTree">—</strong></span>
+    <span class="pill">Personer: <strong id="pillPeople">0</strong></span>
+    <span class="pill">Relationer: <strong id="pillRels">0</strong></span>
+  </div>
+</header>
+
+<section class="card">
+  <h2>Relationer i aktivt träd</h2>
+  <p class="small">Det här är “systemytan” för översikt / felsök. Vanlig användare behöver sällan se rådata.</p>
+
+  <div class="actions">
+    <button type="button" id="listBtn" class="btn secondary">Visa</button>
+    <button type="button" id="refreshBtn" class="btn secondary">Uppdatera status</button>
+    <button type="button" id="clearBtn" class="btn danger">Töm relationer</button>
+    <a class="btn secondary" href="./create-relation.html">← Tillbaka (Skapa)</a>
+  </div>
+
+  <p id="msg" class="muted" aria-live="polite"></p>
+  <pre><code id="out">[]</code></pre>
+</section>
+
+<script>
+  (function authGuard(){
+    try{
+      if(sessionStorage.getItem("demo_auth") !== "1"){
+        window.location.href = "../index.html";
+      }
+    }catch{}
+  })();
+
+  const KEY_TREES  = "slakttradet_trees";
+  const KEY_ACTIVE = "slakttradet_active_tree_id";
+  const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
+  const relKey   = (treeId) => "slakttradet_relationer_" + String(treeId);
+
+  const logoutBtn = document.getElementById("logoutBtn");
+  const pillTree = document.getElementById("pillTree");
+  const pillPeople = document.getElementById("pillPeople");
+  const pillRels = document.getElementById("pillRels");
+  const out = document.getElementById("out");
+  const msg = document.getElementById("msg");
+
+  function safeParse(raw, fallback){ try{ return JSON.parse(raw); }catch{ return fallback; } }
+  function loadJson(key, fallback){
+    const raw = localStorage.getItem(key);
+    return raw ? safeParse(raw, fallback) : fallback;
+  }
+  function saveJson(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
+
+  function getTrees(){
+    const trees = loadJson(KEY_TREES, []);
+    return Array.isArray(trees) ? trees : [];
+  }
+  function activeTreeId(){ return localStorage.getItem(KEY_ACTIVE) || ""; }
+  function activeTreeLabel(){
+    const id = activeTreeId();
+    if(!id) return "—";
+    const t = getTrees().find(x => String(x.id) === String(id));
+    return t ? (t.name || t.id) : id;
+  }
+
+  function loadPeople(){
+    const t = activeTreeId();
+    if(!t) return [];
+    const arr = loadJson(cardsKey(t), []);
+    return Array.isArray(arr) ? arr : [];
+  }
+  function loadRels(){
+    const t = activeTreeId();
+    if(!t) return [];
+    const arr = loadJson(relKey(t), []);
+    return Array.isArray(arr) ? arr : [];
+  }
+  function saveRels(rels){
+    const t = activeTreeId();
+    if(!t) return;
+    saveJson(relKey(t), rels);
+  }
+
+  function escapeHtml(s){
+    return String(s || "")
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+  function setMsg(type, text){
+    msg.innerHTML = type === "error"
+      ? "<span class='error'>" + escapeHtml(text) + "</span>"
+      : type === "ok"
+        ? "<span class='ok'>" + escapeHtml(text) + "</span>"
+        : escapeHtml(text || "");
+  }
+
+  function render(){
+    const t = activeTreeId();
+    const people = loadPeople();
+    const rels = loadRels();
+
+    pillTree.textContent = activeTreeLabel();
+    pillPeople.textContent = String(people.length);
+    pillRels.textContent = String(rels.length);
+
+    if(!t) setMsg("error", "Välj ett aktivt träd först (Träd).");
+    else setMsg("", "");
+  }
+
+  document.getElementById("listBtn").addEventListener("click", () => {
+    out.textContent = JSON.stringify(loadRels(), null, 2);
+    render();
+  });
+
+  document.getElementById("refreshBtn").addEventListener("click", () => {
+    out.textContent = JSON.stringify(loadRels(), null, 2);
+    render();
+  });
+
+  document.getElementById("clearBtn").addEventListener("click", () => {
+    const yes = confirm("Töm alla relationer i aktivt träd?");
+    if(!yes) return;
+    saveRels([]);
+    out.textContent = "[]";
+    setMsg("ok", "Relationer tömda.");
+    render();
+  });
+
+  logoutBtn.addEventListener("click", () => {
+    try{ sessionStorage.removeItem("demo_auth"); }catch{}
+    window.location.href = "../index.html";
+  });
+
+  render();
+  out.textContent = JSON.stringify(loadRels(), null, 2);
+</script>
+</body>
+</html>
 
