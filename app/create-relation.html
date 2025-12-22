@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Relationer – Släktkort</title>
-  <meta name="description" content="Steg 3: Skapa relationer (Förälder→Barn) i aktivt träd. Draft sparas så val inte tappas." />
+  <title>Relationer – Steg 2</title>
+  <meta name="description" content="Steg 2: Välj person → koppla förälder → se relationer för vald person (localStorage, GitHub Pages)." />
 
   <style>
     :root { color-scheme: light; }
@@ -19,22 +19,16 @@
       color: #111;
     }
     a{ color: inherit; text-decoration:none; }
-    header{
-      display:flex;
-      align-items:flex-start;
-      justify-content:space-between;
-      gap:12px;
-      margin-bottom:18px;
-    }
-    h1{ margin:0 0 6px; font-size:1.6rem; }
-    .muted{ color:#555; margin:0 0 12px; }
+    header{ margin-bottom: 16px; }
+    h1{ margin: 0 0 6px; font-size: 1.6rem; }
+    .muted{ color:#555; margin: 0 0 12px; }
 
     .topbar{
       display:flex;
       flex-wrap:wrap;
       gap:10px;
       align-items:center;
-      margin: 10px 0 0;
+      margin: 10px 0 16px;
     }
     .btn, button{
       display:inline-block;
@@ -48,45 +42,28 @@
     }
     .btn.secondary{ border-color:#bbb; }
     .btn.danger{ border-color:#b00020; color:#b00020; }
-    .btn.disabled{
-      opacity:.45;
-      cursor:not-allowed;
-      pointer-events:none;
-    }
+    .btn.disabled{ opacity:.45; cursor:not-allowed; pointer-events:none; }
 
-    .pillRow{
-      display:flex;
-      flex-wrap:wrap;
-      gap:10px;
-      align-items:center;
-      margin: 10px 0 18px;
+    .grid{
+      display:grid;
+      gap:14px;
+      grid-template-columns: 1fr;
     }
-    .pill{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding:8px 10px;
-      border:1px solid #ddd;
-      border-radius:999px;
-      background:#fafafa;
-      font-size:.95rem;
+    @media (min-width: 900px){
+      .grid{ grid-template-columns: 1fr 1fr; }
     }
-    .pill strong{ font-weight:900; }
-    .pill.ok{ border-color:#cfe8cf; background:#f5fff5; }
-    .pill.warn{ border-color:#ffe1a6; background:#fff9ee; }
 
     .card{
       border:1px solid #ddd;
       border-radius:12px;
       padding:16px;
       background:#fff;
-      margin: 14px 0;
     }
     .card h2{ margin:0 0 6px; font-size:1.15rem; }
     .small{ font-size:.95rem; color:#555; margin:0 0 10px; }
 
     label{ display:block; margin:10px 0 6px; font-weight:800; }
-    select, input{
+    select{
       width:100%;
       box-sizing:border-box;
       padding:10px;
@@ -94,11 +71,6 @@
       border:1px solid #bbb;
       font:inherit;
       background:#fff;
-    }
-
-    .row{ display:grid; grid-template-columns: 1fr; gap:12px; }
-    @media (min-width: 720px){
-      .row.two{ grid-template-columns: 1fr 1fr; }
     }
 
     .actions{
@@ -109,101 +81,149 @@
       margin-top: 12px;
     }
 
+    .msg{ margin-top: 10px; }
     .error{ color:#b00020; font-weight:900; }
     .ok{ font-weight:900; }
 
-    pre{
-      background:#f4f4f4;
-      padding:12px;
+    .focusBox{
+      border:1px solid #eee;
       border-radius:12px;
-      overflow:auto;
-      white-space: pre-wrap;
-      margin: 10px 0 0;
+      padding:10px 12px;
+      background:#fafafa;
+      margin-top: 10px;
     }
+    .focusTitle{ font-weight:900; margin:0 0 4px; }
+    .focusMeta{ margin:0; color:#444; }
+
+    .list{
+      margin: 10px 0 0;
+      padding: 0;
+      list-style:none;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .item{
+      border:1px solid #eee;
+      border-radius:12px;
+      padding:10px;
+      background:#fff;
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:flex-start;
+    }
+    .itemMain{ min-width: 0; }
+    .itemTitle{ font-weight:900; margin:0 0 2px; }
+    .itemMeta{ margin:0; color:#555; font-size:.95rem; }
+    .miniBtn{
+      padding:8px 10px;
+      border-radius:10px;
+      border:1px solid #b00020;
+      color:#b00020;
+      background:#fff;
+      cursor:pointer;
+      white-space:nowrap;
+    }
+    code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
   </style>
 </head>
 
 <body>
 <header>
-  <div>
-    <h1>Relationer</h1>
-    <p class="muted">Steg 3 i flödet. Draft sparas automatiskt så dina val inte försvinner.</p>
+  <h1>🔗 Relationer</h1>
+  <p class="muted">Steg 2 i flödet: <strong>Välj person</strong> → <strong>Lägg till förälder</strong> → <strong>Se relationer</strong>.</p>
 
-    <nav class="topbar" aria-label="Navigation">
-      <a class="btn secondary" href="../start.html">Start</a>
-      <a class="btn secondary" href="./trees.html">Träd</a>
-      <a class="btn secondary" href="./slaktkort.html">Personer</a>
-      <a class="btn" href="./create-relation.html">Relationer</a>
-      <a class="btn secondary" href="./map.html">Karta</a>
-    </nav>
-  </div>
-
-  <div class="actions" style="justify-content:flex-end;">
+  <nav class="topbar" aria-label="Navigation">
+    <a class="btn secondary" href="../start.html">Start</a>
+    <a class="btn secondary" href="./trees.html">Träd</a>
+    <a class="btn secondary" href="./slaktkort.html">👤 Personer</a>
+    <a class="btn" href="./create-relation.html">🔗 Relationer</a>
+    <a class="btn secondary" href="./map.html">🗺️ Karta</a>
+    <a class="btn secondary" href="./place-picker.html">Plats-picker</a>
     <button id="logoutBtn" class="btn secondary" type="button">Logga ut</button>
-  </div>
+  </nav>
 </header>
 
-<section class="pillRow" aria-label="Status">
-  <span id="pillTree" class="pill warn">Aktivt träd: <strong>—</strong></span>
-  <span id="pillPeople" class="pill">Personer: <strong>0</strong></span>
-  <span id="pillRels" class="pill">Relationer: <strong>0</strong></span>
-  <span id="pillNext" class="pill warn">Nästa steg: <strong>Personer</strong></span>
-</section>
+<section class="grid" aria-label="Relationer steg för steg">
+  <!-- 1) Välj fokusperson -->
+  <article class="card">
+    <h2>1) Välj person</h2>
+    <p class="small">Den här personen är “fokus”. Du lägger till förälder till fokuspersonen.</p>
 
-<section class="card">
-  <h2>1) Skapa relation</h2>
-  <p class="small">Förälder → barn (max 2 föräldrar per barn). Sparas i aktivt träd.</p>
-
-  <form id="form">
-    <div class="row two">
-      <div>
-        <label for="relationType">Relationstyp</label>
-        <select id="relationType" disabled>
-          <option value="FORALDER_BARN" selected>Förälder → Barn</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="row two">
-      <div>
-        <label for="aSelect">Förälder *</label>
-        <select id="aSelect" required>
-          <option value="">Välj…</option>
-        </select>
-      </div>
-      <div>
-        <label for="bSelect">Barn *</label>
-        <select id="bSelect" required>
-          <option value="">Välj…</option>
-        </select>
-      </div>
-    </div>
+    <label for="focusSelect">Person *</label>
+    <select id="focusSelect" required>
+      <option value="">Välj…</option>
+    </select>
 
     <div class="actions">
-      <button type="submit" class="btn">Spara relation</button>
-      <button type="button" id="resetBtn" class="btn secondary">Rensa val</button>
-      <a id="continueMap" class="btn disabled" href="./map.html" aria-disabled="true" tabindex="-1">Fortsätt → Karta</a>
+      <a class="btn secondary" href="./slaktkort.html">Skapa person</a>
+      <button id="reloadBtn" class="btn secondary" type="button">Ladda om</button>
     </div>
 
-    <p id="msg" class="muted" aria-live="polite"></p>
-  </form>
-</section>
+    <div id="focusBox" class="focusBox" hidden>
+      <p class="focusTitle" id="focusName">—</p>
+      <p class="focusMeta" id="focusMeta">—</p>
+    </div>
 
-<section class="card">
-  <h2>2) Relationer i aktivt träd</h2>
+    <p id="step1Msg" class="msg muted" aria-live="polite"></p>
+  </article>
 
-  <div class="actions">
-    <button type="button" id="listBtn" class="btn secondary">Visa</button>
-    <button type="button" id="clearBtn" class="btn danger">Töm relationer</button>
-    <button type="button" id="refreshBtn" class="btn secondary">Uppdatera listor</button>
-  </div>
+  <!-- 2) Lägg till förälder -->
+  <article class="card">
+    <h2>2) Lägg till förälder</h2>
+    <p class="small">Välj en förälder som kopplas till fokuspersonen. Max <strong>2</strong> föräldrar per barn.</p>
 
-  <pre><code id="out">[]</code></pre>
+    <label for="parentSelect">Förälder *</label>
+    <select id="parentSelect" required>
+      <option value="">Välj…</option>
+    </select>
+
+    <div class="actions">
+      <button id="addParentBtn" class="btn" type="button">Spara koppling</button>
+      <button id="resetBtn" class="btn secondary" type="button">Rensa val</button>
+    </div>
+
+    <p id="step2Msg" class="msg muted" aria-live="polite"></p>
+
+    <div class="actions" style="margin-top:14px;">
+      <a id="goMap" class="btn secondary disabled" href="./map.html" aria-disabled="true" tabindex="-1">Fortsätt → Karta</a>
+    </div>
+  </article>
+
+  <!-- 3) Visa relationer för vald person -->
+  <article class="card" style="grid-column: 1 / -1;">
+    <h2>3) Relationer för vald person</h2>
+    <p class="small">Här ser du föräldrar och barn för fokuspersonen. Du kan även ta bort kopplingar.</p>
+
+    <div class="grid" style="grid-template-columns: 1fr; gap:14px;">
+      <div class="card" style="border-color:#eee;">
+        <h3 style="margin:0 0 6px;">Föräldrar</h3>
+        <p class="small" id="parentsLine">—</p>
+        <ul id="parentsList" class="list"></ul>
+      </div>
+
+      <div class="card" style="border-color:#eee;">
+        <h3 style="margin:0 0 6px;">Barn</h3>
+        <p class="small" id="childrenLine">—</p>
+        <ul id="childrenList" class="list"></ul>
+      </div>
+    </div>
+
+    <div class="actions" style="margin-top:14px;">
+      <a class="btn secondary" href="./slaktkort.html">← Tillbaka (Personer)</a>
+      <a class="btn secondary" href="./map.html">Gå till (Karta)</a>
+    </div>
+
+    <p class="small" style="margin-top:10px;">
+      Data sparas i <code>localStorage</code> per träd: <code>slakttradet_relationer_&lt;treeId&gt;</code>.
+    </p>
+  </article>
 </section>
 
 <script>
   // ============================
-  // Estetisk auth
+  // Estetisk auth-guard
   // ============================
   (function authGuard(){
     try{
@@ -214,67 +234,72 @@
   })();
 
   // ============================
-  // Keys
+  // Keys (MÅSTE matcha övriga sidor)
   // ============================
   const KEY_TREES  = "slakttradet_trees";
   const KEY_ACTIVE = "slakttradet_active_tree_id";
-
   const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
   const relKey   = (treeId) => "slakttradet_relationer_" + String(treeId);
 
-  // Draft (valda personer i relation-form)
-  const draftKey = (treeId) => "slakttradet_draft_relation_" + String(treeId);
-
+  // ============================
   // DOM
+  // ============================
   const logoutBtn = document.getElementById("logoutBtn");
-  const pillTree = document.getElementById("pillTree");
-  const pillPeople = document.getElementById("pillPeople");
-  const pillRels = document.getElementById("pillRels");
-  const pillNext = document.getElementById("pillNext");
 
-  const aSelect = document.getElementById("aSelect");
-  const bSelect = document.getElementById("bSelect");
-  const msg = document.getElementById("msg");
-  const out = document.getElementById("out");
+  const focusSelect = document.getElementById("focusSelect");
+  const parentSelect = document.getElementById("parentSelect");
 
-  const continueMap = document.getElementById("continueMap");
+  const reloadBtn = document.getElementById("reloadBtn");
+  const addParentBtn = document.getElementById("addParentBtn");
+  const resetBtn = document.getElementById("resetBtn");
 
+  const step1Msg = document.getElementById("step1Msg");
+  const step2Msg = document.getElementById("step2Msg");
+
+  const focusBox = document.getElementById("focusBox");
+  const focusName = document.getElementById("focusName");
+  const focusMeta = document.getElementById("focusMeta");
+
+  const parentsLine = document.getElementById("parentsLine");
+  const childrenLine = document.getElementById("childrenLine");
+  const parentsList = document.getElementById("parentsList");
+  const childrenList = document.getElementById("childrenList");
+
+  const goMap = document.getElementById("goMap");
+
+  // ============================
+  // Helpers
+  // ============================
   function safeParse(raw, fallback){ try{ return JSON.parse(raw); }catch{ return fallback; } }
   function loadJson(key, fallback){
     const raw = localStorage.getItem(key);
     return raw ? safeParse(raw, fallback) : fallback;
   }
-  function saveJson(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
+  function saveJson(key, value){
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  function setMsg(el, type, text){
+    el.innerHTML = type === "error"
+      ? "<span class='error'>" + escapeHtml(text) + "</span>"
+      : type === "ok"
+        ? "<span class='ok'>" + escapeHtml(text) + "</span>"
+        : escapeHtml(text || "");
+  }
+
+  function escapeHtml(s){
+    return String(s || "")
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
 
   function activeTreeId(){ return localStorage.getItem(KEY_ACTIVE) || ""; }
-  function getTrees(){
-    const trees = loadJson(KEY_TREES, []);
-    return Array.isArray(trees) ? trees : [];
-  }
-  function activeTreeLabel(){
-    const id = activeTreeId();
-    if(!id) return "—";
-    const t = getTrees().find(x => String(x.id) === String(id));
-    return t ? (t.name || t.id) : id;
-  }
+  function hasTrees(){ return Array.isArray(loadJson(KEY_TREES, [])) && loadJson(KEY_TREES, []).length > 0; }
 
-  function setDisabled(el, disabled){
-    if(disabled){
-      el.classList.add("disabled");
-      el.setAttribute("aria-disabled","true");
-      el.setAttribute("tabindex","-1");
-    }else{
-      el.classList.remove("disabled");
-      el.removeAttribute("aria-disabled");
-      el.removeAttribute("tabindex");
-    }
-  }
-  function setPill(el, kind, html){
-    el.className = "pill " + (kind || "");
-    el.innerHTML = html;
-  }
-
-  function loadPersons(treeId){
+  function loadCards(treeId){
     const arr = loadJson(cardsKey(treeId), []);
     return Array.isArray(arr) ? arr : [];
   }
@@ -283,222 +308,323 @@
     return Array.isArray(arr) ? arr : [];
   }
 
-  function buildChildCount(rels){
-    const c = {};
-    rels.filter(r => r.typ === "FORALDER_BARN").forEach(r => {
-      c[r.franPersonId] = (c[r.franPersonId] || 0) + 1;
-    });
-    return c;
+  function personName(p){
+    const n = `${p.fornamn || ""} ${p.efternamn || ""}`.trim();
+    return n || "(namnlös)";
   }
+
+  function metaLine(p){
+    const years = [p.fodelsear, p.dodsar].filter(v => v !== null && v !== undefined && v !== "").join("–");
+    const place = String(p.plats || "").trim();
+    const parts = [];
+    if(years) parts.push(years);
+    if(place) parts.push(place);
+    return parts.length ? parts.join(" · ") : "—";
+  }
+
+  function setDisabledLink(a, disabled){
+    if(disabled){
+      a.classList.add("disabled");
+      a.setAttribute("aria-disabled","true");
+      a.setAttribute("tabindex","-1");
+    }else{
+      a.classList.remove("disabled");
+      a.removeAttribute("aria-disabled");
+      a.removeAttribute("tabindex");
+    }
+  }
+
+  // ============================
+  // Domain logic
+  // ============================
   function parentsOfChild(rels, childId){
-    return new Set(
-      rels.filter(r => r.typ === "FORALDER_BARN" && r.tillPersonId === childId)
-          .map(r => r.franPersonId)
+    return rels
+      .filter(r => r && r.typ === "FORALDER_BARN" && String(r.tillPersonId) === String(childId))
+      .map(r => String(r.franPersonId));
+  }
+
+  function childrenOfParent(rels, parentId){
+    return rels
+      .filter(r => r && r.typ === "FORALDER_BARN" && String(r.franPersonId) === String(parentId))
+      .map(r => String(r.tillPersonId));
+  }
+
+  function hasParentLink(rels, parentId, childId){
+    return rels.some(r =>
+      r &&
+      r.typ === "FORALDER_BARN" &&
+      String(r.franPersonId) === String(parentId) &&
+      String(r.tillPersonId) === String(childId)
     );
   }
-  function personName(p){
-    return `${p.fornamn || ""} ${p.efternamn || ""}`.trim() || "(namnlös)";
+
+  function makeRelId(){
+    return "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   }
 
   // ============================
-  // Draft save/restore
+  // UI render
   // ============================
-  function saveDraft(){
+  function fillSelects(){
     const t = activeTreeId();
-    if(!t) return;
-    try{
-      sessionStorage.setItem(draftKey(t), JSON.stringify({
-        a: aSelect.value || "",
-        b: bSelect.value || ""
-      }));
-    }catch{}
+    focusSelect.innerHTML = "<option value=''>Välj…</option>";
+    parentSelect.innerHTML = "<option value=''>Välj…</option>";
+
+    if(!hasTrees()){
+      setMsg(step1Msg, "error", "Inga träd finns. Skapa ett träd först (Träd).");
+      setMsg(step2Msg, "", "");
+      setDisabledLink(goMap, true);
+      focusBox.hidden = true;
+      parentsList.innerHTML = "";
+      childrenList.innerHTML = "";
+      parentsLine.textContent = "—";
+      childrenLine.textContent = "—";
+      return;
+    }
+
+    if(!t){
+      setMsg(step1Msg, "error", "Inget aktivt träd valt. Gå till Träd och välj ett aktivt träd.");
+      setMsg(step2Msg, "", "");
+      setDisabledLink(goMap, true);
+      focusBox.hidden = true;
+      parentsList.innerHTML = "";
+      childrenList.innerHTML = "";
+      parentsLine.textContent = "—";
+      childrenLine.textContent = "—";
+      return;
+    }
+
+    const cards = loadCards(t);
+    if(cards.length === 0){
+      setMsg(step1Msg, "error", "Inga personer i aktivt träd. Skapa personer först.");
+      setMsg(step2Msg, "", "");
+      setDisabledLink(goMap, true);
+      focusBox.hidden = true;
+      parentsList.innerHTML = "";
+      childrenList.innerHTML = "";
+      parentsLine.textContent = "—";
+      childrenLine.textContent = "—";
+      return;
+    }
+
+    // Fyll fokus + parent med samma lista
+    for(const p of cards){
+      if(!p || !p.id) continue;
+      const opt1 = document.createElement("option");
+      opt1.value = String(p.id);
+      opt1.textContent = personName(p);
+      focusSelect.appendChild(opt1);
+
+      const opt2 = document.createElement("option");
+      opt2.value = String(p.id);
+      opt2.textContent = personName(p);
+      parentSelect.appendChild(opt2);
+    }
+
+    // Auto-välj första person om inget valt
+    if(!focusSelect.value && focusSelect.options.length > 1){
+      focusSelect.selectedIndex = 1;
+    }
+
+    setMsg(step1Msg, "ok", "Personer laddade.");
+    renderFocus();
   }
-  function loadDraft(){
+
+  function renderFocus(){
     const t = activeTreeId();
     if(!t) return;
-    try{
-      const raw = sessionStorage.getItem(draftKey(t));
-      if(!raw) return;
-      const d = safeParse(raw, null);
-      if(d && typeof d === "object"){
-        if(typeof d.a === "string") aSelect.value = d.a;
-        if(typeof d.b === "string") bSelect.value = d.b;
+
+    const cards = loadCards(t);
+    const rels = loadRels(t);
+
+    const focusId = focusSelect.value;
+    if(!focusId){
+      focusBox.hidden = true;
+      setMsg(step2Msg, "", "Välj en person först.");
+      parentsList.innerHTML = "";
+      childrenList.innerHTML = "";
+      parentsLine.textContent = "—";
+      childrenLine.textContent = "—";
+      setDisabledLink(goMap, true);
+      return;
+    }
+
+    const focus = cards.find(p => String(p.id) === String(focusId));
+    focusBox.hidden = false;
+    focusName.textContent = focus ? personName(focus) : "(okänd)";
+    focusMeta.textContent = focus ? metaLine(focus) : "—";
+
+    // I alternativ A: fokuspersonen är "barnet" i kopplingar när du lägger till förälder
+    // Filtrera föräldralista så att samma person inte kan vara sin egen förälder
+    // och så att "Redan kopplad" inte blir ett vanligt misstag
+    const existingParents = new Set(parentsOfChild(rels, focusId));
+
+    // rebuild parentSelect (för att kunna markera/filtrera)
+    const currentParent = parentSelect.value;
+    parentSelect.innerHTML = "<option value=''>Välj…</option>";
+
+    for(const p of cards){
+      if(!p || !p.id) continue;
+      const pid = String(p.id);
+
+      if(pid === String(focusId)) continue; // får inte vara sin egen förälder
+
+      const opt = document.createElement("option");
+      opt.value = pid;
+      opt.textContent = personName(p) + (existingParents.has(pid) ? " (redan)" : "");
+      parentSelect.appendChild(opt);
+    }
+
+    // behåll val om möjligt
+    if(currentParent){
+      parentSelect.value = currentParent;
+      if(parentSelect.value !== currentParent) parentSelect.value = "";
+    }
+
+    // Render relationer för fokus
+    renderRelationsForFocus(cards, rels, focusId);
+
+    // Enable "fortsätt till karta" om det finns minst 1 person med coords (du kan ändå se karta)
+    const hasAnyCoords = cards.some(p => p && p.coords && (typeof p.coords === "object" || typeof p.coords === "string"));
+    setDisabledLink(goMap, !hasAnyCoords);
+  }
+
+  function renderRelationsForFocus(cards, rels, focusId){
+    parentsList.innerHTML = "";
+    childrenList.innerHTML = "";
+
+    const parentIds = parentsOfChild(rels, focusId);
+    const childIds  = childrenOfParent(rels, focusId);
+
+    parentsLine.textContent = parentIds.length ? (parentIds.length + " st") : "Inga föräldrar kopplade.";
+    childrenLine.textContent = childIds.length ? (childIds.length + " st") : "Inga barn kopplade.";
+
+    // Föräldrar
+    if(parentIds.length){
+      for(const pid of parentIds){
+        const p = cards.find(x => String(x.id) === String(pid));
+        const li = document.createElement("li");
+        li.className = "item";
+        li.innerHTML =
+          "<div class='itemMain'>" +
+            "<p class='itemTitle'>" + escapeHtml(p ? personName(p) : "(okänd)") + "</p>" +
+            "<p class='itemMeta'>Förälder</p>" +
+          "</div>" +
+          "<button class='miniBtn' type='button' data-remove='parent' data-parent='" + escapeHtml(pid) + "'>Ta bort</button>";
+        parentsList.appendChild(li);
       }
-    }catch{}
-  }
-  function clearDraft(){
-    const t = activeTreeId();
-    if(!t) return;
-    try{ sessionStorage.removeItem(draftKey(t)); }catch{}
-  }
-
-  // autosave on change
-  aSelect.addEventListener("change", saveDraft);
-  bSelect.addEventListener("change", saveDraft);
-
-  // ============================
-  // UI build
-  // ============================
-  function loadPersonsIntoSelects(){
-    const t = activeTreeId();
-    msg.textContent = "";
-    aSelect.innerHTML = '<option value="">Välj…</option>';
-    bSelect.innerHTML = '<option value="">Välj…</option>';
-
-    if(!t){
-      msg.innerHTML = "<span class='error'>Välj aktivt träd först (gå till Träd).</span>";
-      setDisabled(aSelect, true);
-      setDisabled(bSelect, true);
-      return;
     }
 
-    const persons = loadPersons(t);
-    const rels = loadRels(t);
-    const counts = buildChildCount(rels);
-
-    setDisabled(aSelect, false);
-    setDisabled(bSelect, false);
-
-    if(persons.length < 2){
-      msg.innerHTML = "<span class='error'>Du behöver minst 2 personer innan du kan skapa relationer.</span>";
+    // Barn
+    if(childIds.length){
+      for(const cid of childIds){
+        const c = cards.find(x => String(x.id) === String(cid));
+        const li = document.createElement("li");
+        li.className = "item";
+        li.innerHTML =
+          "<div class='itemMain'>" +
+            "<p class='itemTitle'>" + escapeHtml(c ? personName(c) : "(okänd)") + "</p>" +
+            "<p class='itemMeta'>Barn</p>" +
+          "</div>" +
+          "<button class='miniBtn' type='button' data-remove='child' data-child='" + escapeHtml(cid) + "'>Ta bort</button>";
+        childrenList.appendChild(li);
+      }
     }
 
-    for(const p of persons){
-      if(!p.id) continue;
+    // Handlers: ta bort relation
+    parentsList.querySelectorAll("button[data-remove='parent']").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const t = activeTreeId();
+        if(!t) return;
+        const parentId = btn.getAttribute("data-parent");
+        const relsNow = loadRels(t).filter(r =>
+          !(r && r.typ === "FORALDER_BARN" && String(r.franPersonId) === String(parentId) && String(r.tillPersonId) === String(focusId))
+        );
+        saveJson(relKey(t), relsNow);
+        setMsg(step2Msg, "ok", "Koppling borttagen.");
+        renderFocus();
+      });
+    });
 
-      const o1 = document.createElement("option");
-      o1.value = p.id;
-      o1.textContent = `${personName(p)} (barn: ${counts[p.id] || 0})`;
-      aSelect.appendChild(o1);
-
-      const o2 = document.createElement("option");
-      o2.value = p.id;
-      o2.textContent = personName(p);
-      bSelect.appendChild(o2);
-    }
+    childrenList.querySelectorAll("button[data-remove='child']").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const t = activeTreeId();
+        if(!t) return;
+        const childId = btn.getAttribute("data-child");
+        const relsNow = loadRels(t).filter(r =>
+          !(r && r.typ === "FORALDER_BARN" && String(r.franPersonId) === String(focusId) && String(r.tillPersonId) === String(childId))
+        );
+        saveJson(relKey(t), relsNow);
+        setMsg(step2Msg, "ok", "Koppling borttagen.");
+        renderFocus();
+      });
+    });
   }
 
-  function refreshStatus(){
+  function addParent(){
     const t = activeTreeId();
-    const label = activeTreeLabel();
+    if(!t) return setMsg(step2Msg, "error", "Inget aktivt träd.");
 
-    if(!t){
-      setPill(pillTree, "warn", "Aktivt träd: <strong>—</strong>");
-      pillPeople.innerHTML = "Personer: <strong>0</strong>";
-      pillRels.innerHTML = "Relationer: <strong>0</strong>";
-      setPill(pillNext, "warn", "Nästa steg: <strong>Träd</strong>");
-      setDisabled(continueMap, true);
-      return;
-    }
+    const focusId = focusSelect.value;
+    const parentId = parentSelect.value;
 
-    const peopleCount = loadPersons(t).length;
-    const relCount = loadRels(t).length;
-
-    setPill(pillTree, "ok", "Aktivt träd: <strong>" + label + "</strong>");
-    pillPeople.innerHTML = "Personer: <strong>" + peopleCount + "</strong>";
-    pillRels.innerHTML = "Relationer: <strong>" + relCount + "</strong>";
-
-    if(peopleCount < 2){
-      setPill(pillNext, "warn", "Nästa steg: <strong>Personer</strong>");
-      setDisabled(continueMap, true);
-    }else if(relCount === 0){
-      setPill(pillNext, "warn", "Nästa steg: <strong>Skapa relation</strong>");
-      setDisabled(continueMap, true);
-    }else{
-      setPill(pillNext, "ok", "Nästa steg: <strong>Karta</strong>");
-      setDisabled(continueMap, false);
-    }
-  }
-
-  // ============================
-  // Actions
-  // ============================
-  document.getElementById("form").addEventListener("submit", (e) => {
-    e.preventDefault();
-
-    const t = activeTreeId();
-    if(!t) return;
-
-    const a = aSelect.value;
-    const b = bSelect.value;
-
-    if(!a || !b || a === b){
-      msg.innerHTML = "<span class='error'>Ogiltigt val (välj olika personer).</span>";
-      return;
-    }
+    if(!focusId) return setMsg(step2Msg, "error", "Välj person först (Steg 1).");
+    if(!parentId) return setMsg(step2Msg, "error", "Välj förälder först.");
+    if(String(parentId) === String(focusId)) return setMsg(step2Msg, "error", "En person kan inte vara sin egen förälder.");
 
     const rels = loadRels(t);
-    const parents = parentsOfChild(rels, b);
+    const currentParents = parentsOfChild(rels, focusId);
 
-    if(parents.has(a)){
-      msg.innerHTML = "<span class='error'>Redan kopplad.</span>";
-      return;
+    if(currentParents.includes(String(parentId))){
+      return setMsg(step2Msg, "error", "Redan kopplad som förälder.");
     }
-    if(parents.size >= 2){
-      msg.innerHTML = "<span class='error'>Barnet har redan 2 föräldrar.</span>";
-      return;
+    if(currentParents.length >= 2){
+      return setMsg(step2Msg, "error", "Barnet har redan 2 föräldrar.");
     }
 
     rels.push({
-      id: "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      id: makeRelId(),
       typ: "FORALDER_BARN",
-      franPersonId: a,
-      tillPersonId: b,
+      franPersonId: String(parentId),
+      tillPersonId: String(focusId),
       createdAt: new Date().toISOString()
     });
 
     saveJson(relKey(t), rels);
-    out.textContent = JSON.stringify(rels, null, 2);
-    msg.innerHTML = "<span class='ok'>Relation sparad.</span>";
-    clearDraft();
-    refreshStatus();
-    loadPersonsIntoSelects();
-    loadDraft(); // om något fortfarande finns
-  });
+    setMsg(step2Msg, "ok", "Koppling sparad.");
+    parentSelect.value = "";
+    renderFocus();
+  }
 
-  document.getElementById("listBtn").addEventListener("click", () => {
-    const t = activeTreeId();
-    out.textContent = JSON.stringify(loadRels(t), null, 2);
-    refreshStatus();
-  });
-
-  document.getElementById("clearBtn").addEventListener("click", () => {
-    const t = activeTreeId();
-    if(!t) return;
-    const yes = confirm("Töm alla relationer i aktivt träd?");
-    if(!yes) return;
-    saveJson(relKey(t), []);
-    out.textContent = "[]";
-    msg.innerHTML = "<span class='ok'>Relationer tömda.</span>";
-    clearDraft();
-    refreshStatus();
-    loadPersonsIntoSelects();
-  });
-
-  document.getElementById("resetBtn").addEventListener("click", () => {
-    aSelect.value = "";
-    bSelect.value = "";
-    saveDraft();
-    msg.textContent = "";
-  });
-
-  document.getElementById("refreshBtn").addEventListener("click", () => {
-    loadPersonsIntoSelects();
-    loadDraft();
-    refreshStatus();
-  });
-
+  // ============================
+  // Events
+  // ============================
   logoutBtn.addEventListener("click", () => {
     try{ sessionStorage.removeItem("demo_auth"); }catch{}
     window.location.href = "../index.html";
   });
 
+  reloadBtn.addEventListener("click", () => {
+    setMsg(step1Msg, "", "Laddar om…");
+    fillSelects();
+  });
+
+  focusSelect.addEventListener("change", () => {
+    setMsg(step2Msg, "", "");
+    renderFocus();
+  });
+
+  addParentBtn.addEventListener("click", addParent);
+
+  resetBtn.addEventListener("click", () => {
+    parentSelect.value = "";
+    setMsg(step2Msg, "", "");
+  });
+
   // ============================
   // Start
   // ============================
-  loadPersonsIntoSelects();
-  loadDraft();
-  refreshStatus();
+  fillSelects();
 </script>
 </body>
 </html>
