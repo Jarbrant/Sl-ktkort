@@ -1,61 +1,100 @@
+
 <!doctype html>
 <html lang="sv">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Släktträdet – Start</title>
+  <title>Släktträdet – Adminpanel</title>
   <style>
-    body { font-family: system-ui, Arial, sans-serif; padding: 24px; max-width: 900px; margin: 0 auto; }
-    h1 { margin: 0 0 8px; }
-    .muted { color:#555; }
-    .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
-    a.card {
-      display:block; padding:16px; border:1px solid #ddd; border-radius:12px;
-      text-decoration:none; color:inherit;
+    body { font-family: system-ui, Arial, sans-serif; margin: 0; padding: 32px 20px; background:#fafafa; color:#111; }
+    .container { max-width: 880px; margin: 0 auto; }
+    h1 { margin: 0 0 6px; font-size: 1.6rem; }
+    .muted { color:#555; margin-bottom: 24px; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:16px; }
+    .card { background:#fff; border:1px solid #ddd; border-radius:14px; padding:18px; display:flex; flex-direction:column; gap:12px; }
+    .card h2 { margin:0; font-size:1.1rem; }
+    .card p { margin:0; color:#555; font-size:0.95rem; line-height:1.4; }
+    .card a { margin-top:auto; display:inline-block; text-decoration:none; border:1px solid #333; border-radius:10px; padding:10px 14px; color:#111; font-weight:600; background:#fff; width:fit-content; }
+    .card a:hover { background:#f0f0f0; }
+
+    .card.status { border-left: 6px solid #b00020; }
+    .card.status a { border-color:#b00020; }
+
+    .card.primary {
+      border-left: 6px solid #2b5cff;
     }
-    a.card:hover { border-color:#aaa; }
-    .title { font-weight:800; margin-bottom:6px; }
-    .topbar { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
-    .btn {
-      display:inline-block; padding:10px 12px; border:1px solid #ddd; border-radius:10px;
-      text-decoration:none; color:inherit; background:#fff;
+    .card.primary a {
+      border-color:#2b5cff;
+      font-weight:800;
     }
-    .btn:hover { border-color:#aaa; }
-    @media (max-width: 700px) {
-      .grid { grid-template-columns: 1fr; }
-      .topbar { flex-direction:column; }
-    }
+
+    footer { margin-top: 40px; font-size:0.9rem; color:#666; }
+    code { background:#eee; padding:2px 6px; border-radius:6px; }
   </style>
 </head>
 <body>
-  <div class="topbar">
-    <div>
-      <h1>Släktträdet</h1>
-      <p class="muted">Välj vy. (Vi kopplar in funktionerna stegvis.)</p>
-    </div>
-    <a class="btn" href="./index.html">Till admin</a>
-  </div>
+  <div class="container">
+    <h1>Släktträdet – Adminpanel</h1>
+    <p class="muted">
+      Intern kontrollpanel. I GitHub Pages-läge kör vi lokalt i <code>localStorage</code>.
+      (Backend/Codespaces kan kopplas på senare.)
+    </p>
 
-  <div class="grid">
-    <div class="card">
-      <div class="title">Släktkort</div>
-      <div class="muted">Kopplas in nästa steg.</div>
+    <div class="grid">
+      <!-- STATUS / START -->
+      <div class="card status">
+        <h2>🚩 Inga träd sparade?</h2>
+        <p>
+          Gå till <strong>Skapa/Välj träd</strong> och skapa ett träd först.
+          Det är grunden för personer, relationer och vyer.
+        </p>
+        <a href="./app/trees.html">Skapa / välj släktträd</a>
+      </div>
+
+      <!-- NY: HELHETSVY -->
+      <div class="card primary">
+        <h2>🗺️ Släktkarta (hel vy)</h2>
+        <p>
+          Visa hela släkten i aktivt träd på karta.
+          Flaggar med namn, klick → relationer och detaljer.
+        </p>
+        <a href="./app/map.html">Öppna släktkartan</a>
+      </div>
+
+      <div class="card">
+        <h2>🌳 Släktträd</h2>
+        <p>Skapa, välj och byt aktivt släktträd.</p>
+        <a href="./app/trees.html">Öppna träd</a>
+      </div>
+
+      <div class="card">
+        <h2>👤 Släktkort</h2>
+        <p>Skapa personer i valt träd (namn, årtal, plats, anteckning, koordinater).</p>
+        <a href="./app/slaktkort.html">Öppna släktkort</a>
+      </div>
+
+      <div class="card">
+        <h2>🔗 Relationer</h2>
+        <p>Koppla personer (förälder → barn).</p>
+        <a href="./app/create-relation.html">Skapa relation</a>
+      </div>
+
+      <div class="card">
+        <h2>📍 Platsväljare</h2>
+        <p>Välj plats i karta och spara lat/lon till släktkort.</p>
+        <a href="./app/place-picker.html">Öppna platsväljare</a>
+      </div>
+
+      <div class="card">
+        <h2>🧬 Trädvy (struktur)</h2>
+        <p>Visuell trädstruktur (demo nu, byggs ut senare).</p>
+        <a href="./app/tree.html">Öppna trädvy</a>
+      </div>
     </div>
 
-    <div class="card">
-      <div class="title">Karta-vy</div>
-      <div class="muted">Kopplas in nästa steg.</div>
-    </div>
-
-    <div class="card">
-      <div class="title">Släktträd-vy</div>
-      <div class="muted">Kopplas in nästa steg.</div>
-    </div>
-
-    <div class="card">
-      <div class="title">Skapa relation</div>
-      <div class="muted">Kopplas in nästa steg.</div>
-    </div>
+    <footer>
+      <p>Status: <strong>GitHub Pages</strong> (statisk) • Data i webbläsaren • Backend valfritt senare.</p>
+    </footer>
   </div>
 </body>
 </html>
