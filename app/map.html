@@ -81,6 +81,7 @@
     .popup .sectionTitle { margin: 10px 0 4px; font-weight: 800; }
     .popup ul { margin: 0; padding-left: 18px; }
     .popup li { margin: 2px 0; }
+    .popup .submuted { color:#666; font-size: .92rem; margin: 0 0 8px; }
   </style>
 </head>
 <body>
@@ -202,22 +203,6 @@
       .replaceAll("'", "&#039;");
   }
 
-  function formatPartnerYears(r){
-    const fy = (r && r.fromYear !== undefined) ? r.fromYear : null;
-    const ty = (r && r.toYear !== undefined) ? r.toYear : null;
-    if(fy === null && ty === null) return "";
-    return ` (${fy ?? "?"}–${ty ?? "?"})`;
-  }
-
-  function formatPartnerStatus(status){
-    const s = String(status || "").toUpperCase();
-    if(s === "GIFT") return "Gift";
-    if(s === "SAMBO") return "Sambo";
-    if(s === "SARBO") return "Särbo";
-    if(s === "SKILDA") return "Skilda";
-    return status ? String(status) : "Partner";
-  }
-
   // =========================
   // Leaflet init
   // =========================
@@ -273,8 +258,6 @@
 
   // =========================
   // Relation-indexering
-  // - FORALDER_BARN: parentsOf/childrenOf
-  // - PARTNER: partnersOf
   // =========================
   function buildRelationIndex(rels){
     const parentsOf = {};   // childId -> [parentId]
@@ -301,32 +284,39 @@
         const b = String(r.personBId || "");
         if(!a || !b || a === b) continue;
 
-        const entryA = { otherId: b, status: r.status, fromYear: r.fromYear ?? null, toYear: r.toYear ?? null };
-        const entryB = { otherId: a, status: r.status, fromYear: r.fromYear ?? null, toYear: r.toYear ?? null };
+        const status = String(r.status || "");
+        const fromYear = (r.fromYear ?? null);
+        const toYear = (r.toYear ?? null);
 
         if(!partnersOf[a]) partnersOf[a] = [];
         if(!partnersOf[b]) partnersOf[b] = [];
 
-        // undvik dubletter
-        const existsA = partnersOf[a].some(x =>
-          String(x.otherId) === b &&
-          String(x.status || "") === String(entryA.status || "") &&
-          (x.fromYear ?? null) === (entryA.fromYear ?? null) &&
-          (x.toYear ?? null) === (entryA.toYear ?? null)
-        );
-        if(!existsA) partnersOf[a].push(entryA);
-
-        const existsB = partnersOf[b].some(x =>
-          String(x.otherId) === a &&
-          String(x.status || "") === String(entryB.status || "") &&
-          (x.fromYear ?? null) === (entryB.fromYear ?? null) &&
-          (x.toYear ?? null) === (entryB.toYear ?? null)
-        );
-        if(!existsB) partnersOf[b].push(entryB);
+        partnersOf[a].push({ otherId: b, status, fromYear, toYear });
+        partnersOf[b].push({ otherId: a, status, fromYear, toYear });
       }
     }
 
     return { parentsOf, childrenOf, partnersOf };
+  }
+
+  function relationBadgeText(pr, byId){
+    const other = byId[pr.otherId];
+    const name = other ? `${formatName(other)}${formatYears(other)}` : pr.otherId;
+
+    const status = pr.status ? pr.status : "PARTNER";
+    const fy = (pr.fromYear ?? null);
+    const ty = (pr.toYear ?? null);
+    const yearText = (fy !== null || ty !== null) ? ` (${fy ?? "?"}–${ty ?? "?"})` : "";
+
+    // stillsamt: "Gift (1924–1938) — Namn"
+    const statusText =
+      status === "GIFT" ? "Gift" :
+      status === "SAMBO" ? "Sambo" :
+      status === "SARBO" ? "Särbo" :
+      status === "SKILDA" ? "Skilda" :
+      status;
+
+    return `${statusText}${yearText} — ${name}`;
   }
 
   function renderPersonList(ids, byId){
@@ -340,20 +330,20 @@
   }
 
   function renderPartnerList(personId, partnersOf, byId){
-    const list = partnersOf[personId] || [];
+    const list = partnersOf?.[personId] || [];
     if(!list || list.length === 0) return "<div class='muted'>—</div>";
 
-    const items = list
-      .map(x => {
-        const other = byId[x.otherId];
-        const otherName = other ? `${formatName(other)}${formatYears(other)}` : `(okänd) — ${x.otherId}`;
-        const status = formatPartnerStatus(x.status);
-        const years = formatPartnerYears(x);
-        return `<li>${escapeHtml(otherName)} — ${escapeHtml(status)}${escapeHtml(years)}</li>`;
-      })
-      .join("");
+    // avdupning (samma otherId+status+år kan finnas flera gånger om man skapar dubletter)
+    const seen = new Set();
+    const items = [];
+    for(const pr of list){
+      const key = `${pr.otherId}|${pr.status}|${pr.fromYear ?? ""}|${pr.toYear ?? ""}`;
+      if(seen.has(key)) continue;
+      seen.add(key);
+      items.push(`<li>${escapeHtml(relationBadgeText(pr, byId))}</li>`);
+    }
 
-    return `<ul>${items}</ul>`;
+    return `<ul>${items.join("")}</ul>`;
   }
 
   // =========================
@@ -406,10 +396,10 @@
 
     const { parentsOf, childrenOf, partnersOf } = buildRelationIndex(safeRels);
 
-    // marker-index (personId -> LatLng)
+    // skapa marker-index (personId -> LatLng)
     const posById = {};
 
-    // markörer
+    // lägg markörer
     let countWithCoords = 0;
     for(const p of safeCards){
       const c = parseCoordsObj(p);
@@ -418,19 +408,28 @@
       countWithCoords++;
       posById[p.id] = L.latLng(c.lat, c.lon);
 
+      const parents = parentsOf[p.id] || [];
+      const kids = childrenOf[p.id] || [];
+      const partners = partnersOf[p.id] || [];
+
       const popupHtml = `
         <div class="popup">
           <h3>${escapeHtml(formatName(p))}${escapeHtml(formatYears(p))}</h3>
           <div class="meta">${escapeHtml(p.plats || "")}</div>
+          <div class="submuted">
+            Föräldrar: <strong>${parents.length}</strong> ·
+            Barn: <strong>${kids.length}</strong> ·
+            Partner: <strong>${partners.length}</strong>
+          </div>
 
-          <div class="sectionTitle">Partner</div>
+          <div class="sectionTitle">Föräldrar (${parents.length})</div>
+          ${renderPersonList(parents, byId)}
+
+          <div class="sectionTitle">Barn (${kids.length})</div>
+          ${renderPersonList(kids, byId)}
+
+          <div class="sectionTitle">Partner (${partners.length})</div>
           ${renderPartnerList(p.id, partnersOf, byId)}
-
-          <div class="sectionTitle">Föräldrar</div>
-          ${renderPersonList(parentsOf[p.id] || [], byId)}
-
-          <div class="sectionTitle">Barn</div>
-          ${renderPersonList(childrenOf[p.id] || [], byId)}
         </div>
       `;
 
@@ -456,7 +455,7 @@
       return;
     }
 
-    // linjer (bara FORALDER_BARN, om coords finns)
+    // rita linjer (FAS 2: bara FORALDER_BARN och bara om båda har coords)
     let drawnLines = 0;
     if(showLines){
       for(const r of safeRels){
