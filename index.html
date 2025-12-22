@@ -15,8 +15,18 @@
     .card p { margin:0; color:#555; font-size:0.95rem; line-height:1.4; }
     .card a { margin-top:auto; display:inline-block; text-decoration:none; border:1px solid #333; border-radius:10px; padding:10px 14px; color:#111; font-weight:600; background:#fff; width:fit-content; }
     .card a:hover { background:#f0f0f0; }
+
     .card.status { border-left: 6px solid #b00020; }
     .card.status a { border-color:#b00020; }
+
+    .card.primary {
+      border-left: 6px solid #2b5cff;
+    }
+    .card.primary a {
+      border-color:#2b5cff;
+      font-weight:800;
+    }
+
     footer { margin-top: 40px; font-size:0.9rem; color:#666; }
     code { background:#eee; padding:2px 6px; border-radius:6px; }
   </style>
@@ -40,6 +50,16 @@
         <a href="./app/trees.html">Skapa / välj släktträd</a>
       </div>
 
+      <!-- NY: HELHETSVY -->
+      <div class="card primary">
+        <h2>🗺️ Släktkarta (hel vy)</h2>
+        <p>
+          Visa hela släkten i aktivt träd på karta.
+          Flaggar med namn, klick → relationer och detaljer.
+        </p>
+        <a href="./app/map.html">Öppna släktkartan</a>
+      </div>
+
       <div class="card">
         <h2>🌳 Släktträd</h2>
         <p>Skapa, välj och byt aktivt släktträd.</p>
@@ -54,25 +74,25 @@
 
       <div class="card">
         <h2>🔗 Relationer</h2>
-        <p>Koppla personer (förälder → barn, m.m.).</p>
+        <p>Koppla personer (förälder → barn).</p>
         <a href="./app/create-relation.html">Skapa relation</a>
       </div>
 
       <div class="card">
-        <h2>🗺️ Karta (platsväljare)</h2>
+        <h2>📍 Platsväljare</h2>
         <p>Välj plats i karta och spara lat/lon till släktkort.</p>
-        <a href="./app/place-picker.html">Öppna karta</a>
+        <a href="./app/place-picker.html">Öppna platsväljare</a>
       </div>
 
       <div class="card">
-        <h2>🧬 Trädvy</h2>
-        <p>Visuell vy av släktträdet (demo nu, byggs ut senare).</p>
+        <h2>🧬 Trädvy (struktur)</h2>
+        <p>Visuell trädstruktur (demo nu, byggs ut senare).</p>
         <a href="./app/tree.html">Öppna trädvy</a>
       </div>
     </div>
 
     <footer>
-      <p>Status: <strong>GitHub Pages</strong> (statisk) • Backend körs separat (t.ex. Codespaces).</p>
+      <p>Status: <strong>GitHub Pages</strong> (statisk) • Data i webbläsaren • Backend valfritt senare.</p>
     </footer>
   </div>
 </body>
