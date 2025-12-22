@@ -1,276 +1,468 @@
 <!doctype html>
 <html lang="sv">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Skapa släktkort</title>
-    <meta name="description" content="Skapa ett släktkort (person) för släktträdet." />
-    <style>
-      :root { color-scheme: light; }
-      body {
-        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-        line-height: 1.5;
-        margin: 0;
-        padding: 24px;
-        max-width: 900px;
-      }
-      a { color: inherit; }
-      header { margin-bottom: 18px; }
-      h1 { margin: 0 0 6px; }
-      p { margin: 0 0 12px; }
-      .muted { color: #555; }
-      .card {
-        border: 1px solid #ddd;
-        border-radius: 10px;
-        padding: 16px;
-        margin: 14px 0;
-      }
-      label { display: block; margin: 10px 0 6px; font-weight: 600; }
-      input, select, textarea {
-        width: 100%;
-        box-sizing: border-box;
-        padding: 10px 10px;
-        border: 1px solid #bbb;
-        border-radius: 8px;
-        font: inherit;
-        background: #fff;
-      }
-      textarea { min-height: 120px; resize: vertical; }
-      .row {
-        display: grid;
-        gap: 12px;
-        grid-template-columns: 1fr;
-      }
-      @media (min-width: 720px) {
-        .row.two { grid-template-columns: 1fr 1fr; }
-      }
-      .actions {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-        margin-top: 14px;
-      }
-      button, .button-link {
-        display: inline-block;
-        padding: 10px 12px;
-        border: 1px solid #333;
-        border-radius: 8px;
-        background: #fff;
-        font: inherit;
-        cursor: pointer;
-        text-decoration: none;
-      }
-      button:focus, .button-link:focus { outline: 2px solid #000; outline-offset: 2px; }
-      pre {
-        background: #f4f4f4;
-        padding: 12px;
-        border-radius: 10px;
-        overflow: auto;
-      }
-      code { background: #f4f4f4; padding: 2px 6px; border-radius: 6px; }
-      .hint { margin-top: 10px; }
-      .error { color: #b00020; font-weight: 700; }
-      .ok { font-weight: 800; }
-      .pill {
-        display: inline-block;
-        padding: 2px 8px;
-        border: 1px solid #bbb;
-        border-radius: 999px;
-        font-size: 0.9rem;
-        margin-left: 6px;
-      }
-      .danger { border-color: #b00020; }
-    </style>
-  </head>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Skapa person – Släktkort</title>
+  <meta name="description" content="Skapa en person (släktkort) i aktivt träd (localStorage)." />
 
-    <section class="card" aria-label="Formulär">
-      <form id="form">
-        <div class="row two">
-          <div>
-            <label for="fornamn">Förnamn *</label>
-            <input id="fornamn" name="fornamn" required maxlength="80" autocomplete="given-name" />
-          </div>
-          <div>
-            <label for="efternamn">Efternamn *</label>
-            <input id="efternamn" name="efternamn" required maxlength="80" autocomplete="family-name" />
-          </div>
-        </div>
+  <style>
+    :root { color-scheme: light; }
+    body{
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      line-height: 1.5;
+      margin: 0;
+      padding: 24px;
+      max-width: 980px;
+      margin-inline: auto;
+      background: #fff;
+      color: #111;
+    }
+    a{ color: inherit; text-decoration: none; }
+    header{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    h1{ margin: 0 0 6px; font-size: 1.6rem; }
+    p{ margin: 0 0 12px; }
+    .muted{ color:#555; }
 
-        <div class="row two">
-          <div>
-            <label for="kon">Kön</label>
-            <select id="kon" name="kon">
-              <option value="Okänt" selected>Okänt</option>
-              <option value="Kvinna">Kvinna</option>
-              <option value="Man">Man</option>
-            </select>
-          </div>
-          <div>
-            <label for="plats">Plats</label>
-            <input id="plats" name="plats" maxlength="120" placeholder="t.ex. Småland" />
-          </div>
-        </div>
+    .topbar{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin: 10px 0 0;
+    }
 
-        <div class="row two">
-          <div>
-            <label for="fodelsear">Födelseår</label>
-            <input id="fodelsear" name="fodelsear" inputmode="numeric" placeholder="t.ex. 1874" />
-          </div>
-          <div>
-            <label for="dodsar">Dödsår</label>
-            <input id="dodsar" name="dodsar" inputmode="numeric" placeholder="t.ex. 1932 (eller tomt)" />
-          </div>
-        </div>
+    .btn, button{
+      display:inline-block;
+      padding: 10px 12px;
+      border: 1px solid #333;
+      border-radius: 10px;
+      background: #fff;
+      font: inherit;
+      cursor: pointer;
+      text-decoration:none;
+    }
+    .btn.secondary{ border-color:#bbb; }
+    .btn.danger{ border-color:#b00020; color:#b00020; }
+    .btn.disabled{
+      opacity:.45;
+      cursor:not-allowed;
+      pointer-events:none;
+    }
 
+    .pillRow{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin: 10px 0 18px;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 8px 10px;
+      border: 1px solid #ddd;
+      border-radius: 999px;
+      background: #fafafa;
+      font-size: .95rem;
+    }
+    .pill strong{ font-weight: 900; }
+    .pill.ok{ border-color:#cfe8cf; background:#f5fff5; }
+    .pill.warn{ border-color:#ffe1a6; background:#fff9ee; }
+
+    .note{
+      margin: 0 0 18px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid #ffe1a6;
+      background: #fff9ee;
+    }
+    .note strong{ font-weight: 900; }
+
+    .grid{
+      display:grid;
+      gap: 14px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 860px){
+      .grid{ grid-template-columns: 1fr 1fr; }
+    }
+
+    .card{
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      padding: 16px;
+      background: #fff;
+    }
+    .card h2{ margin: 0 0 6px; font-size: 1.15rem; }
+
+    label{ display:block; margin: 10px 0 6px; font-weight: 800; }
+    input, select, textarea{
+      width: 100%;
+      box-sizing:border-box;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid #bbb;
+      font: inherit;
+      background:#fff;
+    }
+    textarea{ min-height: 120px; resize: vertical; }
+
+    .row2{ display:grid; grid-template-columns: 1fr; gap: 12px; }
+    @media (min-width: 720px){
+      .row2{ grid-template-columns: 1fr 1fr; }
+    }
+
+    .actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top: 12px;
+      align-items:center;
+    }
+
+    .error{ color:#b00020; font-weight: 900; }
+    .ok{ font-weight: 900; }
+
+    pre{
+      background:#f4f4f4;
+      padding: 12px;
+      border-radius: 12px;
+      overflow:auto;
+      white-space: pre-wrap;
+      margin: 10px 0 0;
+    }
+    code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
+    footer{ margin-top: 18px; color:#666; font-size:.95rem; }
+  </style>
+</head>
+
+<body>
+<header>
+  <div>
+    <h1>➕ Skapa person</h1>
+    <p class="muted">Snabbform för att lägga in en person i <strong>aktivt träd</strong> (localStorage).</p>
+
+    <nav class="topbar" aria-label="Navigation">
+      <a class="btn secondary" href="start.html">Start</a>
+      <a class="btn secondary" href="trees.html">Träd</a>
+      <a class="btn secondary" href="slaktkort.html">Personer</a>
+      <a class="btn secondary" href="create-relation.html">Relationer</a>
+      <a class="btn secondary" href="map.html">Karta</a>
+    </nav>
+  </div>
+
+  <div class="actions" style="justify-content:flex-end; max-width: 360px;">
+    <button id="logoutBtn" class="btn secondary" type="button">Logga ut</button>
+  </div>
+</header>
+
+<section class="pillRow" aria-label="Status">
+  <span id="pillTree" class="pill warn">Aktivt träd: <strong>—</strong></span>
+  <span id="pillCount" class="pill">Personer i trädet: <strong>0</strong></span>
+  <span id="pillNext" class="pill warn">Nästa steg: <strong>Välj träd</strong></span>
+</section>
+
+<div id="noteBox" class="note" hidden></div>
+
+<section class="grid">
+  <section class="card" aria-label="Formulär">
+    <h2>Formulär</h2>
+
+    <form id="form">
+      <div class="row2">
         <div>
-          <label for="anteckning">Anteckning</label>
-          <textarea id="anteckning" name="anteckning" maxlength="2000" placeholder="Fri text…"></textarea>
+          <label for="fornamn">Förnamn *</label>
+          <input id="fornamn" name="fornamn" required maxlength="80" autocomplete="given-name" />
         </div>
-
-        <div class="actions">
-          <button type="submit">Spara släktkort</button>
-          <button type="button" id="resetBtn">Rensa</button>
-          <button type="button" id="exportBtn">Exportera JSON</button>
-          <button type="button" id="clearBtn" class="danger" title="Tar bort allt sparat i webbläsaren">Rensa all sparad data</button>
-          <a class="button-link" href="./index.html">Tillbaka</a>
+        <div>
+          <label for="efternamn">Efternamn *</label>
+          <input id="efternamn" name="efternamn" required maxlength="80" autocomplete="family-name" />
         </div>
+      </div>
 
-        <p id="msg" class="hint muted" aria-live="polite"></p>
-      </form>
-    </section>
+      <div class="row2">
+        <div>
+          <label for="kon">Kön</label>
+          <select id="kon" name="kon">
+            <option value="Okänt" selected>Okänt</option>
+            <option value="Kvinna">Kvinna</option>
+            <option value="Man">Man</option>
+          </select>
+        </div>
+        <div>
+          <label for="plats">Plats</label>
+          <input id="plats" name="plats" maxlength="120" placeholder="t.ex. Småland" />
+        </div>
+      </div>
 
-    <section class="card" aria-label="Senast sparat">
-      <h2 style="margin:0 0 8px;">Senast sparat släktkort</h2>
-      <pre><code id="out">{}</code></pre>
-      <p class="muted" style="margin:10px 0 0;">
-        Relationer skapas i <code>create-relation.html</code> och kan använda dessa sparade personer.
-      </p>
-    </section>
+      <div class="row2">
+        <div>
+          <label for="fodelsear">Födelseår</label>
+          <input id="fodelsear" name="fodelsear" inputmode="numeric" placeholder="t.ex. 1874" />
+        </div>
+        <div>
+          <label for="dodsar">Dödsår</label>
+          <input id="dodsar" name="dodsar" inputmode="numeric" placeholder="t.ex. 1932 (eller tomt)" />
+        </div>
+      </div>
 
-    <script>
-      const KEY_PERSONS = "slakttradet_slaktkort";
-      const KEY_RELATIONS = "slakttradet_relationer";
+      <div>
+        <label for="anteckning">Anteckning</label>
+        <textarea id="anteckning" name="anteckning" maxlength="2000" placeholder="Fri text…"></textarea>
+      </div>
 
-      const form = document.getElementById("form");
-      const out = document.getElementById("out");
-      const msg = document.getElementById("msg");
-      const resetBtn = document.getElementById("resetBtn");
-      const exportBtn = document.getElementById("exportBtn");
-      const clearBtn = document.getElementById("clearBtn");
-      const countEl = document.getElementById("count");
+      <div class="actions">
+        <button type="submit" class="btn">Spara person</button>
+        <button type="button" id="resetBtn" class="btn secondary">Rensa</button>
+        <button type="button" id="exportBtn" class="btn secondary">Exportera JSON</button>
+        <button type="button" id="clearBtn" class="btn danger" title="Rensar personer + relationer i aktivt träd">Rensa data i aktivt träd</button>
+        <a id="continueBtn" class="btn disabled" href="create-relation.html" aria-disabled="true" tabindex="-1">Fortsätt → Relationer</a>
+      </div>
 
-      function safeParse(json, fallback) {
-        try { return JSON.parse(json); } catch { return fallback; }
+      <p id="msg" class="muted" aria-live="polite"></p>
+    </form>
+  </section>
+
+  <section class="card" aria-label="Senast sparat">
+    <h2>Senast sparat</h2>
+    <pre><code id="out">{}</code></pre>
+    <p class="muted" style="margin:10px 0 0;">
+      Relationer skapas i <code>create-relation.html</code> och använder personer i aktivt träd.
+    </p>
+    <div class="actions">
+      <a class="btn secondary" href="slaktkort.html">Öppna Personer</a>
+      <a class="btn secondary" href="trees.html">Byt träd</a>
+    </div>
+  </section>
+</section>
+
+<footer>
+  Rekommendation: använd helst bara <strong>slaktkort.html</strong> som personsida och ta bort denna sida om du inte behöver en snabbform.
+</footer>
+
+<script>
+  // Estetisk auth
+  (function authGuard(){
+    try{
+      if(sessionStorage.getItem("demo_auth") !== "1"){
+        window.location.href = "index.html";
       }
+    }catch{}
+  })();
 
-      function loadPersons() {
-        const raw = localStorage.getItem(KEY_PERSONS);
-        const arr = safeParse(raw, []);
-        return Array.isArray(arr) ? arr : [];
-      }
+  const KEY_TREES  = "slakttradet_trees";
+  const KEY_ACTIVE = "slakttradet_active_tree_id";
+  function cardsKey(treeId){ return "slakttradet_slaktkort_" + String(treeId); }
+  function relKey(treeId){ return "slakttradet_relationer_" + String(treeId); }
 
-      function savePersons(arr) {
-        localStorage.setItem(KEY_PERSONS, JSON.stringify(arr));
-      }
+  const form = document.getElementById("form");
+  const out = document.getElementById("out");
+  const msg = document.getElementById("msg");
+  const resetBtn = document.getElementById("resetBtn");
+  const exportBtn = document.getElementById("exportBtn");
+  const clearBtn = document.getElementById("clearBtn");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const continueBtn = document.getElementById("continueBtn");
 
-      function setCount() {
-        countEl.textContent = String(loadPersons().length);
-      }
+  const pillTree = document.getElementById("pillTree");
+  const pillCount = document.getElementById("pillCount");
+  const pillNext = document.getElementById("pillNext");
+  const noteBox = document.getElementById("noteBox");
 
-      function toYearOrNull(value) {
-        const v = String(value || "").trim();
-        if (!v) return null;
-        if (!/^\d{3,4}$/.test(v)) return "__INVALID_YEAR__";
-        const n = Number(v);
-        if (n < 0 || n > 9999) return "__INVALID_YEAR__";
-        return n;
-      }
+  function safeParse(json, fallback){
+    try { return JSON.parse(json); } catch { return fallback; }
+  }
+  function loadJson(key, fallback){
+    const raw = localStorage.getItem(key);
+    return raw ? safeParse(raw, fallback) : fallback;
+  }
+  function saveJson(key, value){
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+  function getActiveTreeId(){
+    return localStorage.getItem(KEY_ACTIVE) || "";
+  }
+  function getActiveTreeLabel(){
+    const activeId = getActiveTreeId();
+    const trees = loadJson(KEY_TREES, []);
+    if(!activeId) return "—";
+    const t = Array.isArray(trees) ? trees.find(x => String(x.id) === String(activeId)) : null;
+    return t ? (t.name || t.id) : activeId;
+  }
+  function loadPersons(treeId){
+    const arr = loadJson(cardsKey(treeId), []);
+    return Array.isArray(arr) ? arr : [];
+  }
+  function savePersons(treeId, arr){
+    saveJson(cardsKey(treeId), arr);
+  }
+  function setDisabled(el, disabled){
+    if(disabled){
+      el.classList.add("disabled");
+      el.setAttribute("aria-disabled","true");
+      el.setAttribute("tabindex","-1");
+    }else{
+      el.classList.remove("disabled");
+      el.removeAttribute("aria-disabled");
+      el.removeAttribute("tabindex");
+    }
+  }
+  function toYearOrNull(value){
+    const v = String(value || "").trim();
+    if(!v) return null;
+    if(!/^\d{3,4}$/.test(v)) return "__INVALID_YEAR__";
+    const n = Number(v);
+    if(n < 0 || n > 9999) return "__INVALID_YEAR__";
+    return n;
+  }
+  function makeId(){
+    return "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
 
-      function makeId() {
-        const s = String(Date.now());
-        return "p" + s.slice(-6);
-      }
+  function refreshStatus(){
+    const activeId = getActiveTreeId();
+    if(!activeId){
+      pillTree.classList.remove("ok"); pillTree.classList.add("warn");
+      pillTree.innerHTML = 'Aktivt träd: <strong>—</strong>';
+      pillCount.innerHTML = 'Personer i trädet: <strong>0</strong>';
+      pillNext.classList.remove("ok"); pillNext.classList.add("warn");
+      pillNext.innerHTML = 'Nästa steg: <strong>Välj träd</strong>';
+      noteBox.hidden = false;
+      noteBox.innerHTML = '<strong>🚩 Inget aktivt träd valt:</strong> Gå till <a href="trees.html">Träd</a> och välj/skapa ett träd.';
+      setDisabled(continueBtn, true);
+      return;
+    }
 
-      function escapeForDisplay(obj) {
-        return JSON.stringify(obj, null, 2);
-      }
+    const label = getActiveTreeLabel();
+    const count = loadPersons(activeId).length;
 
-      form.addEventListener("submit", (e) => {
-        e.preventDefault();
-        msg.textContent = "";
+    pillTree.classList.remove("warn"); pillTree.classList.add("ok");
+    pillTree.innerHTML = 'Aktivt träd: <strong>' + label + '</strong>';
+    pillCount.innerHTML = 'Personer i trädet: <strong>' + count + '</strong>';
 
-        const fornamn = form.fornamn.value.trim();
-        const efternamn = form.efternamn.value.trim();
-        if (!fornamn || !efternamn) {
-          msg.innerHTML = '<span class="error">Förnamn och efternamn krävs.</span>';
-          return;
-        }
+    if(count < 2){
+      pillNext.classList.remove("ok"); pillNext.classList.add("warn");
+      pillNext.innerHTML = 'Nästa steg: <strong>Lägg till fler personer</strong>';
+      noteBox.hidden = false;
+      noteBox.innerHTML = '<strong>Tip:</strong> Lägg in minst <strong>2 personer</strong> innan du går vidare till Relationer.';
+      setDisabled(continueBtn, true);
+      return;
+    }
 
-        const fodelsear = toYearOrNull(form.fodelsear.value);
-        const dodsar = toYearOrNull(form.dodsar.value);
+    pillNext.classList.remove("warn"); pillNext.classList.add("ok");
+    pillNext.innerHTML = 'Nästa steg: <strong>Relationer</strong>';
+    noteBox.hidden = true;
+    setDisabled(continueBtn, false);
+  }
 
-        if (fodelsear === "__INVALID_YEAR__" || dodsar === "__INVALID_YEAR__") {
-          msg.innerHTML = '<span class="error">Födelseår/Dödsår måste vara tomt eller 3–4 siffror (t.ex. 1874).</span>';
-          return;
-        }
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    msg.textContent = "";
 
-        const person = {
-          id: makeId(),
-          fornamn,
-          efternamn,
-          kon: form.kon.value,
-          fodelsear,
-          dodsar,
-          plats: form.plats.value.trim(),
-          anteckning: form.anteckning.value.trim()
-        };
+    const activeId = getActiveTreeId();
+    if(!activeId){
+      msg.innerHTML = '<span class="error">Välj ett aktivt träd först.</span>';
+      refreshStatus();
+      return;
+    }
 
-        const persons = loadPersons();
-        persons.push(person);
-        savePersons(persons);
+    const fornamn = form.fornamn.value.trim();
+    const efternamn = form.efternamn.value.trim();
+    if(!fornamn || !efternamn){
+      msg.innerHTML = '<span class="error">Förnamn och efternamn krävs.</span>';
+      return;
+    }
 
-        out.textContent = escapeForDisplay(person);
-        msg.innerHTML = '<span class="ok">Sparat.</span> Släktkortet sparades i webbläsaren (LocalStorage).';
-        setCount();
-        form.reset();
-      });
+    const fodelsear = toYearOrNull(form.fodelsear.value);
+    const dodsar = toYearOrNull(form.dodsar.value);
+    if(fodelsear === "__INVALID_YEAR__" || dodsar === "__INVALID_YEAR__"){
+      msg.innerHTML = '<span class="error">Födelseår/Dödsår måste vara tomt eller 3–4 siffror (t.ex. 1874).</span>';
+      return;
+    }
 
-      resetBtn.addEventListener("click", () => {
-        form.reset();
-        msg.textContent = "";
-      });
+    const person = {
+      id: makeId(),
+      fornamn,
+      efternamn,
+      kon: form.kon.value,
+      fodelsear,
+      dodsar,
+      plats: form.plats.value.trim(),
+      anteckning: form.anteckning.value.trim(),
+      createdAt: new Date().toISOString()
+    };
 
-      exportBtn.addEventListener("click", () => {
-        const persons = loadPersons();
-        const payload = { slaktkort: persons };
+    const persons = loadPersons(activeId);
+    persons.push(person);
+    savePersons(activeId, persons);
 
-        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
+    out.textContent = JSON.stringify(person, null, 2);
+    msg.innerHTML = '<span class="ok">Sparat.</span> Personen sparades i aktivt träd.';
+    form.reset();
+    refreshStatus();
+  });
 
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "slaktkort.export.json";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
+  resetBtn.addEventListener("click", () => {
+    form.reset();
+    msg.textContent = "";
+  });
 
-        URL.revokeObjectURL(url);
-        msg.innerHTML = '<span class="ok">Export klar.</span> En JSON-fil laddades ner.';
-      });
+  exportBtn.addEventListener("click", () => {
+    const activeId = getActiveTreeId();
+    if(!activeId){
+      msg.innerHTML = '<span class="error">Välj ett aktivt träd först.</span>';
+      refreshStatus();
+      return;
+    }
+    const persons = loadPersons(activeId);
+    const payload = { activeTreeId: activeId, slaktkort: persons };
 
-      clearBtn.addEventListener("click", () => {
-        const yes = confirm("Rensa all sparad data för Släktträdet i webbläsaren?\n\nDetta tar bort sparade släktkort och relationer.");
-        if (!yes) return;
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
 
-        localStorage.removeItem(KEY_PERSONS);
-        localStorage.removeItem(KEY_RELATIONS);
-        out.textContent = "{}";
-        msg.innerHTML = '<span class="ok">Rensat.</span> All lokal data är borttagen.';
-        setCount();
-      });
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "slaktkort.export.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
 
-      // init
-      setCount();
-    </script>
-  </body>
+    URL.revokeObjectURL(url);
+    msg.innerHTML = '<span class="ok">Export klar.</span> En JSON-fil laddades ner.';
+  });
+
+  clearBtn.addEventListener("click", () => {
+    const activeId = getActiveTreeId();
+    if(!activeId){
+      msg.innerHTML = '<span class="error">Välj ett aktivt träd först.</span>';
+      refreshStatus();
+      return;
+    }
+    const yes = confirm("Rensa personer + relationer i aktivt träd?\n\nDetta tar bort data lokalt i webbläsaren för just detta träd.");
+    if(!yes) return;
+
+    savePersons(activeId, []);
+    saveJson(relKey(activeId), []);
+
+    out.textContent = "{}";
+    msg.innerHTML = '<span class="ok">Rensat.</span> Aktivt träd är nu tomt.';
+    refreshStatus();
+  });
+
+  logoutBtn.addEventListener("click", () => {
+    try{ sessionStorage.removeItem("demo_auth"); }catch{}
+    window.location.href = "index.html";
+  });
+
+  refreshStatus();
+</script>
+</body>
 </html>
