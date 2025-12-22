@@ -321,14 +321,16 @@
   // ============================
   function safeParse(raw, fallback){ try{ return JSON.parse(raw); }catch{ return fallback; } }
   function loadJson(key, fallback){
-    const raw = localStorage.getItem(key);
-    return raw ? safeParse(raw, fallback) : fallback;
+    try{
+      const raw = localStorage.getItem(key);
+      return raw ? safeParse(raw, fallback) : fallback;
+    }catch{
+      return fallback;
+    }
   }
-  function saveJson(key, value){
-    localStorage.setItem(key, JSON.stringify(value));
+  function activeTreeId(){
+    try{ return localStorage.getItem(KEY_ACTIVE) || ""; }catch{ return ""; }
   }
-
-  function activeTreeId(){ return localStorage.getItem(KEY_ACTIVE) || ""; }
   function getTrees(){
     const trees = loadJson(KEY_TREES, []);
     return Array.isArray(trees) ? trees : [];
@@ -418,6 +420,17 @@
     map.setView(m.getLatLng(), Math.max(map.getZoom(), 10), { animate: true });
   }
 
+  function fitTo(ids){
+    const ll = [];
+    for(const id of ids){
+      const m = markersById.get(String(id));
+      if(m) ll.push(m.getLatLng());
+    }
+    if(ll.length === 0) return false;
+    map.fitBounds(L.latLngBounds(ll).pad(0.2));
+    return true;
+  }
+
   function fitToAll(){
     const ll = [];
     markersById.forEach(m => ll.push(m.getLatLng()));
@@ -464,7 +477,7 @@
   }
 
   // ============================
-  // Render
+  // Render helpers
   // ============================
   function renderHint(hasTrees, hasActive, peopleWithCoords){
     if(!hasTrees){
@@ -521,10 +534,11 @@
     }
   }
 
-  function renderMarkers(people){
+  // PATCH: renderMarkers ska alltid bygga ALLA coords/markers (inte bara filter)
+  function renderMarkers(allPeopleWithCoords){
     clearMarkers();
 
-    for(const p of people){
+    for(const p of allPeopleWithCoords){
       const c = coordsFromPerson(p);
       if(!c) continue;
 
@@ -537,6 +551,7 @@
     }
   }
 
+  // PATCH: renderLinks ska använda coordsById från ALLA med coords
   function renderLinks(relations){
     clearLinks();
 
@@ -604,15 +619,30 @@
 
     renderHint(hasTrees, hasActive, peopleWithCoords);
 
+    // LISTA: filtrerad
     renderList(filtered);
-    renderMarkers(filtered);
 
+    // PATCH: MARKÖRER + COORDS: alltid alla med coords
+    renderMarkers(peopleWithCoords);
+
+    // LINKS: rita baserat på alla coords
     const drawn = renderLinks(allRelations);
 
+    // Zoom-logik: om filter finns → zooma till filtrerade, annars alla
+    const hasQuery = String(searchEl.value || "").trim().length > 0;
     if(markersById.size > 0){
-      fitToAll();
+      if(hasQuery){
+        const ids = filtered.map(p => String(p.id));
+        if(!fitTo(ids)) fitToAll();
+      }else{
+        fitToAll();
+      }
+
+      // Leaflet kan behöva detta när layout ändras / efter render
+      setTimeout(() => map.invalidateSize(true), 0);
+
       msg.innerHTML =
-        "<span class='ok'>Klar.</span> Visar " + markersById.size +
+        "<span class='ok'>Klar.</span> Visar " + peopleWithCoords.length +
         " markör(er) och " + drawn + " koppling(ar).";
     }else{
       msg.innerHTML =
