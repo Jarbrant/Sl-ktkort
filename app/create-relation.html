@@ -3,8 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Skapa relation</title>
-  <meta name="description" content="Skapa relationer i aktivt släktträd (localStorage)." />
+  <title>Relationer – Släktkort</title>
+  <meta name="description" content="Steg 3: Skapa relationer (Förälder→Barn) i aktivt träd. Draft sparas så val inte tappas." />
+
   <style>
     :root { color-scheme: light; }
     body{
@@ -12,83 +13,152 @@
       line-height: 1.5;
       margin: 0;
       padding: 24px;
-      max-width: 900px;
+      max-width: 980px;
       margin-inline: auto;
       background: #fff;
       color: #111;
     }
-    a { color: inherit; }
-    header { margin-bottom: 18px; }
-    h1 { margin: 0 0 6px; }
-    p { margin: 0 0 12px; }
-    .muted { color: #555; }
+    a{ color: inherit; text-decoration:none; }
+    header{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:18px;
+    }
+    h1{ margin:0 0 6px; font-size:1.6rem; }
+    .muted{ color:#555; margin:0 0 12px; }
+
+    .topbar{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin: 10px 0 0;
+    }
+    .btn, button{
+      display:inline-block;
+      padding:10px 12px;
+      border:1px solid #333;
+      border-radius:10px;
+      background:#fff;
+      font:inherit;
+      cursor:pointer;
+      text-decoration:none;
+    }
+    .btn.secondary{ border-color:#bbb; }
+    .btn.danger{ border-color:#b00020; color:#b00020; }
+    .btn.disabled{
+      opacity:.45;
+      cursor:not-allowed;
+      pointer-events:none;
+    }
+
+    .pillRow{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin: 10px 0 18px;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 10px;
+      border:1px solid #ddd;
+      border-radius:999px;
+      background:#fafafa;
+      font-size:.95rem;
+    }
+    .pill strong{ font-weight:900; }
+    .pill.ok{ border-color:#cfe8cf; background:#f5fff5; }
+    .pill.warn{ border-color:#ffe1a6; background:#fff9ee; }
+
     .card{
-      border: 1px solid #ddd;
-      border-radius: 10px;
-      padding: 16px;
+      border:1px solid #ddd;
+      border-radius:12px;
+      padding:16px;
+      background:#fff;
       margin: 14px 0;
-      background: #fff;
     }
-    label { display: block; margin: 10px 0 6px; font-weight: 600; }
+    .card h2{ margin:0 0 6px; font-size:1.15rem; }
+    .small{ font-size:.95rem; color:#555; margin:0 0 10px; }
+
+    label{ display:block; margin:10px 0 6px; font-weight:800; }
     select, input{
-      width: 100%;
-      box-sizing: border-box;
-      padding: 10px 10px;
-      border: 1px solid #bbb;
-      border-radius: 8px;
-      font: inherit;
-      background: #fff;
+      width:100%;
+      box-sizing:border-box;
+      padding:10px;
+      border-radius:10px;
+      border:1px solid #bbb;
+      font:inherit;
+      background:#fff;
     }
-    .row{ display: grid; gap: 12px; grid-template-columns: 1fr; }
+
+    .row{ display:grid; grid-template-columns: 1fr; gap:12px; }
     @media (min-width: 720px){
       .row.two{ grid-template-columns: 1fr 1fr; }
     }
+
     .actions{
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-top: 14px;
-      align-items: center;
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-top: 12px;
     }
-    button, .button-link{
-      display: inline-block;
-      padding: 10px 12px;
-      border: 1px solid #333;
-      border-radius: 8px;
-      background: #fff;
-      font: inherit;
-      cursor: pointer;
-      text-decoration: none;
-    }
+
+    .error{ color:#b00020; font-weight:900; }
+    .ok{ font-weight:900; }
+
     pre{
-      background: #f4f4f4;
-      padding: 12px;
-      border-radius: 10px;
-      overflow: auto;
+      background:#f4f4f4;
+      padding:12px;
+      border-radius:12px;
+      overflow:auto;
       white-space: pre-wrap;
+      margin: 10px 0 0;
     }
-    code{ background: #f4f4f4; padding: 2px 6px; border-radius: 6px; }
-    .error{ color: #b00020; font-weight: 700; }
-    .ok{ font-weight: 800; }
-    .hidden{ display:none !important; }
   </style>
 </head>
 
 <body>
 <header>
-  <a href="../start.html">← Tillbaka</a>
-  <h1>Skapa relation</h1>
-  <p class="muted">Förälder → barn (max 2 föräldrar per barn). Data sparas i localStorage.</p>
+  <div>
+    <h1>Relationer</h1>
+    <p class="muted">Steg 3 i flödet. Draft sparas automatiskt så dina val inte försvinner.</p>
+
+    <nav class="topbar" aria-label="Navigation">
+      <a class="btn secondary" href="../start.html">Start</a>
+      <a class="btn secondary" href="./trees.html">Träd</a>
+      <a class="btn secondary" href="./slaktkort.html">Personer</a>
+      <a class="btn" href="./create-relation.html">Relationer</a>
+      <a class="btn secondary" href="./map.html">Karta</a>
+    </nav>
+  </div>
+
+  <div class="actions" style="justify-content:flex-end;">
+    <button id="logoutBtn" class="btn secondary" type="button">Logga ut</button>
+  </div>
 </header>
 
+<section class="pillRow" aria-label="Status">
+  <span id="pillTree" class="pill warn">Aktivt träd: <strong>—</strong></span>
+  <span id="pillPeople" class="pill">Personer: <strong>0</strong></span>
+  <span id="pillRels" class="pill">Relationer: <strong>0</strong></span>
+  <span id="pillNext" class="pill warn">Nästa steg: <strong>Personer</strong></span>
+</section>
+
 <section class="card">
-  <h2>Relation</h2>
+  <h2>1) Skapa relation</h2>
+  <p class="small">Förälder → barn (max 2 föräldrar per barn). Sparas i aktivt träd.</p>
 
   <form id="form">
     <div class="row two">
       <div>
-        <label for="relationType">Relationstyp *</label>
-        <select id="relationType">
+        <label for="relationType">Relationstyp</label>
+        <select id="relationType" disabled>
           <option value="FORALDER_BARN" selected>Förälder → Barn</option>
         </select>
       </div>
@@ -96,13 +166,13 @@
 
     <div class="row two">
       <div>
-        <label for="aSelect" id="aLabel">Förälder *</label>
+        <label for="aSelect">Förälder *</label>
         <select id="aSelect" required>
           <option value="">Välj…</option>
         </select>
       </div>
       <div>
-        <label for="bSelect" id="bLabel">Barn *</label>
+        <label for="bSelect">Barn *</label>
         <select id="bSelect" required>
           <option value="">Välj…</option>
         </select>
@@ -110,126 +180,325 @@
     </div>
 
     <div class="actions">
-      <button type="submit">Spara relation</button>
-      <button type="button" id="resetBtn">Rensa</button>
-      <a class="button-link" href="../start.html">Avbryt</a>
+      <button type="submit" class="btn">Spara relation</button>
+      <button type="button" id="resetBtn" class="btn secondary">Rensa val</button>
+      <a id="continueMap" class="btn disabled" href="./map.html" aria-disabled="true" tabindex="-1">Fortsätt → Karta</a>
     </div>
 
-    <p id="msg" class="muted"></p>
+    <p id="msg" class="muted" aria-live="polite"></p>
   </form>
 </section>
 
 <section class="card">
-  <h2>Relationer (aktivt träd)</h2>
+  <h2>2) Relationer i aktivt träd</h2>
+
   <div class="actions">
-    <button type="button" id="listBtn">Visa</button>
-    <button type="button" id="clearBtn">Töm</button>
+    <button type="button" id="listBtn" class="btn secondary">Visa</button>
+    <button type="button" id="clearBtn" class="btn danger">Töm relationer</button>
+    <button type="button" id="refreshBtn" class="btn secondary">Uppdatera listor</button>
   </div>
+
   <pre><code id="out">[]</code></pre>
 </section>
 
 <script>
+  // ============================
+  // Estetisk auth
+  // ============================
+  (function authGuard(){
+    try{
+      if(sessionStorage.getItem("demo_auth") !== "1"){
+        window.location.href = "../index.html";
+      }
+    }catch{}
+  })();
+
+  // ============================
+  // Keys
+  // ============================
   const KEY_TREES  = "slakttradet_trees";
   const KEY_ACTIVE = "slakttradet_active_tree_id";
-  const cardsKey = id => "slakttradet_slaktkort_" + id;
-  const relKey   = id => "slakttradet_relationer_" + id;
+
+  const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
+  const relKey   = (treeId) => "slakttradet_relationer_" + String(treeId);
+
+  // Draft (valda personer i relation-form)
+  const draftKey = (treeId) => "slakttradet_draft_relation_" + String(treeId);
+
+  // DOM
+  const logoutBtn = document.getElementById("logoutBtn");
+  const pillTree = document.getElementById("pillTree");
+  const pillPeople = document.getElementById("pillPeople");
+  const pillRels = document.getElementById("pillRels");
+  const pillNext = document.getElementById("pillNext");
 
   const aSelect = document.getElementById("aSelect");
   const bSelect = document.getElementById("bSelect");
   const msg = document.getElementById("msg");
   const out = document.getElementById("out");
 
-  function loadJson(k,f){ try{const r=localStorage.getItem(k);return r?JSON.parse(r):f}catch{return f}}
-  function saveJson(k,v){ localStorage.setItem(k,JSON.stringify(v)); }
-  function activeTree(){ return localStorage.getItem(KEY_ACTIVE)||""; }
+  const continueMap = document.getElementById("continueMap");
+
+  function safeParse(raw, fallback){ try{ return JSON.parse(raw); }catch{ return fallback; } }
+  function loadJson(key, fallback){
+    const raw = localStorage.getItem(key);
+    return raw ? safeParse(raw, fallback) : fallback;
+  }
+  function saveJson(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
+
+  function activeTreeId(){ return localStorage.getItem(KEY_ACTIVE) || ""; }
+  function getTrees(){
+    const trees = loadJson(KEY_TREES, []);
+    return Array.isArray(trees) ? trees : [];
+  }
+  function activeTreeLabel(){
+    const id = activeTreeId();
+    if(!id) return "—";
+    const t = getTrees().find(x => String(x.id) === String(id));
+    return t ? (t.name || t.id) : id;
+  }
+
+  function setDisabled(el, disabled){
+    if(disabled){
+      el.classList.add("disabled");
+      el.setAttribute("aria-disabled","true");
+      el.setAttribute("tabindex","-1");
+    }else{
+      el.classList.remove("disabled");
+      el.removeAttribute("aria-disabled");
+      el.removeAttribute("tabindex");
+    }
+  }
+  function setPill(el, kind, html){
+    el.className = "pill " + (kind || "");
+    el.innerHTML = html;
+  }
+
+  function loadPersons(treeId){
+    const arr = loadJson(cardsKey(treeId), []);
+    return Array.isArray(arr) ? arr : [];
+  }
+  function loadRels(treeId){
+    const arr = loadJson(relKey(treeId), []);
+    return Array.isArray(arr) ? arr : [];
+  }
 
   function buildChildCount(rels){
-    const c={};
-    rels.filter(r=>r.typ==="FORALDER_BARN").forEach(r=>{
-      c[r.franPersonId]=(c[r.franPersonId]||0)+1;
+    const c = {};
+    rels.filter(r => r.typ === "FORALDER_BARN").forEach(r => {
+      c[r.franPersonId] = (c[r.franPersonId] || 0) + 1;
     });
     return c;
   }
-
   function parentsOfChild(rels, childId){
     return new Set(
-      rels.filter(r=>r.typ==="FORALDER_BARN" && r.tillPersonId===childId)
-          .map(r=>r.franPersonId)
+      rels.filter(r => r.typ === "FORALDER_BARN" && r.tillPersonId === childId)
+          .map(r => r.franPersonId)
     );
   }
-
-  function label(p,count){
-    const n=`${p.fornamn||""} ${p.efternamn||""}`.trim();
-    return `${n} (barn: ${count||0})`;
+  function personName(p){
+    return `${p.fornamn || ""} ${p.efternamn || ""}`.trim() || "(namnlös)";
   }
 
-  function loadPersons(){
-    const t=activeTree();
-    if(!t){ msg.textContent="Välj ett träd först."; return; }
+  // ============================
+  // Draft save/restore
+  // ============================
+  function saveDraft(){
+    const t = activeTreeId();
+    if(!t) return;
+    try{
+      sessionStorage.setItem(draftKey(t), JSON.stringify({
+        a: aSelect.value || "",
+        b: bSelect.value || ""
+      }));
+    }catch{}
+  }
+  function loadDraft(){
+    const t = activeTreeId();
+    if(!t) return;
+    try{
+      const raw = sessionStorage.getItem(draftKey(t));
+      if(!raw) return;
+      const d = safeParse(raw, null);
+      if(d && typeof d === "object"){
+        if(typeof d.a === "string") aSelect.value = d.a;
+        if(typeof d.b === "string") bSelect.value = d.b;
+      }
+    }catch{}
+  }
+  function clearDraft(){
+    const t = activeTreeId();
+    if(!t) return;
+    try{ sessionStorage.removeItem(draftKey(t)); }catch{}
+  }
 
-    const cards=loadJson(cardsKey(t),[]);
-    const rels =loadJson(relKey(t),[]);
-    const counts=buildChildCount(rels);
+  // autosave on change
+  aSelect.addEventListener("change", saveDraft);
+  bSelect.addEventListener("change", saveDraft);
 
-    aSelect.innerHTML='<option value="">Välj…</option>';
-    bSelect.innerHTML='<option value="">Välj…</option>';
+  // ============================
+  // UI build
+  // ============================
+  function loadPersonsIntoSelects(){
+    const t = activeTreeId();
+    msg.textContent = "";
+    aSelect.innerHTML = '<option value="">Välj…</option>';
+    bSelect.innerHTML = '<option value="">Välj…</option>';
 
-    cards.forEach(p=>{
-      if(!p.id) return;
-      const o1=document.createElement("option");
-      o1.value=p.id;
-      o1.textContent=label(p,counts[p.id]);
+    if(!t){
+      msg.innerHTML = "<span class='error'>Välj aktivt träd först (gå till Träd).</span>";
+      setDisabled(aSelect, true);
+      setDisabled(bSelect, true);
+      return;
+    }
+
+    const persons = loadPersons(t);
+    const rels = loadRels(t);
+    const counts = buildChildCount(rels);
+
+    setDisabled(aSelect, false);
+    setDisabled(bSelect, false);
+
+    if(persons.length < 2){
+      msg.innerHTML = "<span class='error'>Du behöver minst 2 personer innan du kan skapa relationer.</span>";
+    }
+
+    for(const p of persons){
+      if(!p.id) continue;
+
+      const o1 = document.createElement("option");
+      o1.value = p.id;
+      o1.textContent = `${personName(p)} (barn: ${counts[p.id] || 0})`;
       aSelect.appendChild(o1);
 
-      const o2=document.createElement("option");
-      o2.value=p.id;
-      o2.textContent=`${p.fornamn||""} ${p.efternamn||""}`.trim();
+      const o2 = document.createElement("option");
+      o2.value = p.id;
+      o2.textContent = personName(p);
       bSelect.appendChild(o2);
-    });
+    }
   }
 
-  document.getElementById("form").addEventListener("submit",e=>{
+  function refreshStatus(){
+    const t = activeTreeId();
+    const label = activeTreeLabel();
+
+    if(!t){
+      setPill(pillTree, "warn", "Aktivt träd: <strong>—</strong>");
+      pillPeople.innerHTML = "Personer: <strong>0</strong>";
+      pillRels.innerHTML = "Relationer: <strong>0</strong>";
+      setPill(pillNext, "warn", "Nästa steg: <strong>Träd</strong>");
+      setDisabled(continueMap, true);
+      return;
+    }
+
+    const peopleCount = loadPersons(t).length;
+    const relCount = loadRels(t).length;
+
+    setPill(pillTree, "ok", "Aktivt träd: <strong>" + label + "</strong>");
+    pillPeople.innerHTML = "Personer: <strong>" + peopleCount + "</strong>";
+    pillRels.innerHTML = "Relationer: <strong>" + relCount + "</strong>";
+
+    if(peopleCount < 2){
+      setPill(pillNext, "warn", "Nästa steg: <strong>Personer</strong>");
+      setDisabled(continueMap, true);
+    }else if(relCount === 0){
+      setPill(pillNext, "warn", "Nästa steg: <strong>Skapa relation</strong>");
+      setDisabled(continueMap, true);
+    }else{
+      setPill(pillNext, "ok", "Nästa steg: <strong>Karta</strong>");
+      setDisabled(continueMap, false);
+    }
+  }
+
+  // ============================
+  // Actions
+  // ============================
+  document.getElementById("form").addEventListener("submit", (e) => {
     e.preventDefault();
-    const t=activeTree();
+
+    const t = activeTreeId();
     if(!t) return;
 
-    const a=aSelect.value,b=bSelect.value;
-    if(!a||!b||a===b){ msg.textContent="Ogiltigt val."; return; }
+    const a = aSelect.value;
+    const b = bSelect.value;
 
-    const rels=loadJson(relKey(t),[]);
-    const parents=parentsOfChild(rels,b);
-    if(parents.has(a)) return msg.textContent="Redan kopplad.";
-    if(parents.size>=2) return msg.textContent="Barnet har redan 2 föräldrar.";
+    if(!a || !b || a === b){
+      msg.innerHTML = "<span class='error'>Ogiltigt val (välj olika personer).</span>";
+      return;
+    }
+
+    const rels = loadRels(t);
+    const parents = parentsOfChild(rels, b);
+
+    if(parents.has(a)){
+      msg.innerHTML = "<span class='error'>Redan kopplad.</span>";
+      return;
+    }
+    if(parents.size >= 2){
+      msg.innerHTML = "<span class='error'>Barnet har redan 2 föräldrar.</span>";
+      return;
+    }
 
     rels.push({
-      id:"r"+Date.now(),
-      typ:"FORALDER_BARN",
-      franPersonId:a,
-      tillPersonId:b,
-      createdAt:new Date().toISOString()
+      id: "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      typ: "FORALDER_BARN",
+      franPersonId: a,
+      tillPersonId: b,
+      createdAt: new Date().toISOString()
     });
-    saveJson(relKey(t),rels);
-    msg.textContent="Relation sparad.";
-    out.textContent=JSON.stringify(rels,null,2);
-    loadPersons();
+
+    saveJson(relKey(t), rels);
+    out.textContent = JSON.stringify(rels, null, 2);
+    msg.innerHTML = "<span class='ok'>Relation sparad.</span>";
+    clearDraft();
+    refreshStatus();
+    loadPersonsIntoSelects();
+    loadDraft(); // om något fortfarande finns
   });
 
-  document.getElementById("listBtn").onclick=()=>{
-    const t=activeTree();
-    out.textContent=JSON.stringify(loadJson(relKey(t),[]),null,2);
-  };
-  document.getElementById("clearBtn").onclick=()=>{
-    const t=activeTree();
-    saveJson(relKey(t),[]);
-    out.textContent="[]";
-    loadPersons();
-  };
-  document.getElementById("resetBtn").onclick=()=>{
-    document.getElementById("form").reset();
-    msg.textContent="";
-  };
+  document.getElementById("listBtn").addEventListener("click", () => {
+    const t = activeTreeId();
+    out.textContent = JSON.stringify(loadRels(t), null, 2);
+    refreshStatus();
+  });
 
-  loadPersons();
+  document.getElementById("clearBtn").addEventListener("click", () => {
+    const t = activeTreeId();
+    if(!t) return;
+    const yes = confirm("Töm alla relationer i aktivt träd?");
+    if(!yes) return;
+    saveJson(relKey(t), []);
+    out.textContent = "[]";
+    msg.innerHTML = "<span class='ok'>Relationer tömda.</span>";
+    clearDraft();
+    refreshStatus();
+    loadPersonsIntoSelects();
+  });
+
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    aSelect.value = "";
+    bSelect.value = "";
+    saveDraft();
+    msg.textContent = "";
+  });
+
+  document.getElementById("refreshBtn").addEventListener("click", () => {
+    loadPersonsIntoSelects();
+    loadDraft();
+    refreshStatus();
+  });
+
+  logoutBtn.addEventListener("click", () => {
+    try{ sessionStorage.removeItem("demo_auth"); }catch{}
+    window.location.href = "../index.html";
+  });
+
+  // ============================
+  // Start
+  // ============================
+  loadPersonsIntoSelects();
+  loadDraft();
+  refreshStatus();
 </script>
 </body>
 </html>
