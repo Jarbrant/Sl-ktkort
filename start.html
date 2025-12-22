@@ -4,633 +4,244 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Start – Släktkort</title>
-  <meta name="description" content="Start och guidning för Släktkort (demo). Träd → Personer → Relationer → Karta." />
+  <meta name="description" content="Översikt för Släktkort." />
 
   <style>
     :root { color-scheme: light; }
+
     body{
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      line-height: 1.5;
+      line-height: 1.6;
       margin: 0;
       padding: 24px;
       max-width: 1180px;
       margin-inline: auto;
-      background: #fff;
-      color: #111;
+      background: #fafafa;
+      color: #2a2a2a;
     }
+
     a{ color: inherit; text-decoration:none; }
-    h1{ margin:0 0 6px; font-size:1.7rem; letter-spacing: -0.01em; }
-    .muted{ color:#555; margin:0; }
-    .small{ font-size:.95rem; color:#555; }
-    .srOnly{
-      position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
-      clip: rect(0,0,0,0); border:0;
-    }
+    h1{ margin:0 0 6px; font-size:1.7rem; letter-spacing:-0.01em; }
+    h2{ margin:0; font-size:1.1rem; font-weight:700; letter-spacing:-0.01em; }
+
+    .muted{ color:#666; margin:0; }
+    .small{ font-size:.95rem; color:#666; }
 
     header{
       display:flex;
-      align-items:flex-start;
       justify-content:space-between;
+      align-items:flex-start;
       gap:12px;
-      margin-bottom: 14px;
-    }
-
-    .btn, button{
-      display:inline-block;
-      padding:10px 12px;
-      border:1px solid #333;
-      border-radius:12px;
-      background:#fff;
-      font:inherit;
-      cursor:pointer;
-      text-decoration:none;
-    }
-    .btn.secondary{ border-color:#bbb; }
-    .btn.primary{
-      background:#111;
-      color:#fff;
-      border-color:#111;
-      font-weight:900;
-    }
-    .btn.primary:hover{ opacity:.92; }
-    .btn:focus-visible, button:focus-visible, a:focus-visible{
-      outline: 3px solid rgba(0,0,0,.18);
-      outline-offset: 2px;
-      border-radius: 12px;
+      margin-bottom:16px;
     }
 
     .topbar{
       display:flex;
-      flex-wrap:wrap;
       gap:10px;
-      align-items:center;
-      margin-top: 10px;
+      margin-top:10px;
+      flex-wrap:wrap;
     }
 
-    /* ===== Dashboard blocks ===== */
+    .btn, button{
+      padding:8px 10px;
+      border:1px solid #ccc;
+      border-radius:10px;
+      background:#fff;
+      font:inherit;
+      cursor:pointer;
+    }
+
+    .btn.secondary{ border-color:#ccc; }
+
+    .btn:focus-visible,
+    button:focus-visible,
+    a:focus-visible{
+      outline:2px solid rgba(0,0,0,.15);
+      outline-offset:2px;
+      border-radius:10px;
+    }
+
+    .stack{ display:flex; flex-direction:column; gap:14px; }
+
     .card{
-      border:1px solid #eaeaea;
+      border:1px solid #e5e5e5;
       border-radius:16px;
       padding:16px;
       background:#fff;
-      box-shadow: 0 8px 28px rgba(0,0,0,.05);
     }
 
-    .stack{ display:flex; flex-direction:column; gap:12px; }
-
-    /* ===== Status (vägledande) ===== */
+    /* Status */
     .statusRow{
       display:flex;
       flex-wrap:wrap;
       gap:10px;
-      align-items:center;
     }
-    .pill{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding:8px 10px;
-      border:1px solid #e6e6e6;
-      border-radius:999px;
-      background:#fafafa;
-      font-size:.95rem;
-      white-space:nowrap;
-    }
-    .pill strong{ font-weight:900; }
-    .pill.ok{ border-color:#cfe8cf; background:#f5fff5; }
-    .pill.warn{ border-color:#ffe1a6; background:#fff9ee; }
-    .pill.err{ border-color:#ffb3b3; background:#fff2f2; }
 
-    /* ===== Progress ===== */
+    .pill{
+      padding:6px 10px;
+      border:1px solid #e2e2e2;
+      border-radius:999px;
+      background:#f7f7f7;
+      font-size:.95rem;
+    }
+
+    /* Progress */
     .progress{
       display:flex;
-      flex-wrap:wrap;
       gap:10px;
-      align-items:center;
+      flex-wrap:wrap;
+      margin-top:10px;
     }
+
     .step{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding:8px 10px;
-      border:1px solid #eaeaea;
+      padding:6px 10px;
+      border:1px solid #e2e2e2;
       border-radius:999px;
-      background:#fff;
       font-size:.95rem;
-    }
-    .dot{
-      width: 22px;
-      height: 22px;
-      border-radius: 999px;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      font-weight: 950;
-      border:1px solid #bbb;
-      color:#555;
       background:#fff;
-      flex: 0 0 auto;
     }
-    .step.done .dot{
-      border-color:#111;
-      color:#111;
-    }
+
     .step.active{
-      border-color:#111;
-      background:#111;
-      color:#fff;
-      font-weight: 900;
-    }
-    .step.active .dot{
-      border-color:#fff;
-      color:#111;
-      background:#fff;
-    }
-    .arrow{ color:#777; font-weight: 900; }
-
-    /* ===== Next step ===== */
-    .nextBar{
-      border:1px solid #eaeaea;
-      border-radius:16px;
-      padding:12px 14px;
-      background:#fff;
-      box-shadow: 0 8px 28px rgba(0,0,0,.04);
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-    }
-    .nextText{
-      font-weight: 900;
-      letter-spacing: -0.01em;
+      border-color:#999;
+      font-weight:600;
     }
 
-    /* ===== Tiles ===== */
+    /* Tiles */
     .grid{
       display:grid;
       gap:14px;
-      grid-template-columns: 1fr;
-      margin-top: 6px;
+      grid-template-columns:1fr;
     }
+
     @media (min-width: 880px){
-      .grid{ grid-template-columns: 1fr 1fr; }
+      .grid{ grid-template-columns:1fr 1fr; }
     }
 
     .tile{
-      border:1px solid #eaeaea;
+      border:1px solid #e5e5e5;
       border-radius:16px;
       padding:16px;
       background:#fff;
-      box-shadow: 0 8px 28px rgba(0,0,0,.05);
       display:flex;
       flex-direction:column;
-      gap:10px;
-      cursor:pointer;
-      transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
-      position: relative;
+      gap:8px;
+      position:relative;
     }
-    .tile:hover{
-      background:#fcfcfc;
-      transform: translateY(-1px);
-      box-shadow: 0 10px 34px rgba(0,0,0,.07);
-    }
-    .tileHead{
-      display:flex;
-      align-items:flex-start;
-      justify-content:space-between;
-      gap:12px;
-    }
-    .tileTitle{
-      margin:0;
-      font-size: 1.1rem;
-      font-weight: 950;
-      letter-spacing: -0.01em;
-    }
-    .tileDesc{ margin:0; color:#555; font-size:.95rem; }
 
-    /* Make whole tile clickable but keep inner button */
+    .tileDesc{ margin:0; color:#666; font-size:.95rem; }
+
     .tileLink{
       position:absolute;
       inset:0;
       border-radius:16px;
     }
-    .tile .btn{ align-self:flex-start; z-index: 2; }
 
-    /* Footer note */
+    .tile .btn{
+      align-self:flex-start;
+      z-index:2;
+    }
+
     .footerNote{
-      margin-top: 14px;
+      margin-top:18px;
+      font-size:.9rem;
       color:#666;
-      font-size: .92rem;
+    }
+
+    .support{
+      margin-top:6px;
+      font-size:.9rem;
+      color:#666;
     }
   </style>
 </head>
 
 <body>
-  <!-- ============================================
-       DEMO AUTH-GUARD
-       ============================================ -->
-  <script>
-    (function authGuard(){
-      try{
-        if(sessionStorage.getItem("demo_auth") !== "1"){
-          // Om du vill att start ska vara publik: ta bort denna guard.
-          window.location.href = "./index.html";
-        }
-      }catch{}
-    })();
-  </script>
 
-  <header>
-    <div style="min-width:0;">
-      <h1>Start</h1>
-      <p class="muted">Följ stegen: Träd → Personer → Relationer → Karta.</p>
+<script>
+  (function authGuard(){
+    try{
+      if(sessionStorage.getItem("demo_auth") !== "1"){
+        window.location.href = "./index.html";
+      }
+    }catch{}
+  })();
+</script>
 
-      <nav class="topbar" aria-label="Navigation">
-        <a class="btn secondary" href="./start.html" aria-current="page">Start</a>
-        <a class="btn secondary" href="./app/trees.html">Träd</a>
-        <a class="btn secondary" href="./app/slaktkort.html">Personer</a>
-        <a class="btn secondary" href="./app/create-relation.html">Relationer</a>
-        <a class="btn secondary" href="./app/map.html">Karta</a>
-      </nav>
+<header>
+  <div>
+    <h1>Start</h1>
+    <p class="muted">Översikt över ditt släktträd.</p>
+
+    <nav class="topbar" aria-label="Navigation">
+      <a class="btn secondary" href="./app/trees.html">Träd</a>
+      <a class="btn secondary" href="./app/slaktkort.html">Personer</a>
+      <a class="btn secondary" href="./app/create-relation.html">Relationer</a>
+      <a class="btn secondary" href="./app/map.html">Karta</a>
+    </nav>
+  </div>
+
+  <button id="logoutBtn" class="btn secondary">Logga ut</button>
+</header>
+
+<main class="stack">
+
+  <section class="card">
+    <div class="statusRow">
+      <span class="pill">Aktivt träd: —</span>
+      <span class="pill">Personer: —</span>
+      <span class="pill">Relationer: —</span>
+      <span class="pill">Plats: —</span>
     </div>
 
-    <div class="actions" style="display:flex; gap:10px; align-items:center;">
-      <button id="logoutBtn" class="btn secondary" type="button">Logga ut</button>
+    <div class="progress">
+      <span class="step active">Träd</span>
+      <span class="step">Personer</span>
+      <span class="step">Relationer</span>
+      <span class="step">Karta</span>
     </div>
-  </header>
+  </section>
 
-  <main class="stack" aria-label="Startpanel">
-    <!-- ============================================
-         STATUS (vägledande)
-         ============================================ -->
-    <section class="card" aria-label="Status">
-      <div class="statusRow" role="group" aria-label="Vägledande status">
-        <span id="pillTree" class="pill warn">Aktivt träd: <strong>—</strong></span>
-        <span id="pillPeople" class="pill warn">Personer: <strong>—</strong></span>
-        <span id="pillRelations" class="pill warn">Relationer: <strong>—</strong></span>
-        <span id="pillPlace" class="pill warn">Plats: <strong>—</strong></span>
-      </div>
+  <section class="grid">
+    <article class="tile">
+      <a class="tileLink" href="./app/trees.html"></a>
+      <h2>Träd</h2>
+      <p class="tileDesc">Skapa och välj aktivt träd.</p>
+      <a class="btn secondary" href="./app/trees.html">Öppna</a>
+    </article>
 
-      <div style="margin-top:12px;">
-        <div class="progress" aria-label="Progress">
-          <span id="s1" class="step"><span class="dot">1</span>Träd</span>
-          <span class="arrow">→</span>
-          <span id="s2" class="step"><span class="dot">2</span>Personer</span>
-          <span class="arrow">→</span>
-          <span id="s3" class="step"><span class="dot">3</span>Relationer</span>
-          <span class="arrow">→</span>
-          <span id="s4" class="step"><span class="dot">4</span>Karta</span>
-        </div>
-      </div>
+    <article class="tile">
+      <a class="tileLink" href="./app/slaktkort.html"></a>
+      <h2>Personer</h2>
+      <p class="tileDesc">Lägg till personer i trädet.</p>
+      <a class="btn secondary" href="./app/slaktkort.html">Öppna</a>
+    </article>
 
-      <div class="nextBar" style="margin-top:12px;" aria-label="Nästa steg">
-        <div class="nextText" id="nextText">➡️ Nästa: —</div>
-        <a id="nextCta" class="btn primary" href="./app/slaktkort.html">Fortsätt</a>
-      </div>
+    <article class="tile">
+      <a class="tileLink" href="./app/create-relation.html"></a>
+      <h2>Relationer</h2>
+      <p class="tileDesc">Koppla personer.</p>
+      <a class="btn secondary" href="./app/create-relation.html">Öppna</a>
+    </article>
 
-      <p id="hint" class="small" style="margin:12px 0 0;" aria-live="polite">—</p>
-    </section>
+    <article class="tile">
+      <a class="tileLink" href="./app/map.html"></a>
+      <h2>Karta</h2>
+      <p class="tileDesc">Visa platser och markörer.</p>
+      <a class="btn secondary" href="./app/map.html">Öppna</a>
+    </article>
+  </section>
 
-    <!-- ============================================
-         TILES (hela rutor klickbara)
-         ============================================ -->
-    <section class="grid" aria-label="Steg">
-      <!-- Träd -->
-      <article class="tile" aria-label="Träd">
-        <a class="tileLink" href="./app/trees.html" aria-label="Öppna träd"></a>
-        <div class="tileHead">
-          <h2 class="tileTitle">🌳 Träd</h2>
-        </div>
-        <p class="tileDesc">Skapa och välj aktivt träd.</p>
-        <a class="btn secondary" href="./app/trees.html">Öppna träd</a>
-      </article>
+  <p class="footerNote">Demo-läge: data sparas lokalt i webbläsaren.</p>
+  <p class="support">Behöver du hjälp? Kontakta support.</p>
 
-      <!-- Personer -->
-      <article class="tile" aria-label="Personer">
-        <a class="tileLink" href="./app/slaktkort.html" aria-label="Skapa person"></a>
-        <div class="tileHead">
-          <h2 class="tileTitle">👤 Personer</h2>
-        </div>
-        <p class="tileDesc">Lägg till personer i ditt träd.</p>
-        <a class="btn primary" href="./app/slaktkort.html">Skapa person</a>
-      </article>
+</main>
 
-      <!-- Relationer -->
-      <article class="tile" aria-label="Relationer">
-        <a class="tileLink" href="./app/create-relation.html" aria-label="Skapa relation"></a>
-        <div class="tileHead">
-          <h2 class="tileTitle">🔗 Relationer</h2>
-        </div>
-        <p class="tileDesc">Koppla förälder–barn och partner.</p>
-        <a class="btn secondary" href="./app/create-relation.html">Skapa relation</a>
-      </article>
+<script>
+  document.getElementById("logoutBtn").addEventListener("click", () => {
+    try{ sessionStorage.removeItem("demo_auth"); }catch{}
+    window.location.href = "./index.html";
+  });
+</script>
 
-      <!-- Karta -->
-      <article class="tile" aria-label="Karta">
-        <a class="tileLink" href="./app/map.html" aria-label="Öppna karta"></a>
-        <div class="tileHead">
-          <h2 class="tileTitle">🗺️ Karta</h2>
-        </div>
-        <p class="tileDesc">Se markörer och kopplingar.</p>
-        <a class="btn secondary" href="./app/map.html">Öppna karta</a>
-      </article>
-    </section>
-
-    <p class="footerNote">Demo-läge: all data sparas lokalt i din webbläsare.</p>
-  </main>
-
-  <script>
-    // =====================================================
-    // STORAGE KEYS (ska matcha övriga sidor)
-    // =====================================================
-    const KEY_TREES  = "slakttradet_trees";
-    const KEY_ACTIVE = "slakttradet_active_tree_id";
-    const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
-    const relKey   = (treeId) => "slakttradet_relationer_" + String(treeId);
-
-    // =====================================================
-    // DOM
-    // =====================================================
-    const logoutBtn = document.getElementById("logoutBtn");
-
-    const pillTree = document.getElementById("pillTree");
-    const pillPeople = document.getElementById("pillPeople");
-    const pillRelations = document.getElementById("pillRelations");
-    const pillPlace = document.getElementById("pillPlace");
-
-    const s1 = document.getElementById("s1");
-    const s2 = document.getElementById("s2");
-    const s3 = document.getElementById("s3");
-    const s4 = document.getElementById("s4");
-
-    const nextText = document.getElementById("nextText");
-    const nextCta = document.getElementById("nextCta");
-    const hint = document.getElementById("hint");
-
-    // =====================================================
-    // Helpers
-    // =====================================================
-    function safeParse(raw, fallback){ try{ return JSON.parse(raw); }catch{ return fallback; } }
-    function loadJson(key, fallback){
-      const raw = localStorage.getItem(key);
-      return raw ? safeParse(raw, fallback) : fallback;
-    }
-    function setPill(el, kind, html){
-      el.className = "pill " + (kind || "");
-      el.innerHTML = html;
-    }
-
-    function activeTreeId(){ return localStorage.getItem(KEY_ACTIVE) || ""; }
-
-    function getTrees(){
-      const trees = loadJson(KEY_TREES, []);
-      return Array.isArray(trees) ? trees : [];
-    }
-
-    function activeTreeLabel(){
-      const id = activeTreeId();
-      if(!id) return "—";
-      const t = getTrees().find(x => String(x.id) === String(id));
-      return t ? (t.name || t.id) : id;
-    }
-
-    function loadPeople(){
-      const t = activeTreeId();
-      if(!t) return [];
-      const arr = loadJson(cardsKey(t), []);
-      return Array.isArray(arr) ? arr : [];
-    }
-
-    function loadRelations(){
-      const t = activeTreeId();
-      if(!t) return [];
-      const arr = loadJson(relKey(t), []);
-      return Array.isArray(arr) ? arr : [];
-    }
-
-    function inLatLonRange(lat, lon){
-      return Number.isFinite(lat) && Number.isFinite(lon) &&
-        lat >= -90 && lat <= 90 &&
-        lon >= -180 && lon <= 180;
-    }
-
-    function coordsFromPerson(p){
-      if(p && typeof p.coords === "object" && p.coords){
-        const lat = Number(p.coords.lat);
-        const lon = Number(p.coords.lon);
-        if(inLatLonRange(lat, lon)) return { lat, lon };
-        return null;
-      }
-      if(typeof p.coords === "string"){
-        const s = p.coords.trim();
-        const parts = s.split(",").map(x => x.trim()).filter(Boolean);
-        if(parts.length === 2){
-          const lat = Number(parts[0]);
-          const lon = Number(parts[1]);
-          if(inLatLonRange(lat, lon)) return { lat, lon };
-        }
-      }
-      return null;
-    }
-
-    function setStep(el, state){
-      el.classList.remove("done","active");
-      const dot = el.querySelector(".dot");
-      if(!dot) return;
-
-      if(state === "done"){
-        el.classList.add("done");
-        dot.textContent = "✓";
-      }else if(state === "active"){
-        el.classList.add("active");
-        dot.textContent = "●";
-      }else{
-        dot.textContent = dot.dataset.n || dot.textContent || "•";
-      }
-    }
-
-    // Preload dot numbers once
-    for(const [i, el] of [[1,s1],[2,s2],[3,s3],[4,s4]]){
-      const dot = el.querySelector(".dot");
-      if(dot) dot.dataset.n = String(i);
-      if(dot) dot.textContent = String(i);
-    }
-
-    // =====================================================
-    // Compute + Render
-    // =====================================================
-    function computeState(){
-      const trees = getTrees();
-      const hasTrees = trees.length > 0;
-
-      const tId = activeTreeId();
-      const hasActive = !!tId;
-
-      const people = hasActive ? loadPeople() : [];
-      const relations = hasActive ? loadRelations() : [];
-
-      const peopleCount = people.length;
-      const relCount = relations.length;
-
-      const withCoords = people.filter(p => !!coordsFromPerson(p)).length;
-
-      return {
-        hasTrees, hasActive,
-        treeLabel: activeTreeLabel(),
-        peopleCount,
-        relCount,
-        withCoords
-      };
-    }
-
-    function render(){
-      const st = computeState();
-
-      // ---- Status pills (vägledande) ----
-      // Aktivt träd
-      if(!st.hasTrees){
-        setPill(pillTree, "err", "Aktivt träd: <strong>⚠️ skapa träd</strong>");
-      }else if(!st.hasActive){
-        setPill(pillTree, "warn", "Aktivt träd: <strong>⚠️ välj aktivt</strong>");
-      }else{
-        setPill(pillTree, "ok", "Aktivt träd: <strong>✓ " + st.treeLabel + "</strong>");
-      }
-
-      // Personer
-      if(!st.hasActive){
-        setPill(pillPeople, "warn", "Personer: <strong>—</strong>");
-      }else if(st.peopleCount >= 2){
-        setPill(pillPeople, "ok", "Personer: <strong>✓ klart</strong> <span class='srOnly'>(antal)</span>");
-      }else{
-        const want = 2;
-        setPill(pillPeople, "warn", "Personer: <strong>⚠️ skapa " + want + " (nu: " + st.peopleCount + ")</strong>");
-      }
-
-      // Relationer
-      if(!st.hasActive){
-        setPill(pillRelations, "warn", "Relationer: <strong>—</strong>");
-      }else if(st.relCount >= 1){
-        setPill(pillRelations, "ok", "Relationer: <strong>✓ klart</strong>");
-      }else{
-        setPill(pillRelations, "warn", "Relationer: <strong>⚠️ skapa 1</strong>");
-      }
-
-      // Plats (coords)
-      if(!st.hasActive){
-        setPill(pillPlace, "warn", "Plats: <strong>—</strong>");
-      }else if(st.withCoords >= 1){
-        setPill(pillPlace, "ok", "Plats: <strong>✓ minst 1</strong>");
-      }else{
-        setPill(pillPlace, "warn", "Plats: <strong>⚠️ lägg till plats</strong>");
-      }
-
-      // ---- Progress step selection ----
-      // Default: step 1 active
-      let activeStep = 1;
-
-      if(!st.hasTrees || !st.hasActive){
-        activeStep = 1;
-      }else if(st.peopleCount < 2){
-        activeStep = 2;
-      }else if(st.relCount < 1){
-        activeStep = 3;
-      }else{
-        activeStep = 4;
-      }
-
-      const stepEls = [null, s1, s2, s3, s4];
-
-      for(let i=1; i<=4; i++){
-        const el = stepEls[i];
-        const dot = el.querySelector(".dot");
-        if(dot) dot.textContent = dot.dataset.n;
-
-        if(i < activeStep){
-          el.classList.remove("active");
-          el.classList.add("done");
-          const d = el.querySelector(".dot");
-          if(d) d.textContent = "✓";
-        }else if(i === activeStep){
-          el.classList.remove("done");
-          el.classList.add("active");
-          const d = el.querySelector(".dot");
-          if(d) d.textContent = "●";
-        }else{
-          el.classList.remove("done","active");
-          const d = el.querySelector(".dot");
-          if(d) d.textContent = d.dataset.n;
-        }
-      }
-
-      // ---- Next step text + CTA ----
-      let next = "➡️ Nästa: Skapa din första person";
-      let ctaHref = "./app/slaktkort.html";
-      let ctaText = "Fortsätt";
-
-      if(!st.hasTrees){
-        next = "➡️ Nästa: Skapa ett träd";
-        ctaHref = "./app/trees.html";
-        ctaText = "Öppna träd";
-      }else if(!st.hasActive){
-        next = "➡️ Nästa: Välj ett aktivt träd";
-        ctaHref = "./app/trees.html";
-        ctaText = "Välj träd";
-      }else if(st.peopleCount === 0){
-        next = "➡️ Nästa: Skapa din första person";
-        ctaHref = "./app/slaktkort.html";
-        ctaText = "Skapa person";
-      }else if(st.peopleCount === 1){
-        next = "➡️ Nästa: Skapa en person till (minst 2 behövs)";
-        ctaHref = "./app/slaktkort.html";
-        ctaText = "Skapa person";
-      }else if(st.relCount < 1){
-        next = "➡️ Nästa: Skapa en relation";
-        ctaHref = "./app/create-relation.html";
-        ctaText = "Skapa relation";
-      }else if(st.withCoords < 1){
-        next = "➡️ Nästa: Lägg till plats på minst en person";
-        ctaHref = "./app/slaktkort.html";
-        ctaText = "Lägg till plats";
-      }else{
-        next = "➡️ Nästa: Öppna kartan och klicka på en markör";
-        ctaHref = "./app/map.html";
-        ctaText = "Öppna karta";
-      }
-
-      nextText.textContent = next;
-      nextCta.setAttribute("href", ctaHref);
-      nextCta.textContent = ctaText;
-
-      // ---- Hint line (kort, sakligt) ----
-      if(!st.hasTrees){
-        hint.textContent = "Skapa ett träd först. Sedan kan du lägga till personer.";
-      }else if(!st.hasActive){
-        hint.textContent = "Välj vilket träd som är aktivt. Allt sparas i det aktiva trädet.";
-      }else if(st.peopleCount < 2){
-        hint.textContent = "Skapa minst två personer innan du bygger relationer.";
-      }else if(st.relCount < 1){
-        hint.textContent = "Skapa minst en relation för att se kopplingar i kartan.";
-      }else if(st.withCoords < 1){
-        hint.textContent = "Lägg till plats (coords) på minst en person för att få markörer på kartan.";
-      }else{
-        hint.textContent = "Klart för användning. Öppna kartan och testa markörer + kopplingar.";
-      }
-    }
-
-    // =====================================================
-    // Events
-    // =====================================================
-    logoutBtn.addEventListener("click", () => {
-      try{ sessionStorage.removeItem("demo_auth"); }catch{}
-      window.location.href = "./index.html";
-    });
-
-    // Auto-refresh when coming back / storage changes
-    window.addEventListener("focus", render);
-    window.addEventListener("storage", render);
-
-    // Start
-    render();
-  </script>
 </body>
 </html>
