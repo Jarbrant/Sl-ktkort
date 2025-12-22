@@ -88,6 +88,7 @@
       color: var(--text);
       font-weight: 900;
     }
+    .btn.primary:hover{ filter: brightness(.99); }
     .btn.ghost{
       background: transparent;
       box-shadow:none;
@@ -159,7 +160,7 @@
       align-items:start;
     }
     @media (min-width: 980px){
-      .grid{ grid-template-columns: 0.9fr 1.1fr; } /* vänster: sök/lista, höger: formulär */
+      .grid{ grid-template-columns: 1.1fr .9fr; } /* FORM först (vänster), LISTA sen (höger) */
     }
 
     .sectionTitle{
@@ -300,11 +301,6 @@
       margin: 10px 0 0;
     }
     code{ background: rgba(27,31,36,.06); padding: 2px 6px; border-radius: 8px; }
-
-    .srOnly{
-      position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
-      clip: rect(0,0,0,0); border:0;
-    }
   </style>
 </head>
 
@@ -322,7 +318,7 @@
   <header>
     <div style="min-width:0;">
       <h1>Personer</h1>
-      <p class="muted">Skapa och ändra personer. Grundrelationer skapas i <code>Relationer</code>.</p>
+      <p class="muted">Du matar in grunddata. Grundrelationer skapas i <code>Relationer</code>.</p>
 
       <nav class="topbar" aria-label="Navigation">
         <a class="btn secondary" href="../start.html">Start</a>
@@ -352,36 +348,14 @@
       </div>
 
       <div id="guideBox" class="hintBox" style="margin-top:12px;">
-        Steg 1: Sök och välj en person (minst 3 bokstäver) – eller klicka <strong>Skapa person</strong>.
+        Steg 1: Skapa en person (eller välj en via sök).
       </div>
 
       <div id="noteBox" class="noteBox" style="margin-top:12px;" hidden></div>
     </section>
 
     <div class="grid">
-      <!-- VÄNSTER: SÖK + LISTA -->
-      <section class="card" aria-label="Personer i aktivt träd">
-        <p class="sectionTitle" style="margin-bottom:2px;">Sök person</p>
-        <p class="small">Skriv minst 3 bokstäver. Då visas förslag. (Du kan också visa alla.)</p>
-
-        <label for="search">Sök</label>
-        <input id="search" placeholder="t.ex. sti / nil / falun…" autocomplete="off" />
-
-        <div class="row">
-          <button id="showAllBtn" class="btn secondary" type="button">Visa alla</button>
-          <button id="clearSearchBtn" class="btn ghost" type="button">Rensa</button>
-        </div>
-
-        <p id="listMsg" class="msg" aria-live="polite"></p>
-        <ul id="peopleList" class="list" aria-label="Personlista"></ul>
-
-        <details id="debugDetails" style="margin-top:12px;" hidden>
-          <summary>Visa JSON (debug)</summary>
-          <pre id="debugOut">[]</pre>
-        </details>
-      </section>
-
-      <!-- HÖGER: FORM + RELATIONER -->
+      <!-- FORM + RELATIONER (FÖRST) -->
       <section class="stack" aria-label="Form & relationer">
         <section class="card" aria-label="Skapa person">
           <p class="sectionTitle" style="margin-bottom:2px;">Skapa person</p>
@@ -449,7 +423,7 @@
               <button id="clearDraftBtn" class="btn secondary" type="button">Rensa utkast</button>
             </div>
             <p class="small" style="margin-top:8px;">
-              Tips: “Rensa utkast” tar bara bort lokalt utkast – inte sparade personer.
+              “Rensa utkast” tar bort lokalt utkast – inte sparade personer.
             </p>
           </div>
 
@@ -459,7 +433,7 @@
         <details class="card" aria-label="Beräknade relationer" id="relDetails">
           <summary>Beräknade relationer</summary>
           <p class="small" style="margin-top:8px;">
-            Bygger på sparade relationer i <code>Relationer</code>. Ändra relationer där – så uppdateras det här automatiskt.
+            Bygger på relationer i <code>Relationer</code>. Ändra där – så syns det här.
           </p>
 
           <div id="relBox" class="hintBox" style="margin-top:12px;">
@@ -484,6 +458,28 @@
               <div id="relSiblings" class="chips" aria-label="Syskon"></div>
             </div>
           </div>
+        </details>
+      </section>
+
+      <!-- SÖK + LISTA (SEN) -->
+      <section class="card" aria-label="Personer i aktivt träd">
+        <p class="sectionTitle" style="margin-bottom:2px;">Sök person</p>
+        <p class="small">Skriv minst 3 bokstäver för förslag. Eller visa alla.</p>
+
+        <label for="search">Sök</label>
+        <input id="search" placeholder="t.ex. sti / nil / falun…" autocomplete="off" />
+
+        <div class="row">
+          <button id="showAllBtn" class="btn secondary" type="button">Visa alla</button>
+          <button id="clearSearchBtn" class="btn ghost" type="button">Rensa</button>
+        </div>
+
+        <p id="listMsg" class="msg" aria-live="polite"></p>
+        <ul id="peopleList" class="list" aria-label="Personlista"></ul>
+
+        <details id="debugDetails" style="margin-top:12px;" hidden>
+          <summary>Visa JSON (debug)</summary>
+          <pre id="debugOut">[]</pre>
         </details>
       </section>
     </div>
@@ -679,8 +675,21 @@
     // ============================
     // State
     // ============================
-    let selectedId = ""; // person.id (edit) or "" (new)
+    let selectedId = "";
     let forceShowAll = false;
+
+    function updateGuide(){
+      const t = activeTreeId();
+      if(!t){
+        guideBox.textContent = "Gå till Träd och välj ett aktivt träd.";
+        return;
+      }
+      if(selectedId){
+        guideBox.innerHTML = "Du redigerar en person. Ändra → <strong>Spara</strong>.";
+      }else{
+        guideBox.innerHTML = "Skapa person först. (Du kan också söka och välja för att redigera.)";
+      }
+    }
 
     function resetForm(){
       selectedId = "";
@@ -854,23 +863,20 @@
     }
 
     // ============================
-    // List render + typeahead (>=3 tecken)
+    // List render + typeahead (>=3)
     // ============================
     function getQuery(){
       return String(searchEl.value || "").trim().toLowerCase();
     }
-
     function matchesQuery(p, q){
       const n = personName(p).toLowerCase();
       const place = String(p.plats || "").toLowerCase();
       return n.includes(q) || place.includes(q);
     }
-
     function shouldShowSuggestions(){
       const q = getQuery();
       return forceShowAll || q.length >= 3;
     }
-
     function filteredPeople(people){
       const q = getQuery();
       if(forceShowAll) return people;
@@ -894,7 +900,6 @@
 
       if(!show){
         listMsg.textContent = people.length + " personer i trädet. Skriv minst 3 bokstäver för att söka.";
-        // tom lista
         if(debugDetails && !debugDetails.hidden){
           debugOut.textContent = JSON.stringify(people, null, 2);
         }
@@ -942,7 +947,7 @@
     }
 
     // ============================
-    // Status pills + guidance
+    // Status pills
     // ============================
     function refreshStatusPills(){
       const trees = getTrees();
@@ -993,18 +998,6 @@
 
       noteBox.hidden = true;
       return true;
-    }
-
-    function updateGuide(){
-      if(!activeTreeId()){
-        guideBox.textContent = "Gå till Träd och välj ett aktivt träd.";
-        return;
-      }
-      if(selectedId){
-        guideBox.innerHTML = "Du redigerar en person. Steg: ändra fält → <strong>Spara</strong>.";
-      }else{
-        guideBox.innerHTML = "Steg 1: Sök och välj en person (minst 3 bokstäver) – eller klicka <strong>Skapa person</strong> och spara.";
-      }
     }
 
     // ============================
@@ -1133,7 +1126,6 @@
       morePanel.hidden = true;
       moreBtn.setAttribute("aria-expanded", "false");
 
-      // efter save: håll sök/lista stabilt men uppdatera
       renderList();
       renderRelations();
       refreshStatusPills();
@@ -1187,7 +1179,6 @@
       searchTimer = setTimeout(renderList, 120);
     });
 
-    // Auto-refresh on focus
     window.addEventListener("focus", () => {
       refreshStatusPills();
       renderList();
