@@ -145,7 +145,7 @@
   </article>
 
   <article class="card">
-    <h2 id="relsTitle">🔗 Steg 3 – Relationer</h2>
+    <h2 id="relsTitle">🔗 Steg 2 – Relationer</h2>
     <p class="small">Koppla förälder → barn (max 2 föräldrar per barn).</p>
     <div class="actions">
       <a class="btn disabled" id="goRels" href="./app/create-relation.html" aria-disabled="true" tabindex="-1">Öppna Relationer</a>
@@ -153,8 +153,8 @@
     <p class="small" id="relsLine">—</p>
   </article>
 
-  <article class="card" style="grid-column: 1 / -1;">
-    <h2>🗺️ Steg 4 – Karta</h2>
+  <article class="card">
+    <h2 id="mapTitle">🗺️ Steg 3 – Karta</h2>
     <p class="small">Visa personer med koordinater i aktivt träd.</p>
     <div class="actions">
       <a class="btn disabled" id="goMap" href="./app/map.html" aria-disabled="true" tabindex="-1">Öppna Karta</a>
@@ -193,6 +193,7 @@
   const peopleLine = document.getElementById("peopleLine");
   const relsTitle = document.getElementById("relsTitle");
   const relsLine = document.getElementById("relsLine");
+  const mapTitle = document.getElementById("mapTitle");
   const mapLine = document.getElementById("mapLine");
 
   const goPeople = document.getElementById("goPeople");
@@ -239,6 +240,7 @@
 
     const id = activeTreeId();
     const hasActive = !!id;
+
     const firstTime = (!hasTrees || !hasActive);
 
     const peopleCount = hasActive ? countPersons(id) : 0;
@@ -259,25 +261,27 @@
       noteBox.innerHTML = "<strong>🚩 Inget aktivt träd:</strong> Välj ett träd i <a href='./app/trees.html'><code>Träd</code></a>.";
     }else if(peopleCount < 2){
       noteBox.hidden = false;
-      noteBox.innerHTML = "<strong>Tip:</strong> Skapa minst <strong>2 personer</strong> i <a href='./app/slaktkort.html'><code>Personer</code></a> innan relationer.";
+      noteBox.innerHTML = "<strong>Tips:</strong> Skapa minst <strong>2 personer</strong> i <a href='./app/slaktkort.html'><code>Personer</code></a> innan relationer.";
     }else{
       noteBox.hidden = true;
     }
 
-    // Renumbering i text (för tydlighet)
-    treeTitle.textContent = firstTime ? "🌳 Steg 1 – Träd" : "🌳 Träd (kontext)";
-    treeText.textContent  = firstTime
+    // Renummering och text beroende på första gången / återvändare
+    treeTitle.textContent  = firstTime ? "🌳 Steg 1 – Träd" : "🌳 Träd (kontext)";
+    treeText.textContent   = firstTime
       ? "Första gången: skapa/välj ett träd så resten av sidorna vet var de ska spara."
       : "Du har redan ett aktivt träd. Byt träd bara om du behöver.";
 
     peopleTitle.textContent = firstTime ? "👤 Steg 2 – Personer" : "👤 Steg 1 – Personer";
     relsTitle.textContent   = firstTime ? "🔗 Steg 3 – Relationer" : "🔗 Steg 2 – Relationer";
+    mapTitle.textContent    = firstTime ? "🗺️ Steg 4 – Karta" : "🗺️ Steg 3 – Karta";
 
-    // Buttons enabled
+    // Enable/disable knappar
     setDisabled(goPeople, !hasActive);
     setDisabled(goRels, !(hasActive && peopleCount >= 2));
     setDisabled(goMap,  !(hasActive && peopleCount >= 1));
 
+    // Raderna under korten
     treeLine.textContent = hasActive ? ("Aktivt: " + activeTreeLabel()) : "Välj ett aktivt träd först.";
     peopleLine.textContent = !hasActive ? "Välj träd först."
       : (peopleCount === 0 ? "Skapa första personen." : (peopleCount < 2 ? "Skapa minst en person till." : "Klart, du kan skapa relationer."));
