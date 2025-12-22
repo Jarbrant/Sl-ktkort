@@ -3,46 +3,492 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Släktträdet – Logga in</title>
+  <title>Karta – Släktträd</title>
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    crossorigin=""
+  />
+
   <style>
-    body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
-      font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#f4f6f8;color:#222}
-    .box{width:100%;max-width:380px;background:#fff;padding:2rem;border-radius:12px;
-      box-shadow:0 10px 30px rgba(0,0,0,.08)}
-    h1{margin:0 0 .25rem;font-size:1.6rem;text-align:center}
-    .muted{text-align:center;color:#666;margin:0 0 1.25rem;font-size:.9rem}
-    label{display:block;margin:.6rem 0 .25rem;font-size:.85rem;color:#444}
-    input{width:100%;padding:.6rem .7rem;border:1px solid #ccc;border-radius:8px;font-size:.95rem}
-    button{margin-top:.9rem;width:100%;padding:.7rem;border:0;border-radius:10px;background:#2b5cff;color:#fff;
-      font-size:.95rem;cursor:pointer}
-    button:hover{background:#244fd6}
-    .note{margin-top:1rem;text-align:center;font-size:.75rem;color:#777}
+    body { font-family: system-ui, Arial, sans-serif; margin: 0; }
+    header { padding: 16px 20px; border-bottom: 1px solid #ddd; }
+    header a { margin-right: 12px; color: inherit; }
+    h1 { margin: 8px 0 6px; font-size: 1.2rem; }
+    .muted { color:#555; margin:0; }
+
+    .wrap { padding: 12px 20px; }
+    .msg { margin-top: 10px; }
+    .ok { font-weight: 800; }
+    .error { color:#b00020; font-weight: 800; }
+
+    #map {
+      height: 72vh;
+      margin-top: 14px;
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .panelRow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-top: 10px;
+    }
+    .chip {
+      display:inline-block;
+      padding: 6px 10px;
+      border: 1px solid #ddd;
+      border-radius: 999px;
+      background: #fafafa;
+      color:#333;
+      font-size: .95rem;
+    }
+    .actions button {
+      padding: 8px 10px;
+      border: 1px solid #333;
+      background: #fff;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    .coordsBox {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      background: #fafafa;
+      max-width: 720px;
+    }
+    .coordsBox code { background:#f0f0f0; padding: 2px 6px; border-radius: 6px; }
+
+    /* Enkel label som “flagga” */
+    .name-label {
+      background: rgba(255,255,255,0.95);
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      padding: 2px 8px;
+      font-size: 12px;
+      white-space: nowrap;
+      box-shadow: 0 2px 10px rgba(0,0,0,.06);
+    }
+
+    .popup h3 { margin: 0 0 6px; font-size: 1rem; }
+    .popup .meta { margin: 0 0 8px; color:#555; }
+    .popup .sectionTitle { margin: 10px 0 4px; font-weight: 800; }
+    .popup ul { margin: 0; padding-left: 18px; }
+    .popup li { margin: 2px 0; }
+    .popup .submuted { color:#666; font-size: .92rem; margin: 0 0 8px; }
   </style>
 </head>
 <body>
-  <div class="box">
-    <h1>Släktträdet</h1>
-    <p class="muted">Logga in (demo)</p>
 
-    <form id="loginForm">
-      <label for="username">Användarnamn</label>
-      <input id="username" type="text" autocomplete="username" required />
+<header>
+  <a href="../start.html">← Till startsidan</a>
+  <a href="./slaktkort.html">Släktkort</a>
+  <a href="./create-relation.html">Relationer</a>
+  <a href="./trees.html">Träd</a>
 
-      <label for="password">Lösenord</label>
-      <input id="password" type="password" autocomplete="current-password" required />
+  <h1>Släktträd – karta</h1>
+  <p class="muted">Markörer + namn. Klicka på en markör för relationer. Linjer visar förälder ↔ barn.</p>
+</header>
 
-      <button type="submit">Logga in</button>
-    </form>
+<div class="wrap">
+  <div id="msg" class="msg muted" aria-live="polite"></div>
 
-    <div class="note">Demo-läge. Ingen riktig autentisering än.</div>
+  <div class="panelRow">
+    <span class="chip">Aktivt träd: <strong id="activeTreeName">—</strong></span>
+    <span class="chip">Släktkort med coords: <strong id="countCards">0</strong></span>
+    <span class="chip">Relationer: <strong id="countRels">0</strong></span>
+    <span class="chip">Linjer: <strong id="countLines">0</strong></span>
+
+    <span class="actions">
+      <button id="reloadBtn" type="button">Ladda om</button>
+      <button id="fitBtn" type="button">Zooma till alla</button>
+      <button id="togglePickerBtn" type="button">Plats-picker: AV</button>
+      <button id="toggleLinesBtn" type="button">Linjer: PÅ</button>
+    </span>
   </div>
 
-  <script>
-    document.getElementById("loginForm").addEventListener("submit", function (e) {
-      e.preventDefault();
-      // Stabilt: vi går till en fil som också ligger i docs/
-      window.location.href = "./start.html";
-    });
-  </script>
+  <div class="coordsBox">
+    Plats-picker (valfri, för test): <code id="coordsOut">—</code>
+  </div>
+
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+<script>
+  // =========================
+  // LocalStorage keys
+  // =========================
+  const KEY_TREES  = "slakttradet_trees";
+  const KEY_ACTIVE = "slakttradet_active_tree_id";
+  function cardsKey(treeId){ return "slakttradet_slaktkort_" + String(treeId); }
+  function relKey(treeId){ return "slakttradet_relationer_" + String(treeId); }
+
+  // DOM
+  const msg = document.getElementById("msg");
+  const coordsOut = document.getElementById("coordsOut");
+  const activeTreeNameEl = document.getElementById("activeTreeName");
+  const countCardsEl = document.getElementById("countCards");
+  const countRelsEl = document.getElementById("countRels");
+  const countLinesEl = document.getElementById("countLines");
+
+  const reloadBtn = document.getElementById("reloadBtn");
+  const fitBtn = document.getElementById("fitBtn");
+  const togglePickerBtn = document.getElementById("togglePickerBtn");
+  const toggleLinesBtn = document.getElementById("toggleLinesBtn");
+
+  function setMsg(type, text) {
+    msg.className = "msg " + (type === "error" ? "error" : type === "ok" ? "ok" : "muted");
+    msg.textContent = text;
+  }
+
+  function loadJson(key, fallback){
+    try{
+      const raw = localStorage.getItem(key);
+      if(!raw) return fallback;
+      return JSON.parse(raw);
+    }catch{
+      return fallback;
+    }
+  }
+
+  function setCoordsText(lat, lon) {
+    coordsOut.textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+  }
+
+  function getActiveTreeId(){
+    return localStorage.getItem(KEY_ACTIVE) || "";
+  }
+
+  function getActiveTreeName(treeId){
+    const trees = loadJson(KEY_TREES, []);
+    const t = Array.isArray(trees) ? trees.find(x => String(x.id) === String(treeId)) : null;
+    return t?.name ? String(t.name) : (treeId ? String(treeId) : "—");
+  }
+
+  function formatName(p){
+    return `${p.fornamn || ""} ${p.efternamn || ""}`.trim() || "(namnlös)";
+  }
+
+  function formatYears(p){
+    const a = (p.fodelsear ?? "") !== null && (p.fodelsear ?? "") !== "" ? p.fodelsear : "";
+    const b = (p.dodsar ?? "") !== null && (p.dodsar ?? "") !== "" ? p.dodsar : "";
+    if(!a && !b) return "";
+    return ` (${a || "?"}–${b || "?"})`;
+  }
+
+  function parseCoordsObj(p){
+    if(!p || !p.coords) return null;
+    const lat = Number(p.coords.lat);
+    const lon = Number(p.coords.lon);
+    if(!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    if(lat < -90 || lat > 90) return null;
+    if(lon < -180 || lon > 180) return null;
+    return { lat, lon };
+  }
+
+  function escapeHtml(s){
+    return String(s)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  // =========================
+  // Leaflet init
+  // =========================
+  const map = L.map("map").setView([62.0, 15.0], 5);
+
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap contributors"
+  }).addTo(map);
+
+  // lager
+  const linesLayer = L.layerGroup().addTo(map);
+  const cardsLayer = L.layerGroup().addTo(map);
+
+  // =========================
+  // Plats-picker (valfri)
+  // =========================
+  let pickerEnabled = false;
+  let pickMarker = null;
+
+  function ensurePickMarker(latlng) {
+    if (!pickMarker) {
+      pickMarker = L.marker(latlng, { draggable: true }).addTo(map);
+      pickMarker.bindPopup("Vald punkt (dra och släpp)").openPopup();
+
+      pickMarker.on("dragend", () => {
+        const ll = pickMarker.getLatLng();
+        setCoordsText(ll.lat, ll.lng);
+        setMsg("ok", "Punkt uppdaterad (drag & drop).");
+      });
+    } else {
+      pickMarker.setLatLng(latlng);
+    }
+    const ll = pickMarker.getLatLng();
+    setCoordsText(ll.lat, ll.lng);
+  }
+
+  map.on("click", (e) => {
+    if(!pickerEnabled) return;
+    ensurePickMarker(e.latlng);
+    setMsg("ok", "Punkt satt (plats-picker).");
+  });
+
+  function updatePickerUi(){
+    togglePickerBtn.textContent = "Plats-picker: " + (pickerEnabled ? "PÅ" : "AV");
+  }
+
+  togglePickerBtn.addEventListener("click", () => {
+    pickerEnabled = !pickerEnabled;
+    updatePickerUi();
+    setMsg("", pickerEnabled ? "Plats-picker är PÅ. Klicka i kartan för att sätta punkt." : "Plats-picker är AV.");
+  });
+
+  // =========================
+  // Relation-indexering
+  // =========================
+  function buildRelationIndex(rels){
+    const parentsOf = {};   // childId -> [parentId]
+    const childrenOf = {};  // parentId -> [childId]
+    const partnersOf = {};  // personId -> [{ otherId, status, fromYear, toYear }]
+
+    for(const r of (Array.isArray(rels) ? rels : [])){
+      if(!r) continue;
+
+      if(r.typ === "FORALDER_BARN"){
+        const parentId = String(r.franPersonId || "");
+        const childId  = String(r.tillPersonId || "");
+        if(!parentId || !childId) continue;
+
+        if(!parentsOf[childId]) parentsOf[childId] = [];
+        if(!parentsOf[childId].includes(parentId)) parentsOf[childId].push(parentId);
+
+        if(!childrenOf[parentId]) childrenOf[parentId] = [];
+        if(!childrenOf[parentId].includes(childId)) childrenOf[parentId].push(childId);
+      }
+
+      if(r.typ === "PARTNER"){
+        const a = String(r.personAId || "");
+        const b = String(r.personBId || "");
+        if(!a || !b || a === b) continue;
+
+        const status = String(r.status || "");
+        const fromYear = (r.fromYear ?? null);
+        const toYear = (r.toYear ?? null);
+
+        if(!partnersOf[a]) partnersOf[a] = [];
+        if(!partnersOf[b]) partnersOf[b] = [];
+
+        partnersOf[a].push({ otherId: b, status, fromYear, toYear });
+        partnersOf[b].push({ otherId: a, status, fromYear, toYear });
+      }
+    }
+
+    return { parentsOf, childrenOf, partnersOf };
+  }
+
+  function relationBadgeText(pr, byId){
+    const other = byId[pr.otherId];
+    const name = other ? `${formatName(other)}${formatYears(other)}` : pr.otherId;
+
+    const status = pr.status ? pr.status : "PARTNER";
+    const fy = (pr.fromYear ?? null);
+    const ty = (pr.toYear ?? null);
+    const yearText = (fy !== null || ty !== null) ? ` (${fy ?? "?"}–${ty ?? "?"})` : "";
+
+    // stillsamt: "Gift (1924–1938) — Namn"
+    const statusText =
+      status === "GIFT" ? "Gift" :
+      status === "SAMBO" ? "Sambo" :
+      status === "SARBO" ? "Särbo" :
+      status === "SKILDA" ? "Skilda" :
+      status;
+
+    return `${statusText}${yearText} — ${name}`;
+  }
+
+  function renderPersonList(ids, byId){
+    if(!ids || ids.length === 0) return "<div class='muted'>—</div>";
+    const items = ids
+      .map(id => byId[id])
+      .filter(Boolean)
+      .map(p => `<li>${escapeHtml(formatName(p))}${escapeHtml(formatYears(p))}</li>`)
+      .join("");
+    return `<ul>${items}</ul>`;
+  }
+
+  function renderPartnerList(personId, partnersOf, byId){
+    const list = partnersOf?.[personId] || [];
+    if(!list || list.length === 0) return "<div class='muted'>—</div>";
+
+    // avdupning (samma otherId+status+år kan finnas flera gånger om man skapar dubletter)
+    const seen = new Set();
+    const items = [];
+    for(const pr of list){
+      const key = `${pr.otherId}|${pr.status}|${pr.fromYear ?? ""}|${pr.toYear ?? ""}`;
+      if(seen.has(key)) continue;
+      seen.add(key);
+      items.push(`<li>${escapeHtml(relationBadgeText(pr, byId))}</li>`);
+    }
+
+    return `<ul>${items.join("")}</ul>`;
+  }
+
+  // =========================
+  // Render
+  // =========================
+  let lastBounds = null;
+  let showLines = true;
+
+  function updateLinesUi(){
+    toggleLinesBtn.textContent = "Linjer: " + (showLines ? "PÅ" : "AV");
+  }
+
+  toggleLinesBtn.addEventListener("click", () => {
+    showLines = !showLines;
+    updateLinesUi();
+    renderMap();
+  });
+
+  function renderMap(){
+    cardsLayer.clearLayers();
+    linesLayer.clearLayers();
+    lastBounds = null;
+    countLinesEl.textContent = "0";
+
+    const treeId = getActiveTreeId();
+    if(!treeId){
+      activeTreeNameEl.textContent = "—";
+      countCardsEl.textContent = "0";
+      countRelsEl.textContent = "0";
+      setMsg("error", "Inget aktivt träd valt. Gå till 'Träd' och välj ett träd.");
+      return;
+    }
+
+    const treeName = getActiveTreeName(treeId);
+    activeTreeNameEl.textContent = treeName;
+
+    const cards = loadJson(cardsKey(treeId), []);
+    const rels  = loadJson(relKey(treeId), []);
+
+    const safeCards = Array.isArray(cards) ? cards : [];
+    const safeRels  = Array.isArray(rels) ? rels : [];
+
+    countRelsEl.textContent = String(safeRels.length);
+
+    // indexera personer
+    const byId = {};
+    for(const p of safeCards){
+      if(p && typeof p.id === "string" && p.id.trim()) byId[p.id] = p;
+    }
+
+    const { parentsOf, childrenOf, partnersOf } = buildRelationIndex(safeRels);
+
+    // skapa marker-index (personId -> LatLng)
+    const posById = {};
+
+    // lägg markörer
+    let countWithCoords = 0;
+    for(const p of safeCards){
+      const c = parseCoordsObj(p);
+      if(!c) continue;
+
+      countWithCoords++;
+      posById[p.id] = L.latLng(c.lat, c.lon);
+
+      const parents = parentsOf[p.id] || [];
+      const kids = childrenOf[p.id] || [];
+      const partners = partnersOf[p.id] || [];
+
+      const popupHtml = `
+        <div class="popup">
+          <h3>${escapeHtml(formatName(p))}${escapeHtml(formatYears(p))}</h3>
+          <div class="meta">${escapeHtml(p.plats || "")}</div>
+          <div class="submuted">
+            Föräldrar: <strong>${parents.length}</strong> ·
+            Barn: <strong>${kids.length}</strong> ·
+            Partner: <strong>${partners.length}</strong>
+          </div>
+
+          <div class="sectionTitle">Föräldrar (${parents.length})</div>
+          ${renderPersonList(parents, byId)}
+
+          <div class="sectionTitle">Barn (${kids.length})</div>
+          ${renderPersonList(kids, byId)}
+
+          <div class="sectionTitle">Partner (${partners.length})</div>
+          ${renderPartnerList(p.id, partnersOf, byId)}
+        </div>
+      `;
+
+      const marker = L.marker([c.lat, c.lon]).addTo(cardsLayer);
+      marker.bindPopup(popupHtml);
+
+      marker.bindTooltip(escapeHtml(formatName(p)), {
+        permanent: true,
+        direction: "top",
+        offset: [0, -14],
+        className: "name-label",
+        opacity: 0.95
+      });
+
+      if(!lastBounds) lastBounds = L.latLngBounds([ [c.lat, c.lon], [c.lat, c.lon] ]);
+      else lastBounds.extend([c.lat, c.lon]);
+    }
+
+    countCardsEl.textContent = String(countWithCoords);
+
+    if(countWithCoords === 0){
+      setMsg("error", "Inga släktkort med koordinater i aktivt träd. Lägg coords i Släktkort.");
+      return;
+    }
+
+    // rita linjer (FAS 2: bara FORALDER_BARN och bara om båda har coords)
+    let drawnLines = 0;
+    if(showLines){
+      for(const r of safeRels){
+        if(!r || r.typ !== "FORALDER_BARN") continue;
+
+        const parentId = String(r.franPersonId || "");
+        const childId  = String(r.tillPersonId || "");
+        if(!parentId || !childId) continue;
+
+        const p1 = posById[parentId];
+        const p2 = posById[childId];
+        if(!p1 || !p2) continue;
+
+        L.polyline([p1, p2], { weight: 2, opacity: 0.8 }).addTo(linesLayer);
+        drawnLines++;
+      }
+    }
+
+    countLinesEl.textContent = String(drawnLines);
+
+    setMsg("ok", `Klar: ${countWithCoords} markörer, ${drawnLines} linjer i '${treeName}'.`);
+  }
+
+  reloadBtn.addEventListener("click", renderMap);
+  fitBtn.addEventListener("click", () => {
+    if(lastBounds) map.fitBounds(lastBounds.pad(0.2));
+    else setMsg("error", "Inga markörer att zooma till.");
+  });
+
+  updatePickerUi();
+  updateLinesUi();
+  renderMap();
+</script>
+
 </body>
 </html>
