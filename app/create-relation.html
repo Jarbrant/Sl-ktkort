@@ -91,7 +91,7 @@
       <a href="../start.html">← Tillbaka</a>
       <h1>Skapa relation <span class="pill">Förälder → barn</span></h1>
       <p class="muted">
-        Relationer är separata från släktkort. Här skapar du bara kopplingen.
+        Relationer är separata från släktkort. Här skapar du kopplingen och den sparas per träd.
       </p>
     </header>
 
@@ -128,7 +128,7 @@
         </div>
 
         <div class="actions">
-          <button type="submit">Skapa relation (generera JSON)</button>
+          <button type="submit">Skapa relation (sparar)</button>
           <button type="button" id="resetBtn">Rensa</button>
           <a class="button-link" href="../start.html">Avbryt</a>
         </div>
@@ -140,7 +140,7 @@
     <section class="card" aria-label="JSON output">
       <h2 style="margin:0 0 8px;">JSON</h2>
       <p class="muted" style="margin-top:0;">
-        Kopiera objektet nedan. (I demo-läge sparar vi inte relationer automatiskt.)
+        Objektet sparas i localStorage (per träd). Du kan även kopiera JSON för debugging.
       </p>
       <pre><code id="out">{}</code></pre>
       <div class="actions">
@@ -159,6 +159,9 @@
       const KEY_TREES = "slakttradet_trees";
       const KEY_ACTIVE = "slakttradet_active_tree_id";
       function cardsKey(treeId) { return "slakttradet_slaktkort_" + String(treeId); }
+
+      // Relationer per träd
+      function relationsKey(treeId) { return "slakttradet_relationer_" + String(treeId); }
 
       const parentSelect = document.getElementById("parentSelect");
       const childSelect = document.getElementById("childSelect");
@@ -180,6 +183,10 @@
         } catch {
           return fallback;
         }
+      }
+
+      function saveJson(key, value) {
+        localStorage.setItem(key, JSON.stringify(value));
       }
 
       function getActiveTreeId() {
@@ -258,9 +265,41 @@
         }
       }
 
+      function loadRelations(treeId) {
+        const rels = loadJson(relationsKey(treeId), []);
+        return Array.isArray(rels) ? rels : [];
+      }
+
+      function saveRelation(treeId, relObj) {
+        const rels = loadRelations(treeId);
+
+        // enkel duplikat-kontroll (samma parent->child)
+        const exists = rels.some(r =>
+          r &&
+          r.typ === "FORALDER_BARN" &&
+          String(r.franPersonId) === String(relObj.franPersonId) &&
+          String(r.tillPersonId) === String(relObj.tillPersonId)
+        );
+
+        if (exists) {
+          return { ok: false, reason: "Den relationen finns redan." };
+        }
+
+        rels.push(relObj);
+        saveJson(relationsKey(treeId), rels);
+        return { ok: true, count: rels.length };
+      }
+
       form.addEventListener("submit", (e) => {
         e.preventDefault();
         msg.textContent = "";
+
+        const activeTreeId = getActiveTreeId();
+        if (!activeTreeId) {
+          msg.innerHTML = '<span class="error">Inget aktivt träd valt. Gå till Skapa/Välj träd.</span>';
+          out.textContent = "{}";
+          return;
+        }
 
         const parentId = parentSelect.value;
         const childId = childSelect.value;
@@ -280,8 +319,17 @@
           createdAt: new Date().toISOString()
         };
 
+        // Spara i localStorage per träd
+        const result = saveRelation(activeTreeId, obj);
         out.textContent = escapeForDisplay(obj);
-        msg.innerHTML = '<span class="ok">Klart.</span> Du kan kopiera JSON nedan.';
+
+        if (!result.ok) {
+          msg.innerHTML = `<span class="error">${result.reason}</span>`;
+          return;
+        }
+
+        msg.innerHTML =
+          `<span class="ok">Sparat.</span> Relation lagrad för aktivt träd. Totalt relationer: ${result.count}.`;
       });
 
       resetBtn.addEventListener("click", () => {
