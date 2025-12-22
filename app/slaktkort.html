@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Personer – Släktkort</title>
-  <meta name="description" content="Skapa/ändra släktkort (personer) per aktivt träd i localStorage. Stöd för ?personId=..." />
+  <meta name="description" content="Skapa/ändra släktkort (personer) per aktivt träd i localStorage. Visar även beräknade relationer (syskon/kusin/morbror osv) baserat på Förälder→Barn + Partner." />
 
   <style>
     :root { color-scheme: light; }
@@ -69,6 +69,7 @@
     .row{ display:grid; gap:12px; grid-template-columns: 1fr; }
     @media (min-width: 720px){
       .row.two{ grid-template-columns: 1fr 1fr; }
+      .row.three{ grid-template-columns: 1fr 1fr 1fr; }
     }
 
     .actions{
@@ -119,6 +120,38 @@
     .itemTitle{ font-weight:950; margin:0 0 2px; }
     .itemMeta{ margin:0; color:#555; font-size:.95rem; }
 
+    .relGrid{
+      display:grid;
+      gap:12px;
+      grid-template-columns: 1fr;
+      margin-top: 10px;
+    }
+    @media (min-width: 900px){
+      .relGrid{ grid-template-columns: 1fr 1fr; }
+    }
+    .relBox{
+      border:1px solid #eee;
+      border-radius:12px;
+      padding:12px;
+      background:#fff;
+    }
+    .relBox h3{
+      margin:0 0 8px;
+      font-size: 1.05rem;
+    }
+    .relLine{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      padding:6px 0;
+      border-top:1px solid #f1f1f1;
+    }
+    .relLine:first-of-type{ border-top:0; }
+    .relLeft{ min-width: 0; }
+    .relName{ font-weight:850; }
+    .relSub{ color:#666; font-size:.92rem; }
+    .relAction{ white-space:nowrap; }
+
     code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
     pre{ white-space:pre-wrap; background:#f4f4f4; padding:12px; border-radius:12px; overflow:auto; }
   </style>
@@ -127,7 +160,9 @@
 <body>
 <header>
   <h1>👤 Personer (Släktkort)</h1>
-  <p class="muted">LocalStorage-first. Stöd för att öppna från karta via <code>?personId=...</code>.</p>
+  <p class="muted">
+    Du matar in grunddata + grundrelationer (Förälder→Barn + Partner). Resten (syskon/kusin/morbror osv) räknas fram här.
+  </p>
 
   <nav class="topbar" aria-label="Navigation">
     <a class="btn secondary" href="../start.html">Start</a>
@@ -140,25 +175,10 @@
   </nav>
 </header>
 
-<!-- 0) Om du kom hit via karta -->
-<section id="openCard" class="card" hidden>
-  <h2>Öppnad person</h2>
-  <p class="small">Den här personen öppnades via karta-länken.</p>
-  <div class="focusBox">
-    <p class="focusTitle" id="openName">—</p>
-    <p class="focusMeta" id="openMeta">—</p>
-  </div>
-  <div class="actions">
-    <a class="btn secondary" href="./map.html">← Tillbaka till karta</a>
-    <button id="clearOpenBtn" class="btn secondary" type="button">Stäng “Öppnad person”</button>
-  </div>
-  <p id="openMsg" class="muted" aria-live="polite"></p>
-</section>
-
-<!-- 1) Välj träd -->
+<!-- 1) Träd -->
 <section class="card">
   <h2>1) Träd</h2>
-  <p class="small">Personer sparas per träd i <code>localStorage</code>.</p>
+  <p class="small">Personer och relationer sparas per träd i <code>localStorage</code>.</p>
 
   <label for="treeSelect">Aktivt träd</label>
   <select id="treeSelect" aria-label="Välj träd"></select>
@@ -174,7 +194,9 @@
 <!-- 2) Skapa / ändra person -->
 <section class="card">
   <h2 id="formTitle">2) Skapa person</h2>
-  <p class="small" id="formHint">Fyll i minst förnamn eller efternamn. Koordinater kan sättas via Plats-picker.</p>
+  <p class="small" id="formHint">
+    Tips: om du går till Plats-picker och kommer tillbaka, sparas dina fält som “utkast” automatiskt.
+  </p>
 
   <div class="row two">
     <div>
@@ -229,9 +251,27 @@
   <p id="saveMsg" class="muted" aria-live="polite"></p>
 </section>
 
-<!-- 3) Lista personer (klickbar lista) -->
+<!-- 3) Beräknade relationer -->
 <section class="card">
-  <h2>3) Personer i aktivt träd</h2>
+  <h2>3) Beräknade relationer för vald person</h2>
+  <p class="small">
+    Dessa bygger på dina sparade relationer i <code>create-relation.html</code>.
+    Om något saknas: lägg till Förälder→Barn eller Partner, så uppdateras listan.
+  </p>
+
+  <div class="actions">
+    <a class="btn secondary" href="./create-relation.html">Lägg till grundrelationer</a>
+    <button id="refreshComputedBtn" type="button" class="btn secondary">Uppdatera beräkningar</button>
+  </div>
+
+  <div id="computedEmpty" class="muted" style="margin-top:10px;"></div>
+
+  <div class="relGrid" id="relGrid" aria-label="Beräknade relationer"></div>
+</section>
+
+<!-- 4) Personlista -->
+<section class="card">
+  <h2>4) Personer i aktivt träd</h2>
   <p class="small">Klicka en person för att öppna/ändra den.</p>
 
   <div class="actions">
@@ -261,26 +301,22 @@
   })();
 
   // ============================
-  // LocalStorage keys (MÅSTE matcha trees.html / relationer / karta)
+  // Keys (MÅSTE matcha övriga sidor)
   // ============================
   const KEY_TREES = "slakttradet_trees";
   const KEY_ACTIVE = "slakttradet_active_tree_id";
   const KEY_LAST_LOC = "slakttradet_last_location";
-  const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
 
-  // Utkast så du inte tappar namn när du går till place-picker
+  const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
+  const relKey   = (treeId) => "slakttradet_relationer_" + String(treeId);
+
+  // Utkast så du inte tappar fält när du går till place-picker
   const draftKey = (treeId) => "slakttradet_slaktkort_draft_" + String(treeId);
 
   // ============================
   // DOM
   // ============================
   const logoutBtn = document.getElementById("logoutBtn");
-
-  const openCard = document.getElementById("openCard");
-  const openName = document.getElementById("openName");
-  const openMeta = document.getElementById("openMeta");
-  const openMsg = document.getElementById("openMsg");
-  const clearOpenBtn = document.getElementById("clearOpenBtn");
 
   const treeSelect = document.getElementById("treeSelect");
   const reloadTreesBtn = document.getElementById("reloadTreesBtn");
@@ -306,6 +342,10 @@
   const deleteBtn = document.getElementById("deleteBtn");
   const saveMsg = document.getElementById("saveMsg");
 
+  const refreshComputedBtn = document.getElementById("refreshComputedBtn");
+  const computedEmpty = document.getElementById("computedEmpty");
+  const relGrid = document.getElementById("relGrid");
+
   const refreshListBtn = document.getElementById("refreshListBtn");
   const peopleList = document.getElementById("peopleList");
   const out = document.getElementById("out");
@@ -313,8 +353,7 @@
   // ============================
   // State
   // ============================
-  let editingPersonId = "";     // om du editerar en person
-  let openedPersonId = "";      // från ?personId
+  let editingPersonId = "";     // aktuell person vi visar/editerar
   let suppressDraftSave = false;
 
   // ============================
@@ -327,13 +366,6 @@
   }
   function saveJson(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
 
-  function setMsg(el, type, text){
-    el.innerHTML = type === "error"
-      ? "<span class='error'>" + escapeHtml(text) + "</span>"
-      : type === "ok"
-        ? "<span class='ok'>" + escapeHtml(text) + "</span>"
-        : escapeHtml(text || "");
-  }
   function escapeHtml(s){
     return String(s || "")
       .replaceAll("&","&amp;")
@@ -341,6 +373,13 @@
       .replaceAll(">","&gt;")
       .replaceAll('"',"&quot;")
       .replaceAll("'","&#039;");
+  }
+  function setMsg(el, type, text){
+    el.innerHTML = type === "error"
+      ? "<span class='error'>" + escapeHtml(text) + "</span>"
+      : type === "ok"
+        ? "<span class='ok'>" + escapeHtml(text) + "</span>"
+        : escapeHtml(text || "");
   }
 
   function getActiveTreeId(){ return localStorage.getItem(KEY_ACTIVE) || ""; }
@@ -357,6 +396,11 @@
   }
   function saveCards(treeId, cards){
     saveJson(cardsKey(treeId), cards);
+  }
+
+  function loadRels(treeId){
+    const arr = loadJson(relKey(treeId), []);
+    return Array.isArray(arr) ? arr : [];
   }
 
   function personName(p){
@@ -416,7 +460,7 @@
   }
 
   // ============================
-  // Draft (för att inte tappa namn när du går till place-picker)
+  // Draft (så du inte tappar namn när du går till place-picker)
   // ============================
   function readDraft(){
     const t = getActiveTreeId();
@@ -450,10 +494,7 @@
     const d = readDraft();
     if(!d) return;
 
-    // Om vi har öppnat en person via ?personId, ska det få styra istället för draft
-    if(openedPersonId) return;
-
-    // Om formuläret redan har värden (t.ex. du har klickat en person) – lämna
+    // Om formuläret redan har något, lämna det
     const alreadyHasAny =
       String(fornamnEl.value || "").trim() ||
       String(efternamnEl.value || "").trim() ||
@@ -522,57 +563,39 @@
 
     // byte träd = nytt arbetsläge
     editingPersonId = "";
-    openedPersonId = "";
-    hideOpenedPerson();
     resetForm(false);
     restoreDraftIfUseful();
     renderPeopleList();
+    renderComputedRelations();
   });
 
   reloadTreesBtn.addEventListener("click", () => {
     renderTreeSelect();
     restoreDraftIfUseful();
     renderPeopleList();
+    renderComputedRelations();
   });
 
   // ============================
-  // Open via query ?personId=...
+  // Prefill coords från place-picker
   // ============================
-  function getQueryPersonId(){
-    try{
-      const sp = new URLSearchParams(window.location.search);
-      const pid = (sp.get("personId") || "").trim();
-      return pid;
-    }catch{
-      return "";
-    }
+  function prefillCoordsFromPlacePicker(){
+    const data = loadJson(KEY_LAST_LOC, null);
+    if (!data || typeof data.lat !== "number" || typeof data.lon !== "number") return;
+    if(String(coordsEl.value || "").trim()) return; // skriv inte över om du redan har
+    coordsEl.value = `${data.lat}, ${data.lon}`;
+    writeDraft();
   }
 
-  function showOpenedPerson(p){
-    openCard.hidden = false;
-    openName.textContent = personName(p);
-    openMeta.textContent = metaLine(p);
-    setMsg(openMsg, "ok", "Personen är laddad. Du kan ändra och klicka Spara.");
-  }
-  function hideOpenedPerson(){
-    openCard.hidden = true;
-    openName.textContent = "—";
-    openMeta.textContent = "—";
-    openMsg.textContent = "";
-  }
+  clearCoordsBtn.addEventListener("click", () => {
+    coordsEl.value = "";
+    writeDraft();
+    setMsg(saveMsg, "", "Koordinater rensade.");
+  });
 
-  clearOpenBtn.addEventListener("click", () => {
-    openedPersonId = "";
-    hideOpenedPerson();
-
-    // rensa query utan reload
-    try{
-      const url = new URL(window.location.href);
-      url.searchParams.delete("personId");
-      history.replaceState({}, "", url.toString());
-    }catch{}
-
-    setMsg(saveMsg, "", "Stängde “Öppnad person”.");
+  clearDraftBtn.addEventListener("click", () => {
+    clearDraft();
+    setMsg(saveMsg, "ok", "Utkast rensat.");
   });
 
   // ============================
@@ -590,7 +613,7 @@
       saveBtn.textContent = "Spara";
       deleteBtn.disabled = true;
       deleteBtn.classList.add("disabled");
-      formHint.textContent = "Fyll i minst förnamn eller efternamn. Koordinater kan sättas via Plats-picker.";
+      formHint.textContent = "Tips: om du går till Plats-picker och kommer tillbaka, sparas dina fält som “utkast” automatiskt.";
     }
   }
 
@@ -631,32 +654,9 @@
     writeDraft();
   }
 
-  // ============================
-  // Prefill coords från place-picker
-  // ============================
-  function prefillCoordsFromPlacePicker(){
-    const data = loadJson(KEY_LAST_LOC, null);
-    if (!data || typeof data.lat !== "number" || typeof data.lon !== "number") return;
-    if(String(coordsEl.value || "").trim()) return; // skriv inte över om du redan har
-    coordsEl.value = `${data.lat}, ${data.lon}`;
-    writeDraft();
-  }
-
-  clearCoordsBtn.addEventListener("click", () => {
-    coordsEl.value = "";
-    writeDraft();
-    setMsg(saveMsg, "", "Koordinater rensade.");
-  });
-
-  clearDraftBtn.addEventListener("click", () => {
-    clearDraft();
-    setMsg(saveMsg, "ok", "Utkast rensat.");
-  });
-
   newBtn.addEventListener("click", () => {
-    openedPersonId = "";
-    hideOpenedPerson();
     resetForm();
+    renderComputedRelations();
   });
 
   // ============================
@@ -702,7 +702,6 @@
     if(editingPersonId){
       const idx = cards.findIndex(p => String(p.id) === String(editingPersonId));
       if(idx === -1){
-        // om någon länkade hit med personId som inte finns
         cards.push({ ...payload, createdAt: new Date().toISOString() });
         saveCards(treeId, cards);
         setMsg(saveMsg, "ok", "Person hittades inte i listan – skapade ny istället.");
@@ -716,15 +715,13 @@
       cards.push({ ...payload, createdAt: new Date().toISOString() });
       saveCards(treeId, cards);
       setMsg(saveMsg, "ok", `Person sparad (id: ${payload.id}).`);
-      // efter create: gå till edit-läge på den personen
       editingPersonId = payload.id;
       updateFormMode();
     }
 
-    // Draft ska spegla aktuellt läge
     writeDraft();
-
     renderPeopleList();
+    renderComputedRelations();
     openAndHighlight(editingPersonId || payload.id);
   }
 
@@ -739,24 +736,13 @@
     const cards = loadCards(treeId).filter(p => String(p.id) !== String(editingPersonId));
     saveCards(treeId, cards);
 
-    const removedId = editingPersonId;
     editingPersonId = "";
-    openedPersonId = "";
-    hideOpenedPerson();
     resetForm(false);
     clearDraft();
     setMsg(saveMsg, "ok", "Person borttagen.");
 
     renderPeopleList();
-
-    // Rensa query om den pekade på borttagen
-    try{
-      const url = new URL(window.location.href);
-      if(url.searchParams.get("personId") === removedId){
-        url.searchParams.delete("personId");
-        history.replaceState({}, "", url.toString());
-      }
-    }catch{}
+    renderComputedRelations();
   }
 
   saveBtn.addEventListener("click", savePerson);
@@ -780,7 +766,7 @@
     }
 
     const cards = loadCards(treeId);
-    out.textContent = JSON.stringify({ slaktkort: cards }, null, 2);
+    out.textContent = JSON.stringify({ slaktkort: cards, relationer: loadRels(treeId) }, null, 2);
 
     if(cards.length === 0){
       const li = document.createElement("li");
@@ -812,18 +798,17 @@
 
       li.addEventListener("click", () => {
         editingPersonId = String(p.id);
-        openedPersonId = ""; // du öppnar nu från lista
-        hideOpenedPerson();
         fillFormFromPerson(p);
         updateFormMode();
         setMsg(saveMsg, "", "Person laddad. Ändra och klicka Spara ändringar.");
         highlightItem(editingPersonId);
+        renderComputedRelations();
       });
 
       peopleList.appendChild(li);
     }
 
-    highlightItem(editingPersonId || openedPersonId);
+    highlightItem(editingPersonId);
   }
 
   function highlightItem(id){
@@ -853,7 +838,276 @@
     highlightItem(id);
   }
 
-  refreshListBtn.addEventListener("click", renderPeopleList);
+  refreshListBtn.addEventListener("click", () => {
+    renderPeopleList();
+    renderComputedRelations();
+  });
+
+  // ============================
+  // Beräknade relationer (syskon/kusin/morbror osv)
+  // Bygger ENDAST på:
+  // - FORALDER_BARN: franPersonId (förälder) -> tillPersonId (barn)
+  // - PARTNER: personAId <-> personBId
+  // ============================
+  function buildIndexes(people, rels){
+    const byId = new Map(people.map(p => [String(p.id), p]));
+
+    const parentsOf = new Map();   // childId -> Set(parentId)
+    const childrenOf = new Map();  // parentId -> Set(childId)
+    const partnersOf = new Map();  // personId -> Set(partnerId)
+
+    function addSet(map, key, value){
+      const k = String(key);
+      const v = String(value);
+      if(!map.has(k)) map.set(k, new Set());
+      map.get(k).add(v);
+    }
+
+    for(const r of rels){
+      if(!r || !r.typ) continue;
+
+      if(r.typ === "FORALDER_BARN"){
+        const parentId = String(r.franPersonId || "");
+        const childId = String(r.tillPersonId || "");
+        if(!parentId || !childId) continue;
+        addSet(parentsOf, childId, parentId);
+        addSet(childrenOf, parentId, childId);
+      }
+
+      if(r.typ === "PARTNER"){
+        const a = String(r.personAId || "");
+        const b = String(r.personBId || "");
+        if(!a || !b || a === b) continue;
+        addSet(partnersOf, a, b);
+        addSet(partnersOf, b, a);
+      }
+    }
+
+    return { byId, parentsOf, childrenOf, partnersOf };
+  }
+
+  function uniqIds(arr){
+    const s = new Set();
+    for(const x of arr) if(x) s.add(String(x));
+    return Array.from(s);
+  }
+
+  function personLinkButton(personId){
+    const a = document.createElement("a");
+    a.className = "btn secondary";
+    a.style.padding = "8px 10px";
+    a.href = "./slaktkort.html"; // vi öppnar här genom att bara klicka i listan (snabbt)
+    a.textContent = "Öppna";
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      const treeId = getActiveTreeId();
+      if(!treeId) return;
+      const cards = loadCards(treeId);
+      const p = cards.find(x => String(x.id) === String(personId));
+      if(!p) return;
+      editingPersonId = String(personId);
+      fillFormFromPerson(p);
+      updateFormMode();
+      highlightItem(editingPersonId);
+      renderComputedRelations();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+    return a;
+  }
+
+  function renderRelBox(title, ids, idx){
+    const box = document.createElement("div");
+    box.className = "relBox";
+    box.innerHTML = "<h3>" + escapeHtml(title) + "</h3>";
+
+    const clean = uniqIds(ids).filter(id => idx.byId.has(String(id)) && String(id) !== String(editingPersonId));
+    if(clean.length === 0){
+      const p = document.createElement("p");
+      p.className = "muted";
+      p.style.margin = "0";
+      p.textContent = "—";
+      box.appendChild(p);
+      return box;
+    }
+
+    // sortera alfabetiskt för lugn känsla
+    clean.sort((a,b) => {
+      const pa = idx.byId.get(String(a));
+      const pb = idx.byId.get(String(b));
+      return personName(pa).localeCompare(personName(pb), "sv");
+    });
+
+    for(const id of clean){
+      const p = idx.byId.get(String(id));
+      const row = document.createElement("div");
+      row.className = "relLine";
+
+      const left = document.createElement("div");
+      left.className = "relLeft";
+      left.innerHTML =
+        "<div class='relName'>" + escapeHtml(personName(p)) + "</div>" +
+        "<div class='relSub'>" + escapeHtml(metaLine(p)) + "</div>";
+
+      const right = document.createElement("div");
+      right.className = "relAction";
+      right.appendChild(personLinkButton(id));
+
+      row.appendChild(left);
+      row.appendChild(right);
+      box.appendChild(row);
+    }
+
+    return box;
+  }
+
+  function computeRelationsFor(personId, idx){
+    const me = String(personId);
+
+    const parents = Array.from(idx.parentsOf.get(me) || []);
+    const children = Array.from(idx.childrenOf.get(me) || []);
+    const partners = Array.from(idx.partnersOf.get(me) || []);
+
+    // Syskon: delar minst en förälder
+    const siblingsSet = new Set();
+    for(const p of parents){
+      const kids = idx.childrenOf.get(String(p)) || new Set();
+      for(const k of kids){
+        if(String(k) !== me) siblingsSet.add(String(k));
+      }
+    }
+    const siblings = Array.from(siblingsSet);
+
+    // Mor-/far-föräldrar: föräldrar till mina föräldrar
+    const grandparentsSet = new Set();
+    for(const p of parents){
+      const gps = idx.parentsOf.get(String(p)) || new Set();
+      for(const gp of gps) grandparentsSet.add(String(gp));
+    }
+    const grandparents = Array.from(grandparentsSet);
+
+    // Barnbarn: barn till mina barn
+    const grandchildrenSet = new Set();
+    for(const c of children){
+      const gcs = idx.childrenOf.get(String(c)) || new Set();
+      for(const gc of gcs) grandchildrenSet.add(String(gc));
+    }
+    const grandchildren = Array.from(grandchildrenSet);
+
+    // Moster/morbror/faster/farbror: syskon till mina föräldrar
+    const auntsUnclesSet = new Set();
+    for(const p of parents){
+      const pParents = Array.from(idx.parentsOf.get(String(p)) || []);
+      for(const pp of pParents){
+        const kids = idx.childrenOf.get(String(pp)) || new Set();
+        for(const k of kids){
+          if(String(k) !== String(p)) auntsUnclesSet.add(String(k));
+        }
+      }
+    }
+    const auntsUncles = Array.from(auntsUnclesSet);
+
+    // Kusiner: barn till mina mostrar/morbröder/fastrar/farbröder
+    const cousinsSet = new Set();
+    for(const au of auntsUncles){
+      const kids = idx.childrenOf.get(String(au)) || new Set();
+      for(const k of kids) cousinsSet.add(String(k));
+    }
+    const cousins = Array.from(cousinsSet);
+
+    // Syskons barn: (brorson/systerdotter etc) – vi kallar dem "Syskonbarn"
+    const niecesNephewsSet = new Set();
+    for(const s of siblings){
+      const kids = idx.childrenOf.get(String(s)) || new Set();
+      for(const k of kids) niecesNephewsSet.add(String(k));
+    }
+    const niecesNephews = Array.from(niecesNephewsSet);
+
+    // Svärföräldrar (partners föräldrar)
+    const inlawsParentsSet = new Set();
+    for(const partner of partners){
+      const ps = idx.parentsOf.get(String(partner)) || new Set();
+      for(const p of ps) inlawsParentsSet.add(String(p));
+    }
+    const inlawsParents = Array.from(inlawsParentsSet);
+
+    // Svärsyskon (partners syskon)
+    const inlawsSiblingsSet = new Set();
+    for(const partner of partners){
+      const partnerParents = Array.from(idx.parentsOf.get(String(partner)) || []);
+      for(const pp of partnerParents){
+        const kids = idx.childrenOf.get(String(pp)) || new Set();
+        for(const k of kids){
+          if(String(k) !== String(partner)) inlawsSiblingsSet.add(String(k));
+        }
+      }
+    }
+    const inlawsSiblings = Array.from(inlawsSiblingsSet);
+
+    return {
+      parents,
+      partners,
+      children,
+      siblings,
+      grandparents,
+      grandchildren,
+      auntsUncles,
+      cousins,
+      niecesNephews,
+      inlawsParents,
+      inlawsSiblings
+    };
+  }
+
+  function renderComputedRelations(){
+    relGrid.innerHTML = "";
+    computedEmpty.textContent = "";
+
+    const treeId = getActiveTreeId();
+    if(!treeId){
+      computedEmpty.textContent = "Välj ett träd först.";
+      return;
+    }
+
+    if(!editingPersonId){
+      computedEmpty.textContent = "Välj en person i listan (längst ner) för att se relationer.";
+      return;
+    }
+
+    const people = loadCards(treeId);
+    const rels = loadRels(treeId);
+    const idx = buildIndexes(people, rels);
+
+    if(!idx.byId.has(String(editingPersonId))){
+      computedEmpty.textContent = "Personen finns inte i listan längre.";
+      return;
+    }
+
+    // Om inga relationer alls finns
+    if(rels.length === 0){
+      computedEmpty.textContent = "Inga relationer sparade än. Gå till Relationer och lägg till Förälder→Barn eller Partner.";
+      return;
+    }
+
+    const R = computeRelationsFor(editingPersonId, idx);
+
+    // Rendera boxar i en bra ordning
+    relGrid.appendChild(renderRelBox("Föräldrar", R.parents, idx));
+    relGrid.appendChild(renderRelBox("Partner", R.partners, idx));
+    relGrid.appendChild(renderRelBox("Barn", R.children, idx));
+    relGrid.appendChild(renderRelBox("Syskon", R.siblings, idx));
+
+    relGrid.appendChild(renderRelBox("Mor-/far-föräldrar", R.grandparents, idx));
+    relGrid.appendChild(renderRelBox("Barnbarn", R.grandchildren, idx));
+
+    relGrid.appendChild(renderRelBox("Moster/Morbror/Faster/Farbror", R.auntsUncles, idx));
+    relGrid.appendChild(renderRelBox("Kusiner", R.cousins, idx));
+
+    relGrid.appendChild(renderRelBox("Syskonbarn (brorson/systerdotter)", R.niecesNephews, idx));
+    relGrid.appendChild(renderRelBox("Svärföräldrar (partners föräldrar)", R.inlawsParents, idx));
+    relGrid.appendChild(renderRelBox("Svärsyskon (partners syskon)", R.inlawsSiblings, idx));
+  }
+
+  refreshComputedBtn.addEventListener("click", renderComputedRelations);
 
   // ============================
   // Logout
@@ -864,53 +1118,16 @@
   });
 
   // ============================
-  // Start
+  // Init
   // ============================
   (function init(){
-    // 1) träd
     renderTreeSelect();
-
-    // 2) place-picker -> coords
     prefillCoordsFromPlacePicker();
-
-    // 3) autosave draft
     attachDraftAutoSave();
-
-    // 4) list
     renderPeopleList();
-
-    // 5) öppna via karta-länk
-    const pid = getQueryPersonId();
-    if(pid){
-      const treeId = getActiveTreeId();
-      if(!treeId){
-        openCard.hidden = false;
-        openName.textContent = "—";
-        openMeta.textContent = "—";
-        setMsg(openMsg, "error", "Inget aktivt träd valt. Välj träd först.");
-      }else{
-        const cards = loadCards(treeId);
-        const p = cards.find(x => String(x.id) === String(pid));
-        if(!p){
-          openCard.hidden = false;
-          openName.textContent = "—";
-          openMeta.textContent = "—";
-          setMsg(openMsg, "error", "PersonId hittades inte i aktivt träd.");
-        }else{
-          openedPersonId = pid;
-          editingPersonId = pid;
-          showOpenedPerson(p);
-          fillFormFromPerson(p);
-          updateFormMode();
-          highlightItem(pid);
-        }
-      }
-    }else{
-      // 6) om ingen person öppnades via karta: återställ draft så du inte tappar text
-      restoreDraftIfUseful();
-    }
-
+    restoreDraftIfUseful();
     updateFormMode();
+    renderComputedRelations();
   })();
 </script>
 </body>
