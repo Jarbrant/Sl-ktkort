@@ -12,7 +12,7 @@
     .muted { color:#555; }
     .card { border:1px solid #ddd; border-radius:12px; padding:16px; margin-top: 16px; }
     label { display:block; margin-top: 12px; font-weight: 800; }
-    input, select, textarea, button { width:100%; padding:10px; margin-top:6px; font-size:1rem; }
+    input, select, textarea, button { width:100%; padding:10px; margin-top:6px; font-size:1rem; box-sizing: border-box; }
     textarea { min-height: 90px; resize: vertical; }
     button { border:1px solid #333; background:#fff; cursor:pointer; margin-top: 16px; border-radius: 10px; }
     .error { color:#b00020; font-weight: 800; }
@@ -20,7 +20,7 @@
     code { background:#f4f4f4; padding:2px 6px; border-radius:6px; }
     .row { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     @media (max-width: 700px) { .row { grid-template-columns: 1fr; } }
-    .actionsRow { display:flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .actionsRow { display:flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
     .actionsRow button { width: auto; padding: 10px 14px; margin-top: 0; }
     .actionsRow a { margin: 0; }
     pre { white-space:pre-wrap; background:#f4f4f4; padding:12px; border-radius:10px; overflow:auto; }
@@ -28,7 +28,8 @@
 </head>
 
 <body>
-  <a href="./index.html">← Adminpanel</a>
+  <!-- OBS: Denna fil ligger i /app/ så adminpanelen ligger ett steg upp -->
+  <a href="../index.html">← Adminpanel</a>
   <a href="./trees.html">Skapa/Välj träd</a>
   <a href="./place-picker.html">Välj plats (karta)</a>
 
@@ -37,8 +38,25 @@
     LocalStorage-first (funkar på GitHub Pages). Backend kan kopplas på senare.
   </p>
 
+  <!-- 1) Välj träd -->
+  <div class="card">
+    <h2>1) Välj träd</h2>
+    <p class="muted">Släktkort sparas per träd i localStorage.</p>
+
+    <label for="treeSelect">Träd</label>
+    <select id="treeSelect" aria-label="Välj träd"></select>
+
+    <div class="actionsRow">
+      <button id="reloadTreesBtn" type="button">Ladda träd</button>
+      <a href="./trees.html">Gå till Skapa/Välj träd</a>
+    </div>
+
     <p id="treeMsg" class="muted" aria-live="polite"></p>
   </div>
+
+  <!-- 2) Skapa släktkort -->
+  <div class="card">
+    <h2>2) Skapa släktkort</h2>
 
     <div class="row">
       <div>
@@ -90,6 +108,7 @@
     <p id="createMsg" class="muted" aria-live="polite"></p>
   </div>
 
+  <!-- 3) Lista släktkort -->
   <div class="card">
     <h2>3) Lista släktkort i valt träd</h2>
     <p class="muted">Visas som JSON (demo).</p>
