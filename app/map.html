@@ -134,7 +134,7 @@
     }
     .toggleRow label{
       display:flex;
-      align-items:center;
+      align-items:flex-start;
       gap:10px;
       font-weight:700;
       margin:0;
@@ -143,6 +143,7 @@
       width:auto;
       padding:0;
       margin:0;
+      margin-top:2px;
     }
 
     #map{
@@ -193,9 +194,6 @@
     }
     code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
 
-    /* =====================================================
-       DOCKAD VÄNSTERPANEL (täcker aldrig kartan)
-       ===================================================== */
     #dockPanel[hidden]{ display:none; }
 
     .panelHeader{
@@ -243,7 +241,6 @@
       margin-top: 12px;
     }
 
-    /* Mini-tree (chips) */
     .miniTree{
       border:1px solid #eee;
       border-radius:14px;
@@ -264,7 +261,7 @@
 
     .chip{
       display:inline-flex;
-      flex-direction:column;          /* <-- partner/fokus under namnet */
+      flex-direction:column;
       align-items:center;
       justify-content:center;
       gap:4px;
@@ -330,9 +327,6 @@
     }
     .expandItemBtn:hover{ background:#fafafa; }
 
-    /* =====================================================
-       MARKÖRER (ingen popup, fokus + toning)
-       ===================================================== */
     :root{
       --accentGreen: #b7e4c7;
       --accentGreenDeep: #7fcf9b;
@@ -443,9 +437,6 @@
       <a class="btn secondary" href="./slaktkort.html">Gå till Personer</a>
     </div>
 
-    <!-- =====================================================
-         VÄLJ PLATS (NYTT) – spara koordinater till slaktkort.html
-         ===================================================== -->
     <div id="pickBox" class="hintBox">
       <strong>Välj plats till person</strong>
       <div class="small" style="margin-top:6px;">
@@ -512,16 +503,13 @@
 
   <section class="card" aria-label="Karta">
     <h2>Karta</h2>
-    <p class="small">OpenStreetMap via Leaflet. (Klicka på kartan för att sätta flagga i “Välj plats”-läge.)</p>
+    <p class="small">OpenStreetMap via Leaflet. (I “Välj plats”-läge: klicka i kartan för att sätta flagga.)</p>
     <div id="map" role="application" aria-label="Karta med markörer och kopplingar"></div>
     <p id="msg" class="muted" aria-live="polite" style="margin-top:10px;"></p>
   </section>
 </div>
 
 <script>
-  // =====================================================
-  // AUTH-GUARD (DEMO)
-  // =====================================================
   (function authGuard(){
     try{
       if(sessionStorage.getItem("demo_auth") !== "1"){
@@ -530,22 +518,17 @@
     }catch{}
   })();
 
-  // =====================================================
-  // STORAGE KEYS (MÅSTE MATCHA ANDRA SIDOR)
-  // =====================================================
   const KEY_TREES  = "slakttradet_trees";
   const KEY_ACTIVE = "slakttradet_active_tree_id";
   const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
   const relKey   = (treeId) => "slakttradet_relationer_" + String(treeId);
 
-  // =====================================================
-  // MAP PICK RESULT (matchar slaktkort.html)
-  // =====================================================
+  // RESULT nyckel som slaktkort.html läser när vi kommer tillbaka
   const PICK_RESULT_KEY = "slaktkort_map_pick_result";
 
-  // =====================================================
-  // DOM
-  // =====================================================
+  // Autostart-flagga (kompatibelt fallback)
+  const PICK_AUTOSTART_KEY = "slaktkort_map_pick_autostart";
+
   const leftCard = document.getElementById("leftCard");
 
   const logoutBtn = document.getElementById("logoutBtn");
@@ -569,13 +552,11 @@
   const fitBtn = document.getElementById("fitBtn");
   const listEl = document.getElementById("list");
 
-  // PICK UI
   const pickStartBtn = document.getElementById("pickStartBtn");
   const pickSaveBtn = document.getElementById("pickSaveBtn");
   const pickCancelBtn = document.getElementById("pickCancelBtn");
   const pickInfo = document.getElementById("pickInfo");
 
-  // DOCK PANEL DOM
   const dockPanel = document.getElementById("dockPanel");
   const panelClose = document.getElementById("panelClose");
 
@@ -593,9 +574,6 @@
   const expandClose = document.getElementById("expandClose");
   const expandList = document.getElementById("expandList");
 
-  // =====================================================
-  // JSON HELPERS
-  // =====================================================
   function safeParse(raw, fallback){
     try{ return JSON.parse(raw); }
     catch{ return fallback; }
@@ -605,9 +583,6 @@
     return raw ? safeParse(raw, fallback) : fallback;
   }
 
-  // =====================================================
-  // ACTIVE TREE
-  // =====================================================
   function activeTreeId(){
     return localStorage.getItem(KEY_ACTIVE) || "";
   }
@@ -622,9 +597,6 @@
     return t ? (t.name || t.id) : id;
   }
 
-  // =====================================================
-  // FORMAT HELPERS
-  // =====================================================
   function personName(p){
     const n = `${p.fornamn || ""} ${p.efternamn || ""}`.trim();
     return n || "(namnlös)";
@@ -645,9 +617,6 @@
       .replaceAll("'","&#039;");
   }
 
-  // =====================================================
-  // COORDS PARSE + RANGE CHECK
-  // =====================================================
   function inLatLonRange(lat, lon){
     return Number.isFinite(lat) && Number.isFinite(lon) &&
       lat >= -90 && lat <= 90 &&
@@ -672,9 +641,6 @@
     return null;
   }
 
-  // =====================================================
-  // OFFLINE PLATS (FALUN / DALARNA)
-  // =====================================================
   const FALUN = { lat: 60.6070, lon: 15.6355 };
   const FALUN_RADIUS_KM = 15;
   const DALARNA_BOX = { minLat: 59.8, maxLat: 61.4, minLon: 12.2, maxLon: 16.9 };
@@ -705,9 +671,6 @@
     return { primary: "Sverige", secondary: "" };
   }
 
-  // =====================================================
-  // LOADERS
-  // =====================================================
   function loadPeople(){
     const t = activeTreeId();
     if(!t) return [];
@@ -724,9 +687,6 @@
     return people.find(p => String(p.id) === String(id)) || null;
   }
 
-  // =====================================================
-  // LEAFLET SETUP
-  // =====================================================
   const map = L.map("map", { zoomControl: true });
 
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -739,8 +699,8 @@
   const markerLayer = L.layerGroup().addTo(map);
   const linkLayer = L.layerGroup().addTo(map);
 
-  const markersById = new Map(); // personId -> marker
-  const coordsById = new Map();  // personId -> coords
+  const markersById = new Map();
+  const coordsById = new Map();
 
   let focusedMarkerId = "";
 
@@ -766,9 +726,6 @@
     map.fitBounds(L.latLngBounds(ll).pad(0.2));
   }
 
-  // =====================================================
-  // MARKÖR-ICON
-  // =====================================================
   function markerIconHtml(){
     return "<div class='mkWrap'><span class='mkFlag'>🇸🇪</span></div>";
   }
@@ -786,10 +743,8 @@
       if(!el) continue;
       const wrap = el.querySelector(".mkWrap");
       if(!wrap) continue;
-
       wrap.classList.remove("isActive", "isDim");
       if(!hasFocus) continue;
-
       if(String(pid) === String(focusedMarkerId)) wrap.classList.add("isActive");
       else wrap.classList.add("isDim");
     }
@@ -803,9 +758,6 @@
     applyMarkerFocusStyles();
   }
 
-  // =====================================================
-  // FILTERING
-  // =====================================================
   function currentFiltered(peopleWithCoords){
     const q = String(searchEl.value || "").trim().toLowerCase();
     if(!q) return peopleWithCoords;
@@ -820,9 +772,6 @@
     });
   }
 
-  // =====================================================
-  // LIST RENDER
-  // =====================================================
   function renderList(people){
     listEl.innerHTML = "";
 
@@ -870,9 +819,6 @@
     }
   }
 
-  // =====================================================
-  // MARKER RENDER
-  // =====================================================
   function renderMarkers(peopleVisible){
     clearMarkersOnly();
 
@@ -899,9 +845,6 @@
     applyMarkerFocusStyles();
   }
 
-  // =====================================================
-  // PARTNER-ID ADAPTER
-  // =====================================================
   function getPartnerPair(r){
     const a1 = r && (r.personAId ?? r.personA ?? r.aId ?? r.a);
     const b1 = r && (r.personBId ?? r.personB ?? r.bId ?? r.b);
@@ -918,9 +861,6 @@
     return null;
   }
 
-  // =====================================================
-  // LINK RENDER
-  // =====================================================
   function renderLinks(relations, focusId){
     clearLinks();
 
@@ -1008,9 +948,6 @@
     return { parentChild: drawnPC, partner: drawnPartner, total };
   }
 
-  // =====================================================
-  // HINT RENDER
-  // =====================================================
   function renderHint(hasTrees, hasActive, peopleWithCoords){
     if(!hasTrees){
       hint.hidden = false;
@@ -1026,18 +963,15 @@
       hint.hidden = false;
       hint.innerHTML =
         "<strong>Tips:</strong> Inga personer har plats ännu. " +
-        "Gå till <a href='./slaktkort.html'><code>Personer</code></a> och sätt coords (via “Välj plats till person” här eller genom att skriva coords).";
+        "Gå till <a href='./slaktkort.html'><code>Personer</code></a> och sätt coords (via “Välj från kartan”).";
       return;
     }
     hint.hidden = true;
     hint.innerHTML = "";
   }
 
-  // =====================================================
-  // DOCKAD PANEL STATE
-  // =====================================================
   let panelPersonId = "";
-  let expandedMode = "NONE"; // "NONE" | "BARN" | "PARTNER"
+  let expandedMode = "NONE";
 
   function closePanel(){
     dockPanel.hidden = true;
@@ -1064,10 +998,7 @@
       }
     }
 
-    // Viktigt: panelen ska kännas "högst upp i vänsterspalten"
-    try{
-      leftCard.scrollIntoView({ behavior:"smooth", block:"start" });
-    }catch{}
+    try{ leftCard.scrollIntoView({ behavior:"smooth", block:"start" }); }catch{}
   }
 
   function makeChip(label, sub, personId, kind){
@@ -1109,18 +1040,15 @@
 
     for(const p of people){
       const li = document.createElement("li");
-
       const b = document.createElement("button");
       b.type = "button";
       b.className = "expandItemBtn";
       b.textContent = personName(p) + (yearsLine(p) ? (" · " + yearsLine(p)) : "");
-
       b.addEventListener("click", () => {
         const id = String(p.id);
         setFocusMarker(id);
         openPanel(id, { focusMap: true });
       });
-
       li.appendChild(b);
       expandList.appendChild(li);
     }
@@ -1265,9 +1193,6 @@
     }
   }
 
-  // =====================================================
-  // PANEL EVENTS
-  // =====================================================
   panelClose.addEventListener("click", () => {
     closePanel();
     clearFocusMarker();
@@ -1280,20 +1205,19 @@
   });
 
   // =====================================================
-  // PICK MODE (NYTT)
+  // PICK MODE (AUTOSTART)
   // =====================================================
   let pickMode = false;
   let pickLatLng = null;
   let pickMarker = null;
 
-  function setPickInfo(text){
-    pickInfo.textContent = text;
-  }
+  function setPickInfo(text){ pickInfo.textContent = text; }
   function setPickButtons(){
     pickStartBtn.disabled = pickMode;
     pickCancelBtn.disabled = !pickMode;
     pickSaveBtn.disabled = !(pickMode && pickLatLng);
   }
+
   function enterPickMode(){
     pickMode = true;
     pickLatLng = null;
@@ -1303,10 +1227,10 @@
     }
     setPickInfo("Välj plats: klicka på kartan…");
     setPickButtons();
-    try{
-      map.getContainer().style.cursor = "crosshair";
-    }catch{}
+    try{ map.getContainer().style.cursor = "crosshair"; }catch{}
+    try{ leftCard.scrollIntoView({ behavior:"smooth", block:"start" }); }catch{}
   }
+
   function exitPickMode(){
     pickMode = false;
     pickLatLng = null;
@@ -1316,22 +1240,20 @@
     }
     setPickInfo("—");
     setPickButtons();
-    try{
-      map.getContainer().style.cursor = "";
-    }catch{}
+    try{ map.getContainer().style.cursor = ""; }catch{}
   }
+
   function setPickAt(latlng){
     pickLatLng = latlng;
-
     if(!pickMarker){
       pickMarker = L.marker(latlng, { icon: MK_ICON, keyboard: false }).addTo(map);
     }else{
       pickMarker.setLatLng(latlng);
     }
-
     setPickInfo("Vald plats: " + latlng.lat.toFixed(4) + ", " + latlng.lng.toFixed(4));
     setPickButtons();
   }
+
   function savePickAndReturn(){
     if(!pickLatLng) return;
 
@@ -1343,7 +1265,6 @@
       }));
     }catch{}
 
-    // tillbaka till personkort
     window.location.href = "./slaktkort.html";
   }
 
@@ -1357,12 +1278,36 @@
     setPickAt(e.latlng);
   });
 
+  function shouldAutoStartPick(){
+    try{
+      const url = new URL(window.location.href);
+      const pickParam = url.searchParams.get("pick");
+      const modeParam = (url.searchParams.get("mode") || "").toLowerCase();
+      const hash = (url.hash || "").toLowerCase();
+      const ls = localStorage.getItem(PICK_AUTOSTART_KEY);
+
+      if(ls === "1") return true;
+      if(pickParam === "1") return true;
+      if(modeParam === "pick") return true;
+      if(hash === "#pick") return true;
+
+      return false;
+    }catch{
+      // fallback: localStorage flagga räcker
+      return localStorage.getItem(PICK_AUTOSTART_KEY) === "1";
+    }
+  }
+
+  function consumeAutoStartFlags(){
+    try{ localStorage.removeItem(PICK_AUTOSTART_KEY); }catch{}
+    // Om du använder ?pick=1 / #pick så behöver vi inte “rensa”, men vi kan:
+    // lämna URL:en som den är (GitHub Pages refresh-safe)
+  }
+
   // =====================================================
-  // REFRESH CORE
+  // REFRESH
   // =====================================================
   let lastAllRelations = [];
-  let lastPeopleWithCoordsAll = [];
-
   function refreshLinksOnly(){
     const focusId = (!dockPanel.hidden) ? panelPersonId : "";
     renderLinks(lastAllRelations, focusId);
@@ -1392,8 +1337,6 @@
     lastAllRelations = allRelations;
 
     const peopleWithCoordsAll = allPeople.filter(p => !!coordsFromPerson(p));
-    lastPeopleWithCoordsAll = peopleWithCoordsAll;
-
     rebuildCoordsIndex(peopleWithCoordsAll);
 
     const filtered = currentFiltered(peopleWithCoordsAll);
@@ -1435,9 +1378,6 @@
     }
   }
 
-  // =====================================================
-  // EVENTS
-  // =====================================================
   refreshBtn.addEventListener("click", refresh);
 
   fitBtn.addEventListener("click", () => {
@@ -1477,6 +1417,18 @@
   // =====================================================
   setPickButtons();
   refresh();
+
+  // AUTOSTART (efter kartan init)
+  (function autoStartPickIfNeeded(){
+    if(!shouldAutoStartPick()) return;
+    consumeAutoStartFlags();
+    // liten delay så Leaflet hinner layouta kartan
+    setTimeout(() => {
+      enterPickMode();
+      // zooma lite trevligt om man vill sätta plats direkt
+      try{ map.setView(map.getCenter(), Math.max(map.getZoom(), 6), { animate: true }); }catch{}
+    }, 50);
+  })();
 </script>
 </body>
 </html>
