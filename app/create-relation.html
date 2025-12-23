@@ -167,7 +167,13 @@
     }
     .itemTitle{ font-weight:900; margin:0; }
     .itemLeft{ min-width:0; }
-    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .itemBtns{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+      min-width: 160px;
+    }
 
     code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
 
@@ -293,7 +299,7 @@
     </div>
 
     <div class="actions">
-      <!-- ARKIV-ID: CR-05 | Skapa relation -->
+      <!-- ARKIV-ID: CR-05 | Skapa/spara (oförändrat format) -->
       <button id="createBtn" class="btn" type="button">Skapa relation</button>
       <button id="swapBtn" class="btn secondary" type="button">Byt plats</button>
       <button id="clearBtn" class="btn secondary" type="button">Rensa</button>
@@ -310,9 +316,9 @@
       <a class="btn secondary" href="./map.html">Gå till Karta</a>
     </div>
 
+    <!-- ARKIV-ID: CR-06 | Mänsklig lista + redigera/ta bort -->
     <ul id="list" class="list" aria-label="Lista med relationer"></ul>
 
-    <!-- dold teknikrad (ska inte synas) -->
     <p class="small" id="tech" style="margin-top:10px;" hidden>—</p>
   </section>
 </div>
@@ -592,12 +598,16 @@
     const typ = String(relTypeEl.value || "").toUpperCase();
     const variants = VARIANTS_BY_TYPE[typ] || [{ v: "OKAND", label: "—" }];
 
+    const keep = String(relVariantEl.value || "");
     relVariantEl.innerHTML = "";
     for(const it of variants){
       const opt = document.createElement("option");
       opt.value = it.v;
       opt.textContent = it.label;
       relVariantEl.appendChild(opt);
+    }
+    if(keep && Array.from(relVariantEl.options).some(o => o.value === keep)){
+      relVariantEl.value = keep;
     }
   }
 
@@ -707,6 +717,70 @@
   }
 
   // =====================================================
+  // ARKIV-ID: CR-06 | Redigeringsläge (UI + uppdatera samma relation)
+  // =====================================================
+  let editingRelId = "";
+
+  function setEditMode(on){
+    if(on){
+      createBtn.textContent = "Spara ändring";
+    }else{
+      createBtn.textContent = "Skapa relation";
+    }
+  }
+
+  function resetEditState(){
+    editingRelId = "";
+    setEditMode(false);
+  }
+
+  function enterEditMode(rel){
+    if(!rel || !rel.id) return;
+
+    clearBoxes();
+    editingRelId = String(rel.id);
+    setEditMode(true);
+
+    const typ = String(rel.typ || "").toUpperCase();
+    if(typ === "PARTNER"){
+      relTypeEl.value = "PARTNER";
+    }else{
+      relTypeEl.value = "FORALDER_BARN";
+    }
+    renderVariantOptions();
+
+    if(typ === "PARTNER"){
+      const v = String(rel.variant || "").toUpperCase();
+      if(v === "SAMBO") relVariantEl.value = "SAMBO";
+      else relVariantEl.value = "GIFT";
+
+      pickedAId = String(rel.personAId || "");
+      pickedBId = String(rel.personBId || "");
+    }else{
+      pickedAId = String(rel.franPersonId || "");
+      pickedBId = String(rel.tillPersonId || "");
+    }
+
+    if(pickedAId && pickedAId === pickedBId){
+      pickedBId = "";
+    }
+
+    syncDropdowns(pickedAId, pickedBId);
+
+    const pa = cachedPeople.find(p => String(p.id) === String(pickedAId)) || null;
+    const pb = cachedPeople.find(p => String(p.id) === String(pickedBId)) || null;
+
+    focusSearchEl.value = pa ? personName(pa) : "";
+    targetSearchEl.value = pb ? personName(pb) : "";
+
+    focusPickedEl.textContent = pickedAId ? (pa ? personName(pa) : ("#" + pickedAId)) : "—";
+    targetPickedEl.textContent = pickedBId ? (pb ? personName(pb) : ("#" + pickedBId)) : "—";
+
+    setBox(okEl, "<strong>Redigerar.</strong>");
+    try{ focusSearchEl.focus(); }catch{}
+  }
+
+  // =====================================================
   // UI RENDER
   // =====================================================
   function renderPills(){
@@ -771,6 +845,7 @@
     return r.typ;
   }
 
+  <!-- ARKIV-ID: CR-06 | Mänsklig lista + redigera/ta bort -->
   function renderList(){
     listEl.innerHTML = "";
 
@@ -787,9 +862,7 @@
       return;
     }
 
-    const people = cachedPeople;
     const rels = loadRelations();
-
     if(rels.length === 0){
       const li = document.createElement("li");
       li.className = "item";
@@ -799,7 +872,7 @@
       return;
     }
 
-    const peopleById = new Map(people.map(p => [String(p.id), p]));
+    const peopleById = new Map(cachedPeople.map(p => [String(p.id), p]));
 
     for(const r of rels){
       const li = document.createElement("li");
@@ -814,36 +887,54 @@
 
       left.appendChild(title);
 
+      const btns = document.createElement("div");
+      btns.className = "itemBtns";
+
+      const edit = document.createElement("button");
+      edit.className = "btn secondary";
+      edit.type = "button";
+      edit.textContent = "Redigera";
+      edit.addEventListener("click", () => {
+        enterEditMode(r);
+      });
+
       const del = document.createElement("button");
       del.className = "btn danger";
       del.type = "button";
       del.textContent = "Ta bort";
       del.addEventListener("click", () => {
-        const ok = confirm("Ta bort relation?");
+        const ok = confirm("Är du säker?");
         if(!ok) return;
+
         const next = rels.filter(x => String(x.id) !== String(r.id));
         saveRelations(next);
+
+        // om man råkar ta bort den som redigeras
+        if(String(editingRelId || "") === String(r.id)) resetEditState();
+
         clearBoxes();
         setBox(okEl, "<strong>Borttaget.</strong>");
         refresh();
       });
 
+      btns.appendChild(edit);
+      btns.appendChild(del);
+
       li.appendChild(left);
-      li.appendChild(del);
+      li.appendChild(btns);
       listEl.appendChild(li);
     }
   }
 
   function renderTech(){
-    // Dold i UI
     const t = activeTreeId();
     techEl.textContent = "treeId: " + (t || "—");
   }
 
   // =====================================================
-  // ARKIV-ID: CR-05 | CREATE (sparlogik intakt)
+  // ARKIV-ID: CR-05 | CREATE / UPDATE (samma format, samma keys)
   // =====================================================
-  function createRelation(){
+  function createOrUpdateRelation(){
     clearBoxes();
 
     const trees = getTrees();
@@ -869,25 +960,44 @@
     const uiType = String(relTypeEl.value || "").toUpperCase();
     const uiVariant = String(relVariantEl.value || "").toUpperCase();
 
+    // Oförändrad begränsning: spara bara befintligt stödda typer
     if(uiType !== "FORALDER_BARN" && uiType !== "PARTNER"){
       setBox(errEl, "<strong>Den relationen går inte att skapa ännu.</strong>");
       return;
     }
 
     const rels = loadRelations();
+
+    // Om vi redigerar: hitta original och återanvänd id (+ ev. createdAt)
+    let original = null;
+    let idx = -1;
+    if(editingRelId){
+      idx = rels.findIndex(x => String(x.id) === String(editingRelId));
+      if(idx === -1){
+        setBox(errEl, "<strong>Relationen hittas inte längre.</strong>");
+        resetEditState();
+        refresh();
+        return;
+      }
+      original = rels[idx];
+    }
+
     let candidate = null;
 
     if(uiType === "FORALDER_BARN"){
       candidate = normalizeForStore({
-        id: nowId(),
+        id: original ? String(original.id) : nowId(),
+        createdAt: original && original.createdAt ? original.createdAt : undefined,
         typ: "FORALDER_BARN",
         franPersonId: aId,
         tillPersonId: bId
       });
     }else if(uiType === "PARTNER"){
+      // UI-variant mappas till befintliga partner-varianter
       const variant = (uiVariant === "SAMBO") ? "SAMBO" : "GIFT";
       candidate = normalizeForStore({
-        id: nowId(),
+        id: original ? String(original.id) : nowId(),
+        createdAt: original && original.createdAt ? original.createdAt : undefined,
         typ: "PARTNER",
         personAId: aId,
         personBId: bId,
@@ -895,11 +1005,27 @@
       });
     }
 
-    if(rels.some(x => isDuplicate(x, candidate))){
+    // Dublettskydd – men vid redigering: ignorera den man redigerar
+    const dup = rels.some((x, i) => {
+      if(original && i === idx) return false;
+      return isDuplicate(x, candidate);
+    });
+    if(dup){
       setBox(errEl, "<strong>Relationen finns redan.</strong>");
       return;
     }
 
+    if(original){
+      // Uppdatera samma relation (samma id)
+      rels[idx] = candidate;
+      saveRelations(rels);
+      resetEditState();
+      setBox(okEl, "<strong>Sparat.</strong>");
+      refresh();
+      return;
+    }
+
+    // Ny relation (som tidigare)
     rels.unshift(candidate);
     saveRelations(rels);
 
@@ -954,7 +1080,7 @@
     applyPickedFromDropdowns();
   });
 
-  createBtn.addEventListener("click", createRelation);
+  createBtn.addEventListener("click", createOrUpdateRelation);
 
   swapBtn.addEventListener("click", () => {
     clearBoxes();
@@ -978,6 +1104,7 @@
 
   clearBtn.addEventListener("click", () => {
     clearBoxes();
+    resetEditState();
 
     pickedAId = "";
     pickedBId = "";
