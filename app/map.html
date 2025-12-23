@@ -6,9 +6,7 @@
   <title>Karta – Släktkort</title>
   <meta name="description" content="Visa personer med koordinater och kopplingar (relationer) i aktivt träd." />
 
-  <!-- =====================================================
-       LEAFLET (CDN)
-       ===================================================== -->
+  <!-- LEAFLET (CDN) -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -63,7 +61,6 @@
       text-decoration:none;
     }
     .btn.secondary{ border-color:#bbb; }
-    .btn.disabled{ opacity:.45; cursor:not-allowed; pointer-events:none; }
 
     .pillRow{
       display:flex;
@@ -145,18 +142,27 @@
       margin:0;
     }
 
+    /* =====================================================
+       KARTA: fyll hela rutan (lika stor som "rutan")
+       ===================================================== */
+    .mapCard{
+      display:flex;
+      flex-direction:column;
+      min-height: 560px;
+    }
     #map{
       width:100%;
-      height: 560px;
+      flex: 1 1 auto;
+      height: auto;              /* viktigt: låt flex styra */
+      min-height: 520px;         /* desktop */
       border-radius:12px;
       border: 1px solid #ddd;
       overflow:hidden;
       background:#f4f4f4;
-      position: relative;
-      z-index: 1;
     }
     @media (max-width: 520px){
-      #map{ height: 440px; }
+      .mapCard{ min-height: 460px; }
+      #map{ min-height: 420px; }
     }
 
     .error{ color:#b00020; font-weight:900; }
@@ -195,6 +201,9 @@
     }
     code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
 
+    /* =====================================================
+       DOCKAD VÄNSTERPANEL (täcker aldrig kartan)
+       ===================================================== */
     #dockPanel[hidden]{ display:none; }
 
     .panelHeader{
@@ -242,6 +251,7 @@
       margin-top: 12px;
     }
 
+    /* Mini-tree (chips) */
     .miniTree{
       border:1px solid #eee;
       border-radius:14px;
@@ -323,6 +333,7 @@
     }
     .expandItemBtn:hover{ background:#fafafa; }
 
+    /* MARKÖRER */
     :root{
       --accentGreen: #b7e4c7;
       --accentGreenDeep: #7fcf9b;
@@ -349,7 +360,6 @@
       line-height: 1;
       transform: translateY(0.5px);
     }
-
     .mkWrap.isActive{
       border-color: rgba(127,207,155,.85);
       box-shadow:
@@ -358,24 +368,14 @@
         0 0 0 10px rgba(183,228,199,.22);
       transform: scale(1.06);
     }
-
     .mkWrap.isDim{
       opacity: var(--markerDim);
       box-shadow: 0 4px 14px rgba(0,0,0,.06);
       transform: scale(0.98);
     }
-
     .leaflet-marker-icon.mkIcon{
       background: transparent;
       border: 0;
-    }
-
-    /* Temporär klick-flagga */
-    .mkWrap.temp{
-      border-color: rgba(0,0,0,.25);
-      background: rgba(255,255,255,.95);
-      box-shadow: 0 10px 26px rgba(0,0,0,.14);
-      transform: scale(1.02);
     }
   </style>
 </head>
@@ -384,7 +384,7 @@
 <header>
   <div>
     <h1>Karta</h1>
-    <p class="muted">Klicka en markör (eller en person i listan) för att öppna släktöversikt i vänsterpanelen. Klicka på kartan för att sätta en temporär flagga – och om panelen är öppen kan du sätta koordinater direkt på fokuspersonen.</p>
+    <p class="muted">Klicka en markör (eller en person i listan) för att öppna släktöversikt i vänsterpanelen. Inga popups.</p>
 
     <nav class="topbar" aria-label="Navigation">
       <a class="btn secondary" href="../start.html">Start</a>
@@ -392,7 +392,6 @@
       <a class="btn secondary" href="./slaktkort.html">Personer</a>
       <a class="btn secondary" href="./create-relation.html">Relationer</a>
       <a class="btn" href="./map.html">Karta</a>
-      <a class="btn secondary" href="./place-picker.html">Plats-picker</a>
     </nav>
   </div>
 
@@ -409,6 +408,7 @@
 </section>
 
 <div class="grid">
+  <!-- VÄNSTERSPALT -->
   <section class="card" aria-label="Kontroller">
     <h2>Filter & vy</h2>
     <p class="small">Sök på namn eller plats. Klick i listan/markör öppnar panelen. Vald markör lyser, övriga tonas.</p>
@@ -436,24 +436,11 @@
       </label>
     </div>
 
-    <div class="hintBox" style="margin-top:10px;">
-      <strong>Legend:</strong>
-      <div class="small" style="margin-top:6px;">
-        Hel linje = Förälder→Barn<br />
-        Streckad linje = Partner
-      </div>
-    </div>
-
-    <div class="actions">
-      <button id="refreshBtn" type="button" class="btn secondary">Uppdatera</button>
-      <button id="fitBtn" type="button" class="btn">Zooma till alla</button>
-      <a class="btn secondary" href="./slaktkort.html">Lägg till plats</a>
-    </div>
-
     <div id="hint" class="hintBox" hidden></div>
 
     <ul id="list" class="list" aria-label="Personer med koordinater"></ul>
 
+    <!-- DOCKAD PANEL -->
     <section id="dockPanel" class="card" style="margin-top:14px;" aria-label="Släktöversikt" hidden>
       <div class="panelHeader">
         <div style="min-width:0;">
@@ -483,7 +470,7 @@
           </div>
         </div>
 
-        <p class="small" style="margin-top:10px;">Tips: klicka på en chip för att byta fokus. Klicka sedan i kartan för att sätta koordinater på fokuspersonen.</p>
+        <p class="small" style="margin-top:10px;">Tips: klicka på en chip för att byta fokus.</p>
 
         <div class="panelActions">
           <a class="btn secondary" href="./slaktkort.html">Gå till Personer</a>
@@ -503,9 +490,10 @@
     </div>
   </section>
 
-  <section class="card" aria-label="Karta">
+  <!-- HÖGERSPALT (karta) -->
+  <section class="card mapCard" aria-label="Karta">
     <h2>Karta</h2>
-    <p class="small">OpenStreetMap via Leaflet. Klicka i kartan för temporär flagga. Om panelen är öppen: klick i kartan sätter coords på fokuspersonen.</p>
+    <p class="small">OpenStreetMap via Leaflet.</p>
     <div id="map" role="application" aria-label="Karta med markörer och kopplingar"></div>
     <p id="msg" class="muted" aria-live="polite" style="margin-top:10px;"></p>
   </section>
@@ -528,18 +516,13 @@
   // =====================================================
   const KEY_TREES  = "slakttradet_trees";
   const KEY_ACTIVE = "slakttradet_active_tree_id";
-
   const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
   const relKey   = (treeId) => "slakttradet_relationer_" + String(treeId);
-
-  // Nyckel för "senast klickade plats" (kompatibel med din place-picker)
-  const KEY_LAST_LOCATION = "slakttradet_last_location";
 
   // =====================================================
   // DOM
   // =====================================================
   const logoutBtn = document.getElementById("logoutBtn");
-
   const msg = document.getElementById("msg");
   const hint = document.getElementById("hint");
 
@@ -556,8 +539,6 @@
   const togglePartnerEl = document.getElementById("togglePartner");
   const toggleFocusOnlyEl = document.getElementById("toggleFocusOnly");
 
-  const refreshBtn = document.getElementById("refreshBtn");
-  const fitBtn = document.getElementById("fitBtn");
   const listEl = document.getElementById("list");
 
   // Dockad panel DOM
@@ -582,31 +563,21 @@
   // JSON HELPERS
   // =====================================================
   function safeParse(raw, fallback){
-    try{ return JSON.parse(raw); }
-    catch{ return fallback; }
+    try{ return JSON.parse(raw); } catch{ return fallback; }
   }
-
   function loadJson(key, fallback){
     const raw = localStorage.getItem(key);
     return raw ? safeParse(raw, fallback) : fallback;
   }
 
-  function saveJson(key, value){
-    try{ localStorage.setItem(key, JSON.stringify(value)); }catch{}
-  }
-
   // =====================================================
   // ACTIVE TREE
   // =====================================================
-  function activeTreeId(){
-    return localStorage.getItem(KEY_ACTIVE) || "";
-  }
-
+  function activeTreeId(){ return localStorage.getItem(KEY_ACTIVE) || ""; }
   function getTrees(){
     const trees = loadJson(KEY_TREES, []);
     return Array.isArray(trees) ? trees : [];
   }
-
   function activeTreeLabel(){
     const id = activeTreeId();
     if(!id) return "—";
@@ -621,7 +592,6 @@
     const n = `${p.fornamn || ""} ${p.efternamn || ""}`.trim();
     return n || "(namnlös)";
   }
-
   function yearsLine(p){
     const a = (p && p.fodelsear != null && String(p.fodelsear).trim() !== "") ? String(p.fodelsear).trim() : "";
     const b = (p && p.dodsar != null && String(p.dodsar).trim() !== "") ? String(p.dodsar).trim() : "";
@@ -629,7 +599,6 @@
     if(a && b) return `${a}–${b}`;
     return a ? `${a}–` : `–${b}`;
   }
-
   function escapeHtml(s){
     return String(s || "")
       .replaceAll("&","&amp;")
@@ -640,58 +609,54 @@
   }
 
   // =====================================================
-  // COORDS PARSE + RANGE CHECK (AUTOPATCH: stöd fler format)
+  // COORDS (robust)
+  // - stöd för coords:{lat,lon|lng}, lat/lon/lng på root,
+  //   samt string "lat,lon"
   // =====================================================
   function inLatLonRange(lat, lon){
     return Number.isFinite(lat) && Number.isFinite(lon) &&
-      lat >= -90 && lat <= 90 &&
-      lon >= -180 && lon <= 180;
-  }
-
-  function numOrNull(x){
-    const n = Number(x);
-    return Number.isFinite(n) ? n : null;
+      lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
   }
 
   function coordsFromPerson(p){
     if(!p) return null;
 
-    // 1) vanligast: p.coords = {lat, lon} / {lat, lng}
+    // 1) objekt coords
     if(p.coords && typeof p.coords === "object"){
-      const lat = numOrNull(p.coords.lat ?? p.coords.latitude);
-      const lon = numOrNull(p.coords.lon ?? p.coords.lng ?? p.coords.longitude);
-      if(lat != null && lon != null && inLatLonRange(lat, lon)) return { lat, lon };
+      const lat = Number(p.coords.lat ?? p.coords.latitude);
+      const lon = Number(p.coords.lon ?? p.coords.lng ?? p.coords.longitude);
+      if(inLatLonRange(lat, lon)) return { lat, lon };
     }
 
-    // 2) p.coords = "lat,lon"
+    // 2) root fields
+    {
+      const lat = Number(p.lat ?? p.latitude);
+      const lon = Number(p.lon ?? p.lng ?? p.longitude);
+      if(inLatLonRange(lat, lon)) return { lat, lon };
+    }
+
+    // 3) string coords "lat,lon"
     if(typeof p.coords === "string"){
-      const s = p.coords.trim();
-      const parts = s.split(",").map(x => x.trim()).filter(Boolean);
+      const parts = p.coords.split(",").map(x => x.trim()).filter(Boolean);
       if(parts.length === 2){
-        const lat = numOrNull(parts[0]);
-        const lon = numOrNull(parts[1]);
-        if(lat != null && lon != null && inLatLonRange(lat, lon)) return { lat, lon };
+        const lat = Number(parts[0]);
+        const lon = Number(parts[1]);
+        if(inLatLonRange(lat, lon)) return { lat, lon };
       }
     }
 
-    // 3) AUTOPATCH: p.lat/p.lon eller p.lat/p.lng eller p.latitude/p.longitude
-    const lat3 = numOrNull(p.lat ?? p.latitude);
-    const lon3 = numOrNull(p.lon ?? p.lng ?? p.longitude);
-    if(lat3 != null && lon3 != null && inLatLonRange(lat3, lon3)) return { lat: lat3, lon: lon3 };
+    // 4) string i platsfält typ "59.33, 18.06"
+    const maybe = String(p.plats || "").trim();
+    if(maybe.includes(",")){
+      const parts = maybe.split(",").map(x => x.trim()).filter(Boolean);
+      if(parts.length === 2){
+        const lat = Number(parts[0]);
+        const lon = Number(parts[1]);
+        if(inLatLonRange(lat, lon)) return { lat, lon };
+      }
+    }
 
     return null;
-  }
-
-  // sätt coords på person i ett robust format (p.coords = {lat, lon})
-  function setPersonCoords(p, lat, lon){
-    if(!p || !inLatLonRange(lat, lon)) return;
-    if(!p.coords || typeof p.coords !== "object") p.coords = {};
-    p.coords.lat = lat;
-    p.coords.lon = lon;
-
-    // för kompatibilitet med ev. andra sidor som läser p.lat/p.lon:
-    p.lat = lat;
-    p.lon = lon;
   }
 
   // =====================================================
@@ -703,11 +668,10 @@
   }
 
   // =====================================================
-  // OFFLINE PLATS (FALUN / DALARNA)
+  // OFFLINE "PLATS" (enkel)
   // =====================================================
   const FALUN = { lat: 60.6070, lon: 15.6355 };
   const FALUN_RADIUS_KM = 15;
-
   const DALARNA_BOX = { minLat: 59.8, maxLat: 61.4, minLon: 12.2, maxLon: 16.9 };
 
   function haversineKm(a, b){
@@ -721,23 +685,14 @@
       Math.cos(lat1) * Math.cos(toRad(b.lat)) * (Math.sin(dLon/2)**2);
     return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
   }
-
   function inBox(c, box){
     return c.lat >= box.minLat && c.lat <= box.maxLat && c.lon >= box.minLon && c.lon <= box.maxLon;
   }
-
   function placeFromCoords(coords){
     if(!coords) return { primary:"", secondary:"" };
-
     const kmToFalun = haversineKm(coords, FALUN);
-    if(kmToFalun <= FALUN_RADIUS_KM){
-      return { primary: "Falun", secondary: "Dalarna" };
-    }
-
-    if(inBox(coords, DALARNA_BOX)){
-      return { primary: "Dalarna", secondary: "" };
-    }
-
+    if(kmToFalun <= FALUN_RADIUS_KM) return { primary: "Falun", secondary: "Dalarna" };
+    if(inBox(coords, DALARNA_BOX)) return { primary: "Dalarna", secondary: "" };
     return { primary: "Sverige", secondary: "" };
   }
 
@@ -750,20 +705,12 @@
     const arr = loadJson(cardsKey(t), []);
     return Array.isArray(arr) ? arr : [];
   }
-
-  function savePeople(arr){
-    const t = activeTreeId();
-    if(!t) return;
-    saveJson(cardsKey(t), arr);
-  }
-
   function loadRelations(){
     const t = activeTreeId();
     if(!t) return [];
     const arr = loadJson(relKey(t), []);
     return Array.isArray(arr) ? arr : [];
   }
-
   function getPersonById(people, id){
     return people.find(p => String(p.id) === String(id)) || null;
   }
@@ -783,27 +730,22 @@
   const markerLayer = L.layerGroup().addTo(map);
   const linkLayer = L.layerGroup().addTo(map);
 
-  const markersById = new Map(); // personId -> marker
-  const coordsById = new Map();  // personId -> coords
+  const markersById = new Map();
+  const coordsById = new Map();
 
-  // Fokus-state
-  let focusedMarkerId = ""; // personId
+  let focusedMarkerId = "";
 
   function clearMarkersOnly(){
     markerLayer.clearLayers();
     markersById.clear();
   }
-
-  function clearLinks(){
-    linkLayer.clearLayers();
-  }
+  function clearLinks(){ linkLayer.clearLayers(); }
 
   function rebuildCoordsIndex(peopleWithCoordsAll){
     coordsById.clear();
     for(const p of peopleWithCoordsAll){
       const c = coordsFromPerson(p);
-      if(!c) continue;
-      coordsById.set(String(p.id), c);
+      if(c) coordsById.set(String(p.id), c);
     }
   }
 
@@ -820,7 +762,6 @@
   function markerIconHtml(){
     return "<div class='mkWrap'><span class='mkFlag'>🇸🇪</span></div>";
   }
-
   const MK_ICON = L.divIcon({
     className: "mkIcon",
     html: markerIconHtml(),
@@ -828,55 +769,26 @@
     iconAnchor: [11, 11]
   });
 
-  const TEMP_ICON = L.divIcon({
-    className: "mkIcon",
-    html: "<div class='mkWrap temp'><span class='mkFlag'>🚩</span></div>",
-    iconSize: [22, 22],
-    iconAnchor: [11, 11]
-  });
-
-  let tempMarker = null;
-
   function applyMarkerFocusStyles(){
     const hasFocus = !!focusedMarkerId;
-
     for(const [pid, marker] of markersById.entries()){
       const el = marker.getElement();
       if(!el) continue;
-
       const wrap = el.querySelector(".mkWrap");
       if(!wrap) continue;
-
       wrap.classList.remove("isActive", "isDim");
-
       if(!hasFocus) continue;
-
-      if(String(pid) === String(focusedMarkerId)){
-        wrap.classList.add("isActive");
-      }else{
-        wrap.classList.add("isDim");
-      }
+      if(String(pid) === String(focusedMarkerId)) wrap.classList.add("isActive");
+      else wrap.classList.add("isDim");
     }
   }
-
   function setFocusMarker(personId){
     focusedMarkerId = String(personId || "");
     applyMarkerFocusStyles();
   }
-
   function clearFocusMarker(){
     focusedMarkerId = "";
     applyMarkerFocusStyles();
-  }
-
-  function openMarker(personId, opts){
-    const m = markersById.get(String(personId));
-    if(m){
-      map.setView(m.getLatLng(), Math.max(map.getZoom(), 10), { animate: true });
-    }
-    if(opts && opts.openPanel){
-      openPanel(String(personId), { focusMap: false, fromMarker: true });
-    }
   }
 
   // =====================================================
@@ -906,7 +818,7 @@
       const li = document.createElement("li");
       li.className = "item";
       li.style.cursor = "default";
-      li.innerHTML = "<p class='itemTitle'>Inga personer att visa</p><p class='itemMeta'>Lägg koordinater i Personer (eller klicka i kartan när du har fokusperson).</p>";
+      li.innerHTML = "<p class='itemTitle'>Inga personer att visa</p><p class='itemMeta'>Lägg koordinater i Personer.</p>";
       listEl.appendChild(li);
       return;
     }
@@ -931,15 +843,13 @@
 
       li.addEventListener("click", () => {
         const id = String(p.id);
-
         if(String(focusedMarkerId) === id && !dockPanel.hidden){
           closePanel();
           clearFocusMarker();
           return;
         }
-
         setFocusMarker(id);
-        openMarker(id, { openPanel: true });
+        openPanel(id, { focusMap: true }); // viktig: panel högst upp + zoom
       });
 
       listEl.appendChild(li);
@@ -960,13 +870,11 @@
 
       m.on("click", () => {
         const id = String(p.id);
-
         if(String(focusedMarkerId) === id && !dockPanel.hidden){
           closePanel();
           clearFocusMarker();
           return;
         }
-
         setFocusMarker(id);
         openPanel(id, { focusMap: false, fromMarker: true });
       });
@@ -1087,7 +995,7 @@
   }
 
   // =====================================================
-  // HINT RENDER
+  // HINT
   // =====================================================
   function renderHint(hasTrees, hasActive, peopleWithCoords){
     if(!hasTrees){
@@ -1103,8 +1011,8 @@
     if(peopleWithCoords.length === 0){
       hint.hidden = false;
       hint.innerHTML =
-        "<strong>Tips:</strong> Inga personer har plats ännu. " +
-        "Öppna en person i <a href='./slaktkort.html'><code>Personer</code></a> och sätt coords, eller öppna panelen här och klicka i kartan för att sätta coords på fokuspersonen.";
+        "<strong>Tips:</strong> Inga personer har koordinater ännu. " +
+        "Gå till <a href='./slaktkort.html'><code>Personer</code></a> och sätt coords.";
       return;
     }
     hint.hidden = true;
@@ -1115,13 +1023,24 @@
   // DOCKAD PANEL STATE
   // =====================================================
   let panelPersonId = "";
-  let expandedMode = "NONE";
+  let expandedMode = "NONE"; // "NONE" | "BARN" | "PARTNER"
 
   function closePanel(){
     dockPanel.hidden = true;
     panelPersonId = "";
     expandedMode = "NONE";
     try{ refreshLinksOnly(); }catch{}
+  }
+
+  // Viktigt: alltid högst upp i vänsterspalten
+  function scrollPanelToTop(){
+    try{
+      const leftCol = document.querySelector('.grid > section.card');
+      if(leftCol) leftCol.scrollIntoView({ behavior: "smooth", block: "start" });
+      else window.scrollTo({ top: 0, behavior: "smooth" });
+    }catch{
+      try{ window.scrollTo(0,0); }catch{}
+    }
   }
 
   function openPanel(personId, opts){
@@ -1131,10 +1050,16 @@
     dockPanel.hidden = false;
     expandedMode = "NONE";
 
+    // 1) panel först
     renderPanel(panelPersonId);
 
+    // 2) scrolla HÖGST UPP (inte ner)
+    scrollPanelToTop();
+
+    // 3) uppdatera länkar i focusOnly-läge
     try{ refreshLinksOnly(); }catch{}
 
+    // 4) zooma om det ska göras
     if(opts && opts.focusMap){
       const m = markersById.get(panelPersonId);
       if(m){
@@ -1142,7 +1067,10 @@
       }
     }
 
-    try{ dockPanel.scrollIntoView({ behavior: "smooth", block: "start" }); }catch{}
+    // 5) Leaflet: säkerställ att flaggor/karta klick/position alltid funkar efter layout
+    setTimeout(() => {
+      try{ map.invalidateSize(); }catch{}
+    }, 50);
   }
 
   function makeChip(label, sub, personId, kind){
@@ -1184,18 +1112,15 @@
 
     for(const p of people){
       const li = document.createElement("li");
-
       const b = document.createElement("button");
       b.type = "button";
       b.className = "expandItemBtn";
       b.textContent = personName(p) + (yearsLine(p) ? (" · " + yearsLine(p)) : "");
-
       b.addEventListener("click", () => {
         const id = String(p.id);
         setFocusMarker(id);
         openPanel(id, { focusMap: true });
       });
-
       li.appendChild(b);
       expandList.appendChild(li);
     }
@@ -1236,7 +1161,6 @@
   function renderPanel(focusId){
     const people = loadPeople();
     const rels = loadRelations();
-
     const p = getPersonById(people, focusId);
 
     if(!p){
@@ -1266,11 +1190,9 @@
     }
     panelMeta.textContent = meta || "—";
 
-    if(coords){
-      panelTech.textContent = "Koordinater: " + coords.lat.toFixed(4) + ", " + coords.lon.toFixed(4);
-    }else{
-      panelTech.textContent = "Koordinater: — (tips: klicka i kartan för att sätta)";
-    }
+    panelTech.textContent = coords
+      ? ("Koordinater: " + coords.lat.toFixed(4) + ", " + coords.lon.toFixed(4))
+      : "Koordinater: —";
 
     const fam = getFamily(focusId, people, rels);
 
@@ -1303,6 +1225,7 @@
           expandedMode = "PARTNER";
           expandBox.hidden = false;
           setExpandList("Partner", fam.partners);
+          scrollPanelToTop();
         });
         slotPartner.appendChild(more);
       }
@@ -1327,6 +1250,7 @@
           expandedMode = "BARN";
           expandBox.hidden = false;
           setExpandList("Barn", fam.children);
+          scrollPanelToTop();
         });
         slotChildren.appendChild(more);
       }
@@ -1346,81 +1270,21 @@
   panelClose.addEventListener("click", () => {
     closePanel();
     clearFocusMarker();
+    scrollPanelToTop();
+    setTimeout(() => { try{ map.invalidateSize(); }catch{} }, 50);
   });
 
   expandClose.addEventListener("click", () => {
     expandedMode = "NONE";
     expandBox.hidden = true;
     expandList.innerHTML = "";
-  });
-
-  // =====================================================
-  // CLICK-TO-FLAG (AUTOPATCH)
-  // - klick i kartan: temp-flagga + sparar KEY_LAST_LOCATION
-  // - om panelen är öppen: klick sätter coords på fokusperson (bekräftelse)
-  // =====================================================
-  function placeTempFlag(lat, lon){
-    if(!tempMarker){
-      tempMarker = L.marker([lat, lon], { icon: TEMP_ICON, draggable: true }).addTo(markerLayer);
-      tempMarker.on("dragend", () => {
-        const p = tempMarker.getLatLng();
-        saveJson(KEY_LAST_LOCATION, { lat: p.lat, lon: p.lng, ts: Date.now() });
-      });
-    }else{
-      tempMarker.setLatLng([lat, lon]);
-    }
-    saveJson(KEY_LAST_LOCATION, { lat, lon, ts: Date.now() });
-  }
-
-  function setCoordsOnFocusedPerson(lat, lon){
-    const t = activeTreeId();
-    if(!t) return false;
-
-    const people = loadPeople();
-    const p = getPersonById(people, panelPersonId);
-    if(!p) return false;
-
-    setPersonCoords(p, lat, lon);
-    savePeople(people);
-    return true;
-  }
-
-  map.on("click", (e) => {
-    const lat = e.latlng.lat;
-    const lon = e.latlng.lng;
-
-    // alltid: temp-flagga + spara senaste plats
-    placeTempFlag(lat, lon);
-
-    // om panel öppen: erbjud att sätta coords på fokuspersonen
-    if(!dockPanel.hidden && panelPersonId){
-      const ok = window.confirm("Sätta denna plats på fokuspersonen?\n\n" + panelName.textContent + "\n" + lat.toFixed(5) + ", " + lon.toFixed(5));
-      if(ok){
-        const saved = setCoordsOnFocusedPerson(lat, lon);
-        if(saved){
-          // uppdatera UI/markörer direkt
-          refresh();
-          // zooma dit
-          map.setView([lat, lon], Math.max(map.getZoom(), 10), { animate: true });
-        }else{
-          // fallback: bara temp-flagga
-          try{
-            msg.innerHTML = "<span class='error'>Kunde inte spara på person.</span> Kontrollera aktivt träd och att personen finns.";
-          }catch{}
-        }
-      }
-    }else{
-      try{
-        msg.innerHTML = "<span class='ok'>Plats vald.</span> 🚩 " + lat.toFixed(5) + ", " + lon.toFixed(5) + " (sparad som senaste plats)";
-      }catch{}
-    }
+    scrollPanelToTop();
   });
 
   // =====================================================
   // REFRESH CORE
   // =====================================================
   let lastAllRelations = [];
-  let lastPeopleWithCoordsAll = [];
 
   function refreshLinksOnly(){
     const focusId = (!dockPanel.hidden) ? panelPersonId : "";
@@ -1453,10 +1317,7 @@
 
     lastAllRelations = allRelations;
 
-    // AUTOPATCH: filtrera med nya coordsFromPerson som kan läsa fler format
     const peopleWithCoordsAll = allPeople.filter(p => !!coordsFromPerson(p));
-    lastPeopleWithCoordsAll = peopleWithCoordsAll;
-
     rebuildCoordsIndex(peopleWithCoordsAll);
 
     const filtered = currentFiltered(peopleWithCoordsAll);
@@ -1497,26 +1358,15 @@
       applyMarkerFocusStyles();
     }
 
-    // Ladda ev. senaste plats som temp-flagga vid start (trevligt UX)
-    const last = loadJson(KEY_LAST_LOCATION, null);
-    if(last && typeof last === "object"){
-      const lat = Number(last.lat);
-      const lon = Number(last.lon);
-      if(inLatLonRange(lat, lon)){
-        placeTempFlag(lat, lon);
-      }
-    }
+    // Leaflet fix: efter DOM-ändringar
+    setTimeout(() => {
+      try{ map.invalidateSize(); }catch{}
+    }, 50);
   }
 
   // =====================================================
   // EVENTS
   // =====================================================
-  refreshBtn.addEventListener("click", refresh);
-
-  fitBtn.addEventListener("click", () => {
-    if(coordsById.size > 0) fitToAllCoords();
-  });
-
   let searchTimer = null;
   searchEl.addEventListener("input", () => {
     if(searchTimer) clearTimeout(searchTimer);
@@ -1545,10 +1395,23 @@
     window.location.href = "../index.html";
   });
 
+  // Resize: karta ska alltid “hänga med”
+  window.addEventListener("resize", () => {
+    try{ map.invalidateSize(); }catch{}
+  });
+
   // =====================================================
   // START
   // =====================================================
   refresh();
+
+  // Bra start: om vi har coords, zooma en gång
+  setTimeout(() => {
+    try{
+      if(coordsById.size > 0) fitToAllCoords();
+      map.invalidateSize();
+    }catch{}
+  }, 120);
 </script>
 </body>
 </html>
