@@ -165,8 +165,7 @@
       justify-content:space-between;
       gap:10px;
     }
-    .itemTitle{ font-weight:900; margin:0 0 2px; }
-    .itemMeta{ margin:0; color:#555; font-size:.95rem; }
+    .itemTitle{ font-weight:900; margin:0; }
     .itemLeft{ min-width:0; }
     .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 
@@ -177,7 +176,7 @@
       overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
     }
 
-    /* ARKIV-ID: CR-03 | Sök (min 3 bokstäver) – UI-komponenter */
+    /* <!-- ARKIV-ID: CR-03 | Sök – UI-komponenter --> */
     .searchWrap{ position: relative; }
     .suggest{
       position:absolute;
@@ -205,7 +204,9 @@
     }
     .sItem:last-child{ border-bottom:0; }
     .sItem:hover{ background:#fafafa; }
-    .stepTitle{ margin:12px 0 6px; font-weight:900; }
+
+    /* Backup-UI ska inte synas */
+    .backupHidden{ display:none; }
   </style>
 </head>
 
@@ -239,24 +240,21 @@
   <!-- VÄNSTER: FORM -->
   <section class="card" aria-label="Skapa relation">
     <h2>Skapa relation</h2>
-    <p class="small">Följ stegen. Systemet hindrar relation till sig själv.</p>
 
     <div id="hint" class="hintBox" hidden></div>
     <div id="ok" class="okBox" hidden></div>
     <div id="err" class="errBox" hidden></div>
 
-    <!-- ARKIV-ID: CR-03 | Steg 1 – Sök + förslag (fokusperson) -->
-    <div class="stepTitle">Steg 1 – Välj fokusperson</div>
+    <!-- ARKIV-ID: CR-03 | Välj fokusperson -->
     <div class="searchWrap">
-      <label for="focusSearch">Sök (min 3 bokstäver)</label>
-      <input id="focusSearch" type="text" autocomplete="off" placeholder="Skriv minst 3 bokstäver…" />
-      <div id="focusSuggest" class="suggest" hidden aria-label="Förslag fokusperson"></div>
+      <label for="focusSearch">Välj person</label>
+      <input id="focusSearch" type="text" autocomplete="off" placeholder="Skriv namn…" />
+      <div id="focusSuggest" class="suggest" hidden aria-label="Förslag"></div>
     </div>
     <p class="small" id="focusPicked" style="margin:8px 0 0;">—</p>
 
-    <!-- ARKIV-ID: CR-04 | Steg 2 – Relationstyp -->
-    <div class="stepTitle">Steg 2 – Välj relationstyp</div>
-    <label for="relType">Relationstyp</label>
+    <!-- ARKIV-ID: CR-04 | Relationstyp -->
+    <label for="relType">Välj relationstyp</label>
     <select id="relType">
       <option value="FORALDER_BARN">Förälder</option>
       <option value="BARN">Barn</option>
@@ -269,56 +267,42 @@
       <option value="KUSIN">Kusin</option>
       <option value="STYV">Styvrelationer</option>
     </select>
-    <p class="small" id="relTypeNote" style="margin:8px 0 0;">
-      Obs: För att inte ändra kopplingslogiken sparas just nu endast <strong>Förälder</strong> och <strong>Partner</strong>.
-    </p>
 
-    <!-- ARKIV-ID: CR-04 | Steg 3 – Variant -->
-    <div class="stepTitle">Steg 3 – Välj variant</div>
-    <label for="relVariant">Variant</label>
+    <!-- ARKIV-ID: CR-04 | Variant -->
+    <label for="relVariant">Välj variant</label>
     <select id="relVariant"></select>
 
-    <!-- ARKIV-ID: CR-03 | Steg 4 – Sök + förslag (målperson) -->
-    <div class="stepTitle">Steg 4 – Välj målperson (till vem)</div>
+    <!-- ARKIV-ID: CR-03 | Välj målperson -->
     <div class="searchWrap">
-      <label for="targetSearch">Sök (min 3 bokstäver)</label>
-      <input id="targetSearch" type="text" autocomplete="off" placeholder="Skriv minst 3 bokstäver…" />
-      <div id="targetSuggest" class="suggest" hidden aria-label="Förslag målperson"></div>
+      <label for="targetSearch">Välj målperson</label>
+      <input id="targetSearch" type="text" autocomplete="off" placeholder="Skriv namn…" />
+      <div id="targetSuggest" class="suggest" hidden aria-label="Förslag"></div>
     </div>
     <p class="small" id="targetPicked" style="margin:8px 0 0;">—</p>
 
-    <!-- Backup (behålls) -->
-    <div class="row2" style="margin-top:12px;">
+    <!-- Backup (dold) -->
+    <div class="row2 backupHidden" aria-hidden="true" style="margin-top:12px;">
       <div>
-        <label for="personA">Person A (backup)</label>
-        <select id="personA"></select>
+        <label for="personA" class="sr-only">Person A</label>
+        <select id="personA" tabindex="-1"></select>
       </div>
       <div>
-        <label for="personB">Person B (backup)</label>
-        <select id="personB"></select>
+        <label for="personB" class="sr-only">Person B</label>
+        <select id="personB" tabindex="-1"></select>
       </div>
     </div>
 
     <div class="actions">
-      <!-- ARKIV-ID: CR-05 | Skapa relation (sparlogik oförändrad) -->
+      <!-- ARKIV-ID: CR-05 | Skapa relation -->
       <button id="createBtn" class="btn" type="button">Skapa relation</button>
-      <button id="swapBtn" class="btn secondary" type="button">Byt plats (A↔B)</button>
+      <button id="swapBtn" class="btn secondary" type="button">Byt plats</button>
       <button id="clearBtn" class="btn secondary" type="button">Rensa</button>
-    </div>
-
-    <div class="hintBox" style="margin-top:14px;">
-      <strong>Viktigt</strong>
-      <div class="small" style="margin-top:6px;">
-        Relationer sparas per träd i <code>slakttradet_relationer_&lt;treeId&gt;</code>.<br/>
-        Partner sparas även som <code>personAId</code>/<code>personBId</code> (kompatibelt med kartan).
-      </div>
     </div>
   </section>
 
   <!-- HÖGER: LISTA -->
   <section class="card" aria-label="Relationer i aktivt träd">
     <h2>Relationer i aktivt träd</h2>
-    <p class="small">Du kan ta bort en relation här.</p>
 
     <div class="actions">
       <button id="refreshBtn" class="btn secondary" type="button">Uppdatera</button>
@@ -328,7 +312,8 @@
 
     <ul id="list" class="list" aria-label="Lista med relationer"></ul>
 
-    <p class="small" id="tech" style="margin-top:10px;">—</p>
+    <!-- dold teknikrad (ska inte synas) -->
+    <p class="small" id="tech" style="margin-top:10px;" hidden>—</p>
   </section>
 </div>
 
@@ -368,7 +353,6 @@
   const errEl = document.getElementById("err");
 
   const relTypeEl = document.getElementById("relType");
-  const relTypeNoteEl = document.getElementById("relTypeNote");
   const relVariantEl = document.getElementById("relVariant");
 
   const focusSearchEl = document.getElementById("focusSearch");
@@ -424,7 +408,7 @@
     errEl.hidden = true; errEl.innerHTML = "";
   }
 
-  /* ARKIV-ID: CR-01 | Hämta aktivt träd */
+  <!-- ARKIV-ID: CR-01 | Hämta aktivt träd -->
   function getTrees(){
     const arr = loadJson(KEY_TREES, []);
     return Array.isArray(arr) ? arr : [];
@@ -439,7 +423,7 @@
     return t ? (t.name || t.id) : id;
   }
 
-  /* ARKIV-ID: CR-02 | Läs personer */
+  <!-- ARKIV-ID: CR-02 | Läs personer -->
   function loadPeople(){
     const t = activeTreeId();
     if(!t) return [];
@@ -447,7 +431,7 @@
     return Array.isArray(arr) ? arr : [];
   }
 
-  /* ARKIV-ID: CR-05 | Läs/spara relationer (oförändrat) */
+  <!-- ARKIV-ID: CR-05 | Läs/spara relationer (oförändrat) -->
   function loadRelations(){
     const t = activeTreeId();
     if(!t) return [];
@@ -615,12 +599,6 @@
       opt.textContent = it.label;
       relVariantEl.appendChild(opt);
     }
-
-    // Stödinfo (utan designbyte, bara text)
-    const supported = (typ === "FORALDER_BARN" || typ === "PARTNER");
-    relTypeNoteEl.innerHTML =
-      "Obs: För att inte ändra kopplingslogiken sparas just nu endast <strong>Förälder</strong> och <strong>Partner</strong>."
-      + (supported ? "" : " (Vald typ finns som UI, men kan inte sparas ännu.)");
   }
 
   // =====================================================
@@ -695,21 +673,21 @@
     syncDropdowns(pickedAId, pickedBId);
 
     const p = cachedPeople.find(x => String(x.id) === pickedAId) || null;
-    focusPickedEl.textContent = pickedAId ? ("Vald: " + (p ? personName(p) : ("#" + pickedAId))) : "—";
+    focusPickedEl.textContent = pickedAId ? (p ? personName(p) : ("#" + pickedAId)) : "—";
   }
 
   function pickTarget(id){
     clearBoxes();
     const next = String(id || "");
     if(next && next === pickedAId){
-      setBox(errEl, "<strong>Målperson får inte vara samma som fokusperson.</strong>");
+      setBox(errEl, "<strong>Välj en annan person.</strong>");
       return;
     }
     pickedBId = next;
     syncDropdowns(pickedAId, pickedBId);
 
     const p = cachedPeople.find(x => String(x.id) === pickedBId) || null;
-    targetPickedEl.textContent = pickedBId ? ("Vald: " + (p ? personName(p) : ("#" + pickedBId))) : "—";
+    targetPickedEl.textContent = pickedBId ? (p ? personName(p) : ("#" + pickedBId)) : "—";
   }
 
   function applyPickedFromDropdowns(){
@@ -724,8 +702,8 @@
     const pa = cachedPeople.find(p => String(p.id) === String(pickedAId)) || null;
     const pb = cachedPeople.find(p => String(p.id) === String(pickedBId)) || null;
 
-    focusPickedEl.textContent = pickedAId ? ("Vald: " + (pa ? personName(pa) : ("#" + pickedAId))) : "—";
-    targetPickedEl.textContent = pickedBId ? ("Vald: " + (pb ? personName(pb) : ("#" + pickedBId))) : "—";
+    focusPickedEl.textContent = pickedAId ? (pa ? personName(pa) : ("#" + pickedAId)) : "—";
+    targetPickedEl.textContent = pickedBId ? (pb ? personName(pb) : ("#" + pickedBId)) : "—";
   }
 
   // =====================================================
@@ -754,15 +732,15 @@
     const hasActive = !!act && trees.some(t => String(t.id) === String(act));
 
     if(!hasTrees){
-      setBox(hintEl, "<strong>🚩 Inga träd:</strong> Gå till <a href='./trees.html'><code>Träd</code></a> och skapa ett träd.");
+      setBox(hintEl, "<strong>Skapa ett träd först.</strong> <a href='./trees.html'>Gå till Träd</a>.");
       return false;
     }
     if(!hasActive){
-      setBox(hintEl, "<strong>🚩 Inget aktivt träd:</strong> Välj aktivt träd i <a href='./trees.html'><code>Träd</code></a>.");
+      setBox(hintEl, "<strong>Välj ett aktivt träd.</strong> <a href='./trees.html'>Gå till Träd</a>.");
       return false;
     }
     if(cachedPeople.length < 2){
-      setBox(hintEl, "<strong>🚩 För få personer:</strong> Du behöver minst <code>2</code> personer i aktivt träd. Gå till <a href='./slaktkort.html'><code>Personer</code></a>.");
+      setBox(hintEl, "<strong>Lägg till minst två personer.</strong> <a href='./slaktkort.html'>Gå till Personer</a>.");
       return false;
     }
     return true;
@@ -804,7 +782,7 @@
       const li = document.createElement("li");
       li.className = "item";
       li.style.cursor = "default";
-      li.innerHTML = "<div class='itemLeft'><p class='itemTitle'>—</p><p class='itemMeta'>Välj aktivt träd först.</p></div>";
+      li.innerHTML = "<div class='itemLeft'><p class='itemTitle'>—</p></div>";
       listEl.appendChild(li);
       return;
     }
@@ -816,7 +794,7 @@
       const li = document.createElement("li");
       li.className = "item";
       li.style.cursor = "default";
-      li.innerHTML = "<div class='itemLeft'><p class='itemTitle'>Inga relationer ännu</p><p class='itemMeta'>Skapa en relation till vänster.</p></div>";
+      li.innerHTML = "<div class='itemLeft'><p class='itemTitle'>Inga relationer ännu</p></div>";
       listEl.appendChild(li);
       return;
     }
@@ -834,19 +812,14 @@
       title.className = "itemTitle";
       title.textContent = relLabel(r, peopleById);
 
-      const meta = document.createElement("p");
-      meta.className = "itemMeta mono";
-      meta.textContent = "id: " + (r.id || "—") + " · typ: " + (r.typ || "—");
-
       left.appendChild(title);
-      left.appendChild(meta);
 
       const del = document.createElement("button");
       del.className = "btn danger";
       del.type = "button";
       del.textContent = "Ta bort";
       del.addEventListener("click", () => {
-        const ok = confirm("Ta bort relation?\n\n" + relLabel(r, peopleById));
+        const ok = confirm("Ta bort relation?");
         if(!ok) return;
         const next = rels.filter(x => String(x.id) !== String(r.id));
         saveRelations(next);
@@ -862,11 +835,9 @@
   }
 
   function renderTech(){
+    // Dold i UI
     const t = activeTreeId();
-    techEl.textContent =
-      "Aktivt treeId: " + (t || "—") +
-      " · PeopleKey: " + (t ? cardsKey(t) : "—") +
-      " · RelationsKey: " + (t ? relKey(t) : "—");
+    techEl.textContent = "treeId: " + (t || "—");
   }
 
   // =====================================================
@@ -879,29 +850,27 @@
     const act = activeTreeId();
     const hasActive = !!act && trees.some(t => String(t.id) === String(act));
     if(!hasActive){
-      setBox(errEl, "<strong>Välj aktivt träd först.</strong> Gå till <a href='./trees.html'><code>Träd</code></a>.");
+      setBox(errEl, "<strong>Välj ett aktivt träd.</strong>");
       return;
     }
 
-    // Primärt: sökval om finns, annars backup dropdowns
     const aId = String(pickedAId || personAEl.value || "");
     const bId = String(pickedBId || personBEl.value || "");
 
     if(!aId || !bId){
-      setBox(errEl, "<strong>Välj fokusperson och målperson.</strong>");
+      setBox(errEl, "<strong>Välj två personer.</strong>");
       return;
     }
     if(aId === bId){
-      setBox(errEl, "<strong>Du kan inte koppla en person till sig själv.</strong>");
+      setBox(errEl, "<strong>Välj en annan person.</strong>");
       return;
     }
 
     const uiType = String(relTypeEl.value || "").toUpperCase();
     const uiVariant = String(relVariantEl.value || "").toUpperCase();
 
-    // Förbud: ändra kopplingslogik -> vi sparar bara det som redan stöds
     if(uiType !== "FORALDER_BARN" && uiType !== "PARTNER"){
-      setBox(errEl, "<strong>Den relationstypen kan inte sparas ännu.</strong> Välj <code>Förälder</code> eller <code>Partner</code>.");
+      setBox(errEl, "<strong>Den relationen går inte att skapa ännu.</strong>");
       return;
     }
 
@@ -909,7 +878,6 @@
     let candidate = null;
 
     if(uiType === "FORALDER_BARN"){
-      // (Variant är UI-only och sparas inte, för att inte ändra format.)
       candidate = normalizeForStore({
         id: nowId(),
         typ: "FORALDER_BARN",
@@ -917,7 +885,6 @@
         tillPersonId: bId
       });
     }else if(uiType === "PARTNER"){
-      // Mappa UI-variant till befintliga partner-varianter
       const variant = (uiVariant === "SAMBO") ? "SAMBO" : "GIFT";
       candidate = normalizeForStore({
         id: nowId(),
@@ -936,7 +903,7 @@
     rels.unshift(candidate);
     saveRelations(rels);
 
-    setBox(okEl, "<strong>Sparat.</strong> Relation skapad i aktivt träd.");
+    setBox(okEl, "<strong>Sparat.</strong>");
     refresh();
   }
 
@@ -947,7 +914,6 @@
     renderVariantOptions();
   });
 
-  /* ARKIV-ID: CR-03 | Sök-input events */
   focusSearchEl.addEventListener("input", () => {
     clearBoxes();
     const q = focusSearchEl.value || "";
@@ -1006,8 +972,8 @@
     const pb = cachedPeople.find(p => String(p.id) === String(pickedBId)) || null;
     focusSearchEl.value = pa ? personName(pa) : "";
     targetSearchEl.value = pb ? personName(pb) : "";
-    focusPickedEl.textContent = pickedAId ? ("Vald: " + (pa ? personName(pa) : ("#" + pickedAId))) : "—";
-    targetPickedEl.textContent = pickedBId ? ("Vald: " + (pb ? personName(pb) : ("#" + pickedBId))) : "—";
+    focusPickedEl.textContent = pickedAId ? (pa ? personName(pa) : ("#" + pickedAId)) : "—";
+    targetPickedEl.textContent = pickedBId ? (pb ? personName(pb) : ("#" + pickedBId)) : "—";
   });
 
   clearBtn.addEventListener("click", () => {
