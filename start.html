@@ -7,47 +7,91 @@
   <meta name="description" content="Översikt över ditt släktarbete (localStorage-first)." />
 
   <style>
-    :root { color-scheme: light; }
+    /* ARKIV-ID: UI-GLOBAL-01 | Global designstandard
+       Syfte: Gemensam baseline för alla Släktkort-sidor (GitHub Pages, local HTML).
+       Placering: Klistra in HÖGST UPP i varje sidas <style>-tagg.
+       Obs: Endast CSS. Ingen JS/keys/logik påverkas.
+    */
+    :root{
+      color-scheme: light;
+    }
     body{
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       line-height: 1.5;
       margin: 0;
       padding: 24px;
-      max-width: 980px;
+      max-width: 1180px;
       margin-inline: auto;
       background: #fff;
       color: #111;
     }
-    a{ color: inherit; text-decoration: none; }
-    header{ margin-bottom: 16px; }
+    a{
+      color: inherit;
+      text-decoration: none;
+    }
+    header{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:18px;
+    }
+    .topbar{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin: 10px 0 0;
+    }
+    .btn, button{
+      display:inline-block;
+      padding:10px 12px;
+      border:1px solid #333;
+      border-radius:10px;
+      background:#fff;
+      font:inherit;
+      cursor:pointer;
+      text-decoration:none;
+      user-select:none;
+    }
+    .btn.secondary{
+      border-color:#bbb;
+    }
+    .btn:disabled,
+    button:disabled{
+      opacity:.55;
+      cursor:not-allowed;
+    }
+    .btn.navActive{
+      background:#f5fff5;
+      border-color:#cfe8cf;
+      color:#111;
+    }
+    .liftBoxGreen{
+      border: 1px solid #cfe8cf;
+      background: #f5fff5;
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
 
+    /* --- Start-sidans egna layout (behålls) --- */
+    .kicker{
+      margin: 0 0 6px;
+      color: #4b5563;
+      font-size: 13px;
+    }
+    h1{ margin: 0 0 4px; font-size: 28px; }
+
+    /* Nav: anpassa till global knappstil (utan nya flöden) */
     nav{
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: center;
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
       margin: 10px 0 18px;
     }
-    nav a{
-      padding: 8px 10px;
-      border-radius: 12px;
-      background: #f2f3f5;
-      border: 1px solid #e6e8eb;
-    }
-    nav a[aria-current="page"]{
-      background: #e9f7ef;
-      border-color: #bfe7cf;
-    }
-    .spacer{ flex: 1 1 auto; }
-    .btn{
-      padding: 8px 10px;
-      border-radius: 12px;
-      background: #fff;
-      border: 1px solid #e6e8eb;
-      cursor: pointer;
-      font: inherit;
-    }
 
+    /* Start-sidans grid/kort (oförändrat) */
     .grid{
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -108,13 +152,14 @@
       background: #fafafa;
       width: fit-content;
     }
-    .kicker{
-      margin: 0 0 6px;
-      color: #4b5563;
-      font-size: 13px;
+
+    .spacer{ flex: 1 1 auto; }
+
+    .foot{
+      margin-top: 18px;
+      font-size: 12px;
+      color: #6b7280;
     }
-    h1{ margin: 0 0 4px; font-size: 28px; }
-    .foot{ margin-top: 18px; font-size: 12px; color: #6b7280; }
     .sr-only{
       position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
       overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
@@ -123,20 +168,25 @@
 </head>
 
 <body>
-  <header>
+  <header style="display:block;">
     <h1>Start</h1>
-    <p class="kicker">Översikt. All data sparas lokalt i webbläsaren.</p>
+    <p class="kicker">Översikt över ditt släktarbete.</p>
 
-    <nav aria-label="Huvudmeny">
-      <a href="./start.html" aria-current="page">Start</a>
-      <a href="./app/trees.html">Träd</a>
-      <a href="./app/slaktkort.html">Personer</a>
-      <a href="./app/create-relation.html">Relationer</a>
-      <a href="./app/map.html">Karta</a>
+    <nav class="topbar" aria-label="Huvudmeny">
+      <a class="btn navActive" href="./start.html" aria-current="page">Start</a>
+      <a class="btn secondary" href="./app/trees.html">Träd</a>
+      <a class="btn secondary" href="./app/slaktkort.html">Personer</a>
+      <a class="btn secondary" href="./app/create-relation.html">Relationer</a>
+      <a class="btn secondary" href="./app/map.html">Karta</a>
       <span class="spacer"></span>
-      <button class="btn" id="logoutBtn" type="button">Logga ut</button>
+      <button class="btn secondary" id="logoutBtn" type="button">Logga ut</button>
     </nav>
   </header>
+
+  <!-- Nilsson-rutan / lyft-ruta (svagt grön) för viktig info -->
+  <div class="liftBoxGreen" role="note" aria-label="Info" style="margin: 10px 0 14px;">
+    Här ser du en snabb översikt. Siffrorna uppdateras automatiskt när du lägger till personer och relationer.
+  </div>
 
   <div class="grid" role="list" aria-label="Status">
     <a class="card" role="listitem" href="./app/trees.html" aria-label="Gå till Träd">
@@ -176,7 +226,7 @@
     </a>
   </div>
 
-  <p class="foot">Tips: om siffrorna är 0 fast du vet att data finns, är det nästan alltid olika localStorage-nycklar mellan sidorna. Den här start-sidan räknar ändå rätt.</p>
+  <p class="foot">Tips: Om siffrorna verkar fel kan du testa att uppdatera sidan. (Det påverkar inte din data.)</p>
 
   <script>
     "use strict";
