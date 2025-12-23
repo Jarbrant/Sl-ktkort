@@ -4,7 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Personer – Släktkort</title>
-  <meta name="description" content="Skapa och redigera personer i aktivt träd (localStorage-first) med platsval från karta." />
+  <meta name="description" content="Skapa och redigera personer (localStorage-first). Välj plats från karta och spara koordinater." />
+
   <style>
     :root { color-scheme: light; }
     body{
@@ -12,113 +13,50 @@
       line-height: 1.5;
       margin: 0;
       padding: 24px;
-      max-width: 1100px;
+      max-width: 1180px;
       margin-inline: auto;
       background: #fff;
       color: #111;
     }
     a{ color: inherit; text-decoration:none; }
-    header{ margin-bottom: 16px; }
+    header{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:18px;
+    }
+    h1{ margin:0 0 6px; font-size:1.6rem; }
+    .muted{ color:#555; margin:0 0 12px; }
 
-    nav{
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: center;
-      margin: 10px 0 18px;
-    }
-    nav a{
-      padding: 8px 10px;
-      border-radius: 12px;
-      background: #f2f3f5;
-      border: 1px solid #e6e8eb;
-    }
-    nav a[aria-current="page"]{
-      background: #e9f7ef;
-      border-color: #bfe7cf;
-    }
-    .spacer{ flex: 1 1 auto; }
-    .btn{
-      padding: 8px 10px;
-      border-radius: 12px;
-      background: #fff;
-      border: 1px solid #e6e8eb;
-      cursor: pointer;
-      font: inherit;
-    }
-    .btn.primary{
-      background:#111;
-      color:#fff;
-      border-color:#111;
-    }
-    .btn.secondary{
-      background:#fafafa;
-    }
-    .btn:disabled{
-      opacity:.55;
-      cursor:not-allowed;
-    }
-
-    .grid{
-      display:grid;
-      gap: 14px;
-      grid-template-columns: 1fr;
-    }
-    @media (min-width: 980px){
-      .grid{ grid-template-columns: 420px 1fr; align-items:start; }
-    }
-
-    .card{
-      border: 1px solid #e6e8eb;
-      border-radius: 16px;
-      padding: 14px 14px 12px;
-      background: #fff;
-      box-shadow: 0 1px 0 rgba(0,0,0,.03);
-    }
-    h1{ margin: 0 0 4px; font-size: 28px; }
-    .kicker{
-      margin: 0 0 6px;
-      color: #4b5563;
-      font-size: 13px;
-    }
-    h2{ margin:0 0 8px; font-size: 16px; }
-    .muted{ color:#6b7280; font-size: 13px; margin:0; }
-
-    label{ display:block; font-weight: 750; margin:10px 0 6px; }
-    input, select, textarea{
-      width:100%;
-      box-sizing:border-box;
-      padding:10px;
-      border-radius:12px;
-      border:1px solid #e6e8eb;
-      font:inherit;
-      background:#fff;
-    }
-    textarea{ min-height: 90px; resize: vertical; }
-
-    .row2{
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-    @media (max-width: 520px){
-      .row2{ grid-template-columns: 1fr; }
-    }
-
-    .actions{
+    .topbar{
       display:flex;
       flex-wrap:wrap;
       gap:10px;
       align-items:center;
-      margin-top: 12px;
+      margin: 10px 0 0;
     }
+    .btn, button{
+      display:inline-block;
+      padding:10px 12px;
+      border:1px solid #333;
+      border-radius:10px;
+      background:#fff;
+      font:inherit;
+      cursor:pointer;
+      text-decoration:none;
+      user-select:none;
+    }
+    .btn.secondary{ border-color:#bbb; }
+    .btn.danger{ border-color:#b00020; color:#b00020; }
+    .btn:disabled{ opacity:.5; cursor:not-allowed; }
 
     .pillRow{
       display:flex;
       flex-wrap:wrap;
       gap:10px;
       align-items:center;
-      margin: 10px 0 0;
+      margin: 10px 0 18px;
     }
     .pill{
       display:inline-flex;
@@ -135,6 +73,25 @@
     .pill.warn{ border-color:#ffe1a6; background:#fff9ee; }
     .pill.err{ border-color:#ffb3b3; background:#fff2f2; }
 
+    .grid{
+      display:grid;
+      gap:14px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 1080px){
+      .grid{ grid-template-columns: 420px 1fr; }
+    }
+
+    .card{
+      border:1px solid #ddd;
+      border-radius:12px;
+      padding:16px;
+      background:#fff;
+      position: relative;
+    }
+    .card h2{ margin:0 0 6px; font-size:1.15rem; }
+    .small{ font-size:.95rem; color:#555; margin:0 0 10px; }
+
     .list{
       margin: 10px 0 0;
       padding: 0;
@@ -142,32 +99,55 @@
       display:flex;
       flex-direction:column;
       gap:10px;
-      max-height: 560px;
+      max-height: 520px;
       overflow:auto;
+      border-top: 1px solid #eee;
+      padding-top: 10px;
     }
     .item{
-      border:1px solid #e6e8eb;
-      border-radius:14px;
+      border:1px solid #eee;
+      border-radius:12px;
       padding:10px;
       background:#fff;
-    }
-    .itemTop{
-      display:flex;
-      align-items:baseline;
-      justify-content:space-between;
-      gap:10px;
-    }
-    .itemTitle{ font-weight:900; margin:0; }
-    .itemMeta{ margin:4px 0 0; color:#4b5563; font-size: 13px; }
-    .itemBtns{ display:flex; gap:8px; flex-wrap:wrap; margin-top: 8px; }
-    .smallBtn{
-      padding: 7px 9px;
-      border-radius: 12px;
-      border: 1px solid #e6e8eb;
-      background:#fafafa;
       cursor:pointer;
+    }
+    .item:hover{ background:#fafafa; }
+    .item.active{
+      border-color:#7fcf9b;
+      box-shadow: 0 0 0 4px rgba(183,228,199,.35);
+      background:#fff;
+    }
+    .itemTitle{ font-weight:900; margin:0 0 2px; }
+    .itemMeta{ margin:0; color:#555; font-size:.95rem; }
+    .itemSub{ margin:4px 0 0; color:#333; font-size:.95rem; }
+
+    label{ display:block; margin:10px 0 6px; font-weight:800; }
+    input, select, textarea{
+      width:100%;
+      box-sizing:border-box;
+      padding:10px;
+      border-radius:10px;
+      border:1px solid #bbb;
       font:inherit;
-      font-size: 13px;
+      background:#fff;
+    }
+    textarea{ min-height: 110px; resize: vertical; }
+
+    .row2{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:12px;
+    }
+    @media (max-width: 640px){
+      .row2{ grid-template-columns: 1fr; }
+    }
+
+    .actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-top: 12px;
     }
 
     .hintBox{
@@ -176,586 +156,707 @@
       border-radius: 12px;
       border: 1px solid #ffe1a6;
       background: #fff9ee;
-      color:#111;
-      font-size: 13px;
     }
-
-    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .okBox{
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid #cfe8cf;
+      background: #f5fff5;
+    }
+    code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
   </style>
 </head>
 
 <body>
-  <header>
+<header>
+  <div>
     <h1>Personer</h1>
-    <p class="kicker">Lägg till personer i aktivt träd. Välj plats från kartan utan att förlora formuläret.</p>
+    <p class="muted">Skapa och redigera personer i aktivt träd. Välj plats från kartan och spara koordinater.</p>
 
-    <nav aria-label="Huvudmeny">
-      <a href="../start.html">Start</a>
-      <a href="./trees.html">Träd</a>
-      <a href="./slaktkort.html" aria-current="page">Personer</a>
-      <a href="./create-relation.html">Relationer</a>
-      <a href="./map.html">Karta</a>
-      <span class="spacer"></span>
-      <button class="btn" id="logoutBtn" type="button">Logga ut</button>
+    <nav class="topbar" aria-label="Navigation">
+      <a class="btn secondary" href="../start.html">Start</a>
+      <a class="btn secondary" href="./trees.html">Träd</a>
+      <a class="btn" href="./slaktkort.html">Personer</a>
+      <a class="btn secondary" href="./create-relation.html">Relationer</a>
+      <a class="btn secondary" href="./map.html">Karta</a>
     </nav>
-
-    <div class="pillRow" aria-label="Status">
-      <span id="pillTree" class="pill warn">Aktivt träd: <strong>—</strong></span>
-      <span id="pillCount" class="pill">Personer: <strong>0</strong></span>
-      <span id="pillCoords" class="pill">Med koordinater: <strong>0</strong></span>
-    </div>
-  </header>
-
-  <div class="grid">
-    <section class="card" aria-label="Personformulär">
-      <h2 id="formTitle">Skapa person</h2>
-      <p class="muted" id="formSub">Fyll i uppgifter. Plats väljs via kartan.</p>
-
-      <form id="personForm" autocomplete="off">
-        <div class="row2">
-          <div>
-            <label for="fornamn">Förnamn</label>
-            <input id="fornamn" name="fornamn" placeholder="t.ex. Stina" />
-          </div>
-          <div>
-            <label for="efternamn">Efternamn</label>
-            <input id="efternamn" name="efternamn" placeholder="t.ex. Nilsson" />
-          </div>
-        </div>
-
-        <div class="row2">
-          <div>
-            <label for="kon">Kön</label>
-            <select id="kon" name="kon">
-              <option value="">—</option>
-              <option value="man">Man</option>
-              <option value="kvinna">Kvinna</option>
-            </select>
-          </div>
-          <div>
-            <label for="yrke">Yrke (valfritt)</label>
-            <input id="yrke" name="yrke" placeholder="t.ex. bonde" />
-          </div>
-        </div>
-
-        <div class="row2">
-          <div>
-            <label for="fodelsear">Födelseår (valfritt)</label>
-            <input id="fodelsear" name="fodelsear" inputmode="numeric" placeholder="t.ex. 1988" />
-          </div>
-          <div>
-            <label for="dodsar">Dödsår (valfritt)</label>
-            <input id="dodsar" name="dodsar" inputmode="numeric" placeholder="t.ex. 2050" />
-          </div>
-        </div>
-
-        <label for="plats">Plats (valfritt)</label>
-        <input id="plats" name="plats" placeholder="t.ex. Falun" />
-
-        <label>Koordinater</label>
-        <input id="coords" name="coords" class="mono" placeholder="Välj från kartan" readonly />
-
-        <div class="actions">
-          <button id="pickOnMapBtn" class="btn secondary" type="button">Välj från kartan</button>
-          <button id="clearCoordsBtn" class="btn secondary" type="button">Rensa koordinater</button>
-        </div>
-
-        <label for="notes">Anteckning (valfritt)</label>
-        <textarea id="notes" name="notes" placeholder="Valfri anteckning…"></textarea>
-
-        <div class="actions">
-          <button id="savePersonBtn" class="btn primary" type="submit">Spara person</button>
-          <button id="newPersonBtn" class="btn" type="button">Ny person</button>
-        </div>
-
-        <div id="msg" class="hintBox" hidden></div>
-      </form>
-
-      <div class="hintBox" id="mapHint">
-        Tips: Klicka <strong>Välj från kartan</strong>, sätt en flagga, och gå tillbaka hit så fylls koordinaterna i automatiskt.
-      </div>
-    </section>
-
-    <section class="card" aria-label="Personlista">
-      <h2>Lista</h2>
-      <p class="muted">Klicka Redigera för att ändra en person.</p>
-      <ul id="peopleList" class="list" aria-label="Personer"></ul>
-    </section>
   </div>
 
-  <script>
-    "use strict";
+  <div class="actions" style="justify-content:flex-end;">
+    <button id="logoutBtn" class="btn secondary" type="button">Logga ut</button>
+  </div>
+</header>
 
-    // =====================================================
-    // AUTH-GUARD (DEMO) – samma stil som map.html
-    // =====================================================
-    (function authGuard(){
-      try{
-        if(sessionStorage.getItem("demo_auth") !== "1"){
-          window.location.href = "../index.html";
-        }
-      }catch{}
-    })();
+<section class="pillRow" aria-label="Status">
+  <span id="pillTree" class="pill warn">Aktivt träd: <strong>—</strong></span>
+  <span id="pillPeople" class="pill">Personer: <strong>0</strong></span>
+  <span id="pillCoords" class="pill">Med koordinater: <strong>0</strong></span>
+</section>
 
-    // =====================================================
-    // STORAGE KEYS (matchar map.html)
-    // =====================================================
-    const KEY_TREES  = "slakttradet_trees";
-    const KEY_ACTIVE = "slakttradet_active_tree_id";
-    const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
+<div class="grid">
+  <!-- VÄNSTER: LISTA -->
+  <section class="card" aria-label="Lista">
+    <h2>Personlista</h2>
+    <p class="small">Klicka en person för att redigera. Eller skapa ny.</p>
 
-    // =====================================================
-    // DRAFT + MAP PICK keys (ROBUST: localStorage)
-    // =====================================================
-    const DRAFT_KEY = "slaktkort_person_draft_v2";
-    const PICK_RESULT_KEY = "slaktkort_map_pick_result"; // {lat, lon}
+    <div class="actions">
+      <button id="newBtn" type="button" class="btn">Skapa ny person</button>
+      <button id="reloadBtn" type="button" class="btn secondary">Ladda om</button>
+    </div>
 
-    // =====================================================
-    // DOM
-    // =====================================================
-    const pillTree = document.getElementById("pillTree");
-    const pillCount = document.getElementById("pillCount");
-    const pillCoords = document.getElementById("pillCoords");
+    <div id="leftHint" class="hintBox" hidden></div>
 
-    const peopleList = document.getElementById("peopleList");
+    <ul id="list" class="list" aria-label="Personer"></ul>
+  </section>
 
-    const form = document.getElementById("personForm");
-    const formTitle = document.getElementById("formTitle");
-    const formSub = document.getElementById("formSub");
-    const msg = document.getElementById("msg");
+  <!-- HÖGER: FORM -->
+  <section class="card" aria-label="Personkort">
+    <h2 id="formTitle">Ny person</h2>
+    <p class="small" id="formSub">Fyll i uppgifter och spara.</p>
 
-    const fornamn = document.getElementById("fornamn");
-    const efternamn = document.getElementById("efternamn");
-    const kon = document.getElementById("kon");
-    const yrke = document.getElementById("yrke");
-    const fodelsear = document.getElementById("fodelsear");
-    const dodsar = document.getElementById("dodsar");
-    const plats = document.getElementById("plats");
-    const coords = document.getElementById("coords");
-    const notes = document.getElementById("notes");
+    <div class="row2">
+      <div>
+        <label for="fornamn">Förnamn</label>
+        <input id="fornamn" autocomplete="off" />
+      </div>
+      <div>
+        <label for="efternamn">Efternamn</label>
+        <input id="efternamn" autocomplete="off" />
+      </div>
+    </div>
 
-    const pickOnMapBtn = document.getElementById("pickOnMapBtn");
-    const clearCoordsBtn = document.getElementById("clearCoordsBtn");
-    const newPersonBtn = document.getElementById("newPersonBtn");
-    const logoutBtn = document.getElementById("logoutBtn");
+    <div class="row2">
+      <div>
+        <label for="kon">Kön</label>
+        <select id="kon">
+          <option value="">—</option>
+          <option value="man">Man</option>
+          <option value="kvinna">Kvinna</option>
+        </select>
+      </div>
+      <div>
+        <label for="yrke">Yrke (valfritt)</label>
+        <input id="yrke" autocomplete="off" />
+      </div>
+    </div>
 
-    // =====================================================
-    // Helpers
-    // =====================================================
-    function safeParseJSON(raw, fallback){
-      try{ return JSON.parse(raw); }catch{ return fallback; }
+    <div class="row2">
+      <div>
+        <label for="fodelsear">Födelseår (valfritt)</label>
+        <input id="fodelsear" inputmode="numeric" placeholder="t.ex. 1980" />
+      </div>
+      <div>
+        <label for="dodsar">Dödsår (valfritt)</label>
+        <input id="dodsar" inputmode="numeric" placeholder="t.ex. 2020" />
+      </div>
+    </div>
+
+    <label for="plats">Plats (valfritt)</label>
+    <input id="plats" placeholder="t.ex. Falun" autocomplete="off" />
+
+    <div class="hintBox">
+      <strong>Plats från kartan</strong>
+      <div class="small" style="margin-top:6px;">
+        Klicka <strong>Välj plats</strong>, sätt flaggan på kartan och spara där. När du kommer tillbaka fylls koordinaterna i automatiskt.
+      </div>
+      <div class="actions" style="margin-top:10px;">
+        <button id="pickBtn" type="button" class="btn">Välj plats</button>
+        <button id="clearCoordsBtn" type="button" class="btn secondary">Rensa koordinater</button>
+      </div>
+    </div>
+
+    <label for="coords">Koordinater (lat, lon) (valfritt)</label>
+    <input id="coords" placeholder="t.ex. 60.6070, 15.6355" autocomplete="off" />
+
+    <label for="anteckning">Anteckning (valfritt)</label>
+    <textarea id="anteckning" placeholder="..." ></textarea>
+
+    <div class="actions">
+      <button id="saveBtn" type="button" class="btn">Spara</button>
+      <button id="deleteBtn" type="button" class="btn danger" disabled>Ta bort</button>
+      <button id="resetBtn" type="button" class="btn secondary">Återställ form</button>
+    </div>
+
+    <div id="statusBox" class="okBox" hidden></div>
+    <p class="small" id="tech" style="margin-top:10px;">—</p>
+  </section>
+</div>
+
+<script>
+  "use strict";
+
+  // =====================================================
+  // DEMO AUTH GUARD (matchar din map.html)
+  // =====================================================
+  (function authGuard(){
+    try{
+      if(sessionStorage.getItem("demo_auth") !== "1"){
+        window.location.href = "../index.html";
+      }
+    }catch{}
+  })();
+
+  // =====================================================
+  // STORAGE KEYS (måste matcha övriga sidor)
+  // =====================================================
+  const KEY_TREES  = "slakttradet_trees";
+  const KEY_ACTIVE = "slakttradet_active_tree_id";
+  const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
+
+  // Pick integration (matchar map.html)
+  const PICK_RESULT_KEY = "slaktkort_map_pick_result";
+  const PICK_AUTOSTART_KEY = "slaktkort_map_pick_autostart";
+
+  // Draft: för att inte tappa uppgifter när man går till kartan
+  const DRAFT_KEY = "slaktkort_person_draft_v1";
+
+  // =====================================================
+  // DOM
+  // =====================================================
+  const logoutBtn = document.getElementById("logoutBtn");
+
+  const pillTree = document.getElementById("pillTree");
+  const pillPeople = document.getElementById("pillPeople");
+  const pillCoords = document.getElementById("pillCoords");
+
+  const leftHint = document.getElementById("leftHint");
+  const listEl = document.getElementById("list");
+  const newBtn = document.getElementById("newBtn");
+  const reloadBtn = document.getElementById("reloadBtn");
+
+  const formTitle = document.getElementById("formTitle");
+  const formSub = document.getElementById("formSub");
+
+  const fornamnEl = document.getElementById("fornamn");
+  const efternamnEl = document.getElementById("efternamn");
+  const konEl = document.getElementById("kon");
+  const yrkeEl = document.getElementById("yrke");
+  const fodelsearEl = document.getElementById("fodelsear");
+  const dodsarEl = document.getElementById("dodsar");
+  const platsEl = document.getElementById("plats");
+  const coordsEl = document.getElementById("coords");
+  const anteckningEl = document.getElementById("anteckning");
+
+  const pickBtn = document.getElementById("pickBtn");
+  const clearCoordsBtn = document.getElementById("clearCoordsBtn");
+
+  const saveBtn = document.getElementById("saveBtn");
+  const deleteBtn = document.getElementById("deleteBtn");
+  const resetBtn = document.getElementById("resetBtn");
+
+  const statusBox = document.getElementById("statusBox");
+  const techEl = document.getElementById("tech");
+
+  // =====================================================
+  // HELPERS
+  // =====================================================
+  function safeParse(raw, fallback){
+    try{ return JSON.parse(raw); }catch{ return fallback; }
+  }
+  function loadJson(key, fallback){
+    const raw = localStorage.getItem(key);
+    return raw ? safeParse(raw, fallback) : fallback;
+  }
+  function saveJson(key, value){
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+  function escapeHtml(s){
+    return String(s || "")
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+  function uid(){
+    return "p_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,8);
+  }
+  function activeTreeId(){
+    return localStorage.getItem(KEY_ACTIVE) || "";
+  }
+  function getTrees(){
+    const trees = loadJson(KEY_TREES, []);
+    return Array.isArray(trees) ? trees : [];
+  }
+  function activeTreeLabel(){
+    const id = activeTreeId();
+    if(!id) return "—";
+    const t = getTrees().find(x => String(x.id) === String(id));
+    return t ? (t.name || t.id) : id;
+  }
+  function loadPeople(){
+    const t = activeTreeId();
+    if(!t) return [];
+    const arr = loadJson(cardsKey(t), []);
+    return Array.isArray(arr) ? arr : [];
+  }
+  function savePeople(arr){
+    const t = activeTreeId();
+    if(!t) return;
+    saveJson(cardsKey(t), Array.isArray(arr) ? arr : []);
+  }
+  function personName(p){
+    const n = `${p.fornamn || ""} ${p.efternamn || ""}`.trim();
+    return n || "(namnlös)";
+  }
+  function yearsLine(p){
+    const a = (p && p.fodelsear != null && String(p.fodelsear).trim() !== "") ? String(p.fodelsear).trim() : "";
+    const b = (p && p.dodsar != null && String(p.dodsar).trim() !== "") ? String(p.dodsar).trim() : "";
+    if(!a && !b) return "";
+    if(a && b) return `${a}–${b}`;
+    return a ? `${a}–` : `–${b}`;
+  }
+  function parseCoordsText(txt){
+    const s = String(txt || "").trim();
+    if(!s) return null;
+    const parts = s.split(",").map(x => x.trim()).filter(Boolean);
+    if(parts.length !== 2) return null;
+    const lat = Number(parts[0]);
+    const lon = Number(parts[1]);
+    if(!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    if(lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+    return { lat, lon };
+  }
+  function coordsToText(c){
+    if(!c || !Number.isFinite(c.lat) || !Number.isFinite(c.lon)) return "";
+    return `${c.lat.toFixed(4)}, ${c.lon.toFixed(4)}`;
+  }
+  function showStatus(html){
+    statusBox.hidden = false;
+    statusBox.innerHTML = html;
+    setTimeout(() => { try{ statusBox.hidden = true; }catch{} }, 1800);
+  }
+
+  // =====================================================
+  // STATE
+  // =====================================================
+  let people = [];
+  let selectedId = ""; // "" = ny person
+
+  // =====================================================
+  // DRAFT (för att inte tappa formdata när man går till kartan)
+  // =====================================================
+  function makeDraft(){
+    return {
+      ts: Date.now(),
+      selectedId: selectedId || "",
+      form: {
+        fornamn: fornamnEl.value || "",
+        efternamn: efternamnEl.value || "",
+        kon: konEl.value || "",
+        yrke: yrkeEl.value || "",
+        fodelsear: fodelsearEl.value || "",
+        dodsar: dodsarEl.value || "",
+        plats: platsEl.value || "",
+        coordsText: coordsEl.value || "",
+        anteckning: anteckningEl.value || ""
+      }
+    };
+  }
+  function saveDraft(){
+    try{ localStorage.setItem(DRAFT_KEY, JSON.stringify(makeDraft())); }catch{}
+  }
+  function clearDraft(){
+    try{ localStorage.removeItem(DRAFT_KEY); }catch{}
+  }
+  function loadDraft(){
+    const d = loadJson(DRAFT_KEY, null);
+    if(!d || !d.form) return null;
+    return d;
+  }
+  function applyDraft(d){
+    try{
+      selectedId = String(d.selectedId || "");
+      const f = d.form || {};
+      fornamnEl.value = f.fornamn || "";
+      efternamnEl.value = f.efternamn || "";
+      konEl.value = f.kon || "";
+      yrkeEl.value = f.yrke || "";
+      fodelsearEl.value = f.fodelsear || "";
+      dodsarEl.value = f.dodsar || "";
+      platsEl.value = f.plats || "";
+      coordsEl.value = f.coordsText || "";
+      anteckningEl.value = f.anteckning || "";
+    }catch{}
+  }
+
+  // autospara draft vid ändringar (så du aldrig tappar uppgifter)
+  function hookAutoDraft(){
+    const els = [
+      fornamnEl, efternamnEl, konEl, yrkeEl, fodelsearEl, dodsarEl, platsEl, coordsEl, anteckningEl
+    ];
+    for(const el of els){
+      el.addEventListener("input", saveDraft);
+      el.addEventListener("change", saveDraft);
     }
-    function loadJson(key, fallback){
-      const raw = localStorage.getItem(key);
-      return raw ? safeParseJSON(raw, fallback) : fallback;
-    }
-    function saveJson(key, value){
-      localStorage.setItem(key, JSON.stringify(value));
-    }
-    function escapeHtml(s){
-      return String(s ?? "")
-        .replaceAll("&","&amp;")
-        .replaceAll("<","&lt;")
-        .replaceAll(">","&gt;")
-        .replaceAll('"',"&quot;")
-        .replaceAll("'","&#039;");
-    }
-    function uuid(){
-      try{
-        if(crypto && typeof crypto.randomUUID === "function") return crypto.randomUUID();
-      }catch{}
-      return "p_" + Math.random().toString(16).slice(2) + "_" + Date.now().toString(16);
-    }
-    function activeTreeId(){
-      return localStorage.getItem(KEY_ACTIVE) || "";
-    }
-    function getTrees(){
-      const t = loadJson(KEY_TREES, []);
-      return Array.isArray(t) ? t : [];
-    }
-    function activeTreeLabel(){
-      const id = activeTreeId();
-      if(!id) return "—";
-      const t = getTrees().find(x => String(x.id) === String(id));
-      return t ? (t.name || t.id) : id;
-    }
-    function personName(p){
-      const n = `${p.fornamn || ""} ${p.efternamn || ""}`.trim();
-      return n || "(namnlös)";
-    }
-    function yearsLine(p){
-      const a = (p && p.fodelsear != null && String(p.fodelsear).trim() !== "") ? String(p.fodelsear).trim() : "";
-      const b = (p && p.dodsar != null && String(p.dodsar).trim() !== "") ? String(p.dodsar).trim() : "";
-      if(!a && !b) return "";
-      if(a && b) return `${a}–${b}`;
-      return a ? `${a}–` : `–${b}`;
-    }
-    function parseCoordsString(s){
-      const t = String(s || "").trim();
-      if(!t) return null;
-      const parts = t.split(",").map(x => x.trim()).filter(Boolean);
-      if(parts.length !== 2) return null;
-      const lat = Number(parts[0]);
-      const lon = Number(parts[1]);
-      if(!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-      if(lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
-      return { lat, lon };
-    }
-    function formatCoords(c){
-      if(!c) return "";
-      return `${Number(c.lat).toFixed(4)}, ${Number(c.lon).toFixed(4)}`;
-    }
-    function showMsg(text){
-      msg.hidden = false;
-      msg.textContent = text;
-    }
-    function hideMsg(){
-      msg.hidden = true;
-      msg.textContent = "";
+  }
+
+  // =====================================================
+  // PICK RESULT (kommer från map.html)
+  // =====================================================
+  function consumePickResult(){
+    const raw = localStorage.getItem(PICK_RESULT_KEY);
+    if(!raw) return null;
+    localStorage.removeItem(PICK_RESULT_KEY);
+    const obj = safeParse(raw, null);
+    if(!obj) return null;
+    const lat = Number(obj.lat);
+    const lon = Number(obj.lon);
+    if(!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    return { lat, lon };
+  }
+
+  // =====================================================
+  // UI RENDER
+  // =====================================================
+  function renderPills(){
+    const trees = getTrees();
+    const hasTrees = trees.length > 0;
+    const t = activeTreeId();
+    const hasActive = !!t;
+
+    pillTree.className = "pill " + (hasActive ? "ok" : (hasTrees ? "warn" : "err"));
+    pillTree.innerHTML = "Aktivt träd: <strong>" + (hasActive ? escapeHtml(activeTreeLabel()) : "—") + "</strong>";
+
+    pillPeople.innerHTML = "Personer: <strong>" + people.length + "</strong>";
+
+    const nCoords = people.filter(p => {
+      const c = p && p.coords && typeof p.coords === "object" ? p.coords : null;
+      return c && Number.isFinite(Number(c.lat)) && Number.isFinite(Number(c.lon));
+    }).length;
+    pillCoords.innerHTML = "Med koordinater: <strong>" + nCoords + "</strong>";
+  }
+
+  function renderList(){
+    listEl.innerHTML = "";
+
+    const t = activeTreeId();
+    if(!t){
+      leftHint.hidden = false;
+      leftHint.innerHTML = "<strong>🚩 Inget aktivt träd:</strong> Gå till <a href='./trees.html'><code>Träd</code></a> och välj aktivt träd.";
+      return;
     }
 
-    // =====================================================
-    // People load/save per active tree
-    // =====================================================
-    function loadPeople(){
-      const t = activeTreeId();
-      if(!t) return [];
-      const arr = loadJson(cardsKey(t), []);
-      return Array.isArray(arr) ? arr : [];
-    }
-    function savePeople(arr){
-      const t = activeTreeId();
-      if(!t) return;
-      saveJson(cardsKey(t), arr);
+    leftHint.hidden = true;
+    leftHint.innerHTML = "";
+
+    if(people.length === 0){
+      const li = document.createElement("li");
+      li.className = "item";
+      li.style.cursor = "default";
+      li.innerHTML = "<p class='itemTitle'>Inga personer ännu</p><p class='itemMeta'>Klicka “Skapa ny person”.</p>";
+      listEl.appendChild(li);
+      return;
     }
 
-    // =====================================================
-    // Editor state
-    // =====================================================
-    let editingId = "";
+    for(const p of people){
+      const li = document.createElement("li");
+      li.className = "item" + (String(p.id) === String(selectedId) ? " active" : "");
+      li.dataset.id = String(p.id);
 
-    function clearForm(){
-      editingId = "";
-      formTitle.textContent = "Skapa person";
-      formSub.textContent = "Fyll i uppgifter. Plats väljs via kartan.";
-      fornamn.value = "";
-      efternamn.value = "";
-      kon.value = "";
-      yrke.value = "";
-      fodelsear.value = "";
-      dodsar.value = "";
-      plats.value = "";
-      coords.value = "";
-      notes.value = "";
-      hideMsg();
-      saveDraft();
+      const years = yearsLine(p);
+      const hasC = p && p.coords && Number.isFinite(Number(p.coords.lat)) && Number.isFinite(Number(p.coords.lon));
+      const coordsLine = hasC ? ("Koordinater: " + Number(p.coords.lat).toFixed(4) + ", " + Number(p.coords.lon).toFixed(4)) : "Koordinater: —";
+      const platsLine = String(p.plats || "").trim() ? ("Plats: " + escapeHtml(String(p.plats || "").trim())) : "Plats: —";
+
+      li.innerHTML =
+        "<p class='itemTitle'>" + escapeHtml(personName(p)) + "</p>" +
+        "<p class='itemMeta'>" + escapeHtml(years || "—") + "</p>" +
+        "<p class='itemSub'>" + escapeHtml(platsLine) + "</p>" +
+        "<p class='itemSub'>" + escapeHtml(coordsLine) + "</p>";
+
+      li.addEventListener("click", () => {
+        selectPerson(String(p.id));
+      });
+
+      listEl.appendChild(li);
     }
+  }
 
-    function fillForm(p){
-      editingId = String(p.id || "");
+  function setFormMode(){
+    if(selectedId){
       formTitle.textContent = "Redigera person";
       formSub.textContent = "Ändra uppgifter och spara.";
-      fornamn.value = String(p.fornamn || "");
-      efternamn.value = String(p.efternamn || "");
-      kon.value = String(p.kon || "");
-      yrke.value = String(p.yrke || "");
-      fodelsear.value = (p.fodelsear == null ? "" : String(p.fodelsear));
-      dodsar.value = (p.dodsar == null ? "" : String(p.dodsar));
-      plats.value = String(p.plats || "");
-      coords.value = p.coords && typeof p.coords === "object" ? formatCoords(p.coords) : "";
-      notes.value = String(p.notes || "");
-      hideMsg();
-      saveDraft();
+      deleteBtn.disabled = false;
+    }else{
+      formTitle.textContent = "Ny person";
+      formSub.textContent = "Fyll i uppgifter och spara.";
+      deleteBtn.disabled = true;
+    }
+  }
+
+  function clearForm(){
+    selectedId = "";
+    fornamnEl.value = "";
+    efternamnEl.value = "";
+    konEl.value = "";
+    yrkeEl.value = "";
+    fodelsearEl.value = "";
+    dodsarEl.value = "";
+    platsEl.value = "";
+    coordsEl.value = "";
+    anteckningEl.value = "";
+    setFormMode();
+    renderList();
+    saveDraft();
+    renderTech();
+  }
+
+  function selectPerson(id){
+    const p = people.find(x => String(x.id) === String(id));
+    if(!p) return;
+
+    selectedId = String(p.id);
+
+    fornamnEl.value = p.fornamn || "";
+    efternamnEl.value = p.efternamn || "";
+    konEl.value = p.kon || "";
+    yrkeEl.value = p.yrke || "";
+    fodelsearEl.value = (p.fodelsear ?? "") + "";
+    dodsarEl.value = (p.dodsar ?? "") + "";
+    platsEl.value = p.plats || "";
+    coordsEl.value = p && p.coords ? coordsToText({ lat:Number(p.coords.lat), lon:Number(p.coords.lon) }) : "";
+    anteckningEl.value = p.anteckning || "";
+
+    setFormMode();
+    renderList();
+    saveDraft();
+    renderTech();
+  }
+
+  function gatherForm(){
+    const coordsParsed = parseCoordsText(coordsEl.value);
+    return {
+      fornamn: String(fornamnEl.value || "").trim(),
+      efternamn: String(efternamnEl.value || "").trim(),
+      kon: String(konEl.value || "").trim(),
+      yrke: String(yrkeEl.value || "").trim(),
+      fodelsear: String(fodelsearEl.value || "").trim(),
+      dodsar: String(dodsarEl.value || "").trim(),
+      plats: String(platsEl.value || "").trim(),
+      coords: coordsParsed ? { lat: coordsParsed.lat, lon: coordsParsed.lon } : null,
+      anteckning: String(anteckningEl.value || "").trim()
+    };
+  }
+
+  function renderTech(){
+    const t = activeTreeId();
+    if(!t){
+      techEl.textContent = "—";
+      return;
+    }
+    const mode = selectedId ? ("Redigerar: " + selectedId) : "Skapar: ny person";
+    techEl.textContent = mode + " · Storage: " + cardsKey(t);
+  }
+
+  // =====================================================
+  // CRUD
+  // =====================================================
+  function savePerson(){
+    const t = activeTreeId();
+    if(!t){
+      showStatus("<strong>Välj aktivt träd först.</strong> Gå till Träd.");
+      return;
     }
 
-    // =====================================================
-    // Draft (ROBUST: localStorage) – överlever flik/refresh
-    // =====================================================
-    function readForm(){
-      return {
-        editingId,
-        fornamn: fornamn.value,
-        efternamn: efternamn.value,
-        kon: kon.value,
-        yrke: yrke.value,
-        fodelsear: fodelsear.value,
-        dodsar: dodsar.value,
-        plats: plats.value,
-        coords: coords.value,
-        notes: notes.value,
-        activeTreeId: activeTreeId() // för extra säkerhet
-      };
-    }
-    function writeForm(d){
-      if(!d || typeof d !== "object") return;
-      editingId = String(d.editingId || "");
-      fornamn.value = String(d.fornamn || "");
-      efternamn.value = String(d.efternamn || "");
-      kon.value = String(d.kon || "");
-      yrke.value = String(d.yrke || "");
-      fodelsear.value = String(d.fodelsear || "");
-      dodsar.value = String(d.dodsar || "");
-      plats.value = String(d.plats || "");
-      coords.value = String(d.coords || "");
-      notes.value = String(d.notes || "");
-
-      if(editingId){
-        formTitle.textContent = "Redigera person";
-        formSub.textContent = "Ändra uppgifter och spara.";
-      }else{
-        formTitle.textContent = "Skapa person";
-        formSub.textContent = "Fyll i uppgifter. Plats väljs via kartan.";
-      }
-    }
-    function saveDraft(){
-      try{
-        localStorage.setItem(DRAFT_KEY, JSON.stringify({ ts: Date.now(), data: readForm() }));
-      }catch{}
-    }
-    function loadDraft(){
-      try{
-        const raw = localStorage.getItem(DRAFT_KEY);
-        if(!raw) return null;
-        const obj = JSON.parse(raw);
-        if(!obj || typeof obj !== "object") return null;
-        // rensa om äldre än 6 timmar
-        if(obj.ts && (Date.now() - obj.ts) > 6*60*60*1000){
-          localStorage.removeItem(DRAFT_KEY);
-          return null;
-        }
-        return obj.data || null;
-      }catch{
-        return null;
-      }
-    }
-    function clearDraft(){
-      try{ localStorage.removeItem(DRAFT_KEY); }catch{}
+    const f = gatherForm();
+    if(!f.fornamn && !f.efternamn){
+      showStatus("<strong>Fyll i minst förnamn eller efternamn.</strong>");
+      return;
     }
 
-    // autospara draft när man skriver + när sidan lämnas
-    let draftTimer = null;
-    form.addEventListener("input", () => {
-      if(draftTimer) clearTimeout(draftTimer);
-      draftTimer = setTimeout(saveDraft, 120);
-    });
-    window.addEventListener("beforeunload", () => {
-      try{ saveDraft(); }catch{}
-    });
-
-    // =====================================================
-    // Apply map pick result on load (coords)
-    // =====================================================
-    function applyPickResultIfAny(){
-      try{
-        const raw = localStorage.getItem(PICK_RESULT_KEY);
-        if(!raw) return;
-        const res = JSON.parse(raw);
-        if(!res || typeof res !== "object") return;
-
-        const lat = Number(res.lat);
-        const lon = Number(res.lon);
-        if(!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-
-        coords.value = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
-        if(!String(plats.value || "").trim()){
-          plats.value = "Vald på karta";
-        }
-
-        saveDraft();
-        localStorage.removeItem(PICK_RESULT_KEY);
-      }catch{}
+    if(coordsEl.value.trim() && !f.coords){
+      showStatus("<strong>Koordinater ser fel ut.</strong> Skriv som: 60.6070, 15.6355");
+      return;
     }
 
-    // =====================================================
-    // Render list
-    // =====================================================
-    function render(){
-      const t = activeTreeId();
-      const hasActive = !!t;
-      const trees = getTrees();
-
-      pillTree.className = "pill " + (hasActive ? "ok" : (trees.length ? "warn" : "err"));
-      pillTree.innerHTML = "Aktivt träd: <strong>" + escapeHtml(hasActive ? activeTreeLabel() : "—") + "</strong>";
-
-      const people = hasActive ? loadPeople() : [];
-      pillCount.innerHTML = "Personer: <strong>" + people.length + "</strong>";
-
-      const withCoords = people.filter(p => p && p.coords && Number.isFinite(+p.coords.lat) && Number.isFinite(+p.coords.lon)).length;
-      pillCoords.innerHTML = "Med koordinater: <strong>" + withCoords + "</strong>";
-
-      peopleList.innerHTML = "";
-
-      if(!trees.length){
-        const li = document.createElement("li");
-        li.className = "item";
-        li.innerHTML = "<p class='itemTitle'>Inga träd ännu</p><p class='itemMeta'>Gå till Träd och skapa ett träd först.</p>";
-        peopleList.appendChild(li);
+    if(selectedId){
+      // update
+      const idx = people.findIndex(x => String(x.id) === String(selectedId));
+      if(idx === -1){
+        showStatus("<strong>Hittar inte personen.</strong> Ladda om.");
         return;
       }
 
-      if(!hasActive){
-        const li = document.createElement("li");
-        li.className = "item";
-        li.innerHTML = "<p class='itemTitle'>Inget aktivt träd valt</p><p class='itemMeta'>Gå till Träd och välj aktivt träd.</p>";
-        peopleList.appendChild(li);
-        return;
-      }
-
-      if(people.length === 0){
-        const li = document.createElement("li");
-        li.className = "item";
-        li.innerHTML = "<p class='itemTitle'>Inga personer ännu</p><p class='itemMeta'>Skapa din första person i formuläret.</p>";
-        peopleList.appendChild(li);
-        return;
-      }
-
-      for(const p of people){
-        const li = document.createElement("li");
-        li.className = "item";
-
-        const top = document.createElement("div");
-        top.className = "itemTop";
-
-        const title = document.createElement("p");
-        title.className = "itemTitle";
-        title.textContent = personName(p);
-
-        const yrs = document.createElement("p");
-        yrs.className = "itemMeta";
-        yrs.textContent = yearsLine(p) || "—";
-
-        top.appendChild(title);
-        top.appendChild(yrs);
-
-        const meta = document.createElement("p");
-        meta.className = "itemMeta";
-        const c = p.coords ? formatCoords(p.coords) : "";
-        meta.textContent =
-          (p.plats ? ("Plats: " + p.plats + " · ") : "") +
-          (c ? ("Coords: " + c) : "Coords: —");
-
-        const btns = document.createElement("div");
-        btns.className = "itemBtns";
-
-        const edit = document.createElement("button");
-        edit.type = "button";
-        edit.className = "smallBtn";
-        edit.textContent = "Redigera";
-        edit.addEventListener("click", () => fillForm(p));
-
-        const del = document.createElement("button");
-        del.type = "button";
-        del.className = "smallBtn";
-        del.textContent = "Ta bort";
-        del.addEventListener("click", () => {
-          const ok = confirm("Ta bort " + personName(p) + "?");
-          if(!ok) return;
-          const next = loadPeople().filter(x => String(x.id) !== String(p.id));
-          savePeople(next);
-          if(String(editingId) === String(p.id)){
-            clearForm();
-          }
-          render();
-        });
-
-        btns.appendChild(edit);
-        btns.appendChild(del);
-
-        li.appendChild(top);
-        li.appendChild(meta);
-        li.appendChild(btns);
-
-        peopleList.appendChild(li);
-      }
-    }
-
-    // =====================================================
-    // Events
-    // =====================================================
-    pickOnMapBtn.addEventListener("click", () => {
-      // spara draft innan navigation så inget försvinner
-      saveDraft();
-      window.location.href = "./map.html";
-    });
-
-    clearCoordsBtn.addEventListener("click", () => {
-      coords.value = "";
-      saveDraft();
-    });
-
-    newPersonBtn.addEventListener("click", () => {
-      clearForm();
-    });
-
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-
-      const t = activeTreeId();
-      if(!t){
-        showMsg("Välj ett aktivt träd först (gå till Träd).");
-        return;
-      }
-
-      const fn = String(fornamn.value || "").trim();
-      const en = String(efternamn.value || "").trim();
-      if(!fn && !en){
-        showMsg("Fyll i minst förnamn eller efternamn.");
-        return;
-      }
-
-      const c = parseCoordsString(coords.value);
-
-      const person = {
-        id: editingId || uuid(),
-        fornamn: fn,
-        efternamn: en,
-        kon: String(kon.value || ""),
-        yrke: String(yrke.value || "").trim(),
-        fodelsear: String(fodelsear.value || "").trim(),
-        dodsar: String(dodsar.value || "").trim(),
-        plats: String(plats.value || "").trim(),
-        coords: c ? { lat: c.lat, lon: c.lon } : null,
-        notes: String(notes.value || "").trim()
+      const prev = people[idx];
+      const updated = {
+        ...prev,
+        fornamn: f.fornamn,
+        efternamn: f.efternamn,
+        kon: f.kon,
+        yrke: f.yrke,
+        fodelsear: f.fodelsear,
+        dodsar: f.dodsar,
+        plats: f.plats,
+        coords: f.coords ? { lat: f.coords.lat, lon: f.coords.lon } : null,
+        anteckning: f.anteckning,
+        updatedAt: Date.now()
       };
 
-      const all = loadPeople();
-      const idx = all.findIndex(x => String(x.id) === String(person.id));
-      if(idx >= 0){
-        all[idx] = person;
-      }else{
-        all.push(person);
-      }
-      savePeople(all);
-
-      // rensa draft efter lyckad save (men behåll formulärdata i edit-läge)
-      clearDraft();
-      fillForm(person);
-      showMsg("Sparad.");
-      render();
-    });
-
-    logoutBtn.addEventListener("click", () => {
-      try{ sessionStorage.removeItem("demo_auth"); }catch{}
-      window.location.href = "../index.html";
-    });
-
-    // =====================================================
-    // Boot
-    // =====================================================
-    // 1) Återställ draft först
-    const d = loadDraft();
-    if(d){
-      // om draft hör till ett annat aktivt träd är det ändå OK — men vi låter det vara
-      writeForm(d);
+      people[idx] = updated;
+      savePeople(people);
+      showStatus("<strong>Sparat.</strong>");
+      clearDraft(); // klart
+      // behåll selection
+      renderPills();
+      renderList();
+      renderTech();
+      return;
     }
 
-    // 2) Applicera ev. punkt från kartan
-    applyPickResultIfAny();
+    // create
+    const p = {
+      id: uid(),
+      fornamn: f.fornamn,
+      efternamn: f.efternamn,
+      kon: f.kon,
+      yrke: f.yrke,
+      fodelsear: f.fodelsear,
+      dodsar: f.dodsar,
+      plats: f.plats,
+      coords: f.coords ? { lat: f.coords.lat, lon: f.coords.lon } : null,
+      anteckning: f.anteckning,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
 
-    // 3) Spara direkt så allt “låses” direkt (viktigt på GitHub Pages)
+    people.unshift(p);
+    savePeople(people);
+    selectedId = String(p.id);
+    setFormMode();
+    showStatus("<strong>Skapad och sparad.</strong>");
+    clearDraft(); // klart
+    renderPills();
+    renderList();
+    renderTech();
+  }
+
+  function deletePerson(){
+    if(!selectedId) return;
+    const idx = people.findIndex(x => String(x.id) === String(selectedId));
+    if(idx === -1) return;
+
+    const name = personName(people[idx]);
+    const ok = confirm("Ta bort " + name + "?");
+    if(!ok) return;
+
+    people.splice(idx, 1);
+    savePeople(people);
+    showStatus("<strong>Borttagen.</strong>");
+    clearDraft();
+    clearForm();
+    renderPills();
+  }
+
+  // =====================================================
+  // KARTA PICK FLOW
+  // =====================================================
+  function goPickOnMap(){
+    // autospara draft så inget tappas
     saveDraft();
 
-    render();
-  </script>
+    // sätt autostart-flagga (kompatibel)
+    try{ localStorage.setItem(PICK_AUTOSTART_KEY, "1"); }catch{}
+
+    // öppna map i pick-läge
+    window.location.href = "./map.html?pick=1";
+  }
+
+  function applyPickedCoordsIfAny(){
+    const picked = consumePickResult();
+    if(!picked) return false;
+
+    coordsEl.value = coordsToText({ lat: picked.lat, lon: picked.lon });
+    showStatus("<strong>Plats vald.</strong> Spara personen för att behålla koordinaterna.");
+    saveDraft();
+    return true;
+  }
+
+  function clearCoords(){
+    coordsEl.value = "";
+    saveDraft();
+    showStatus("<strong>Koordinater rensade.</strong>");
+  }
+
+  // =====================================================
+  // EVENTS
+  // =====================================================
+  newBtn.addEventListener("click", () => {
+    clearForm();
+    showStatus("<strong>Ny person.</strong>");
+  });
+
+  reloadBtn.addEventListener("click", () => {
+    init();
+    showStatus("<strong>Omladdat.</strong>");
+  });
+
+  saveBtn.addEventListener("click", savePerson);
+  deleteBtn.addEventListener("click", deletePerson);
+
+  resetBtn.addEventListener("click", () => {
+    // återställ från vald person eller tom
+    if(selectedId){
+      selectPerson(selectedId);
+      showStatus("<strong>Återställt.</strong>");
+    }else{
+      clearForm();
+      showStatus("<strong>Återställt.</strong>");
+    }
+  });
+
+  pickBtn.addEventListener("click", goPickOnMap);
+  clearCoordsBtn.addEventListener("click", clearCoords);
+
+  logoutBtn.addEventListener("click", () => {
+    try{ sessionStorage.removeItem("demo_auth"); }catch{}
+    window.location.href = "../index.html";
+  });
+
+  // =====================================================
+  // INIT
+  // =====================================================
+  function init(){
+    people = loadPeople();
+
+    // status pills
+    renderPills();
+
+    // först: om vi kommer tillbaka från kartan -> applicera coords
+    // (innan vi eventuellt läser draft)
+    const hadPick = applyPickedCoordsIfAny();
+
+    // sedan: om det finns draft -> återställ form (så inget tappas)
+    const draft = loadDraft();
+    if(draft){
+      applyDraft(draft);
+      setFormMode();
+
+      // om vi precis fick coords från kartan vill vi behålla dem även om draft hade annat
+      if(hadPick){
+        // coordsEl är redan uppdaterad; säkerställ att draft också sparas
+        saveDraft();
+      }
+    }else{
+      setFormMode();
+    }
+
+    // om draft säger att en person var vald, highlighta den
+    // men om selectedId finns och personen finns -> ok, annars ny
+    if(selectedId){
+      const exists = people.some(p => String(p.id) === String(selectedId));
+      if(!exists) selectedId = "";
+    }
+
+    // render
+    renderList();
+    setFormMode();
+    renderTech();
+  }
+
+  hookAutoDraft();
+  init();
+</script>
 </body>
 </html>
