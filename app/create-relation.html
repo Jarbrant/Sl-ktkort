@@ -7,7 +7,14 @@
   <meta name="description" content="Koppla personer i släkten (localStorage-first)." />
 
   <style>
-    :root { color-scheme: light; }
+    /* ARKIV-ID: UI-GLOBAL-01 | Global designstandard
+       Syfte: Gemensam baseline för alla Släktkort-sidor (GitHub Pages, local HTML).
+       Placering: Klistra in HÖGST UPP i varje sidas <style>-tagg.
+       Obs: Endast CSS. Ingen JS/keys/logik påverkas.
+    */
+    :root{
+      color-scheme: light;
+    }
     body{
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       line-height: 1.5;
@@ -18,8 +25,10 @@
       background: #fff;
       color: #111;
     }
-    a{ color: inherit; text-decoration:none; }
-
+    a{
+      color: inherit;
+      text-decoration: none;
+    }
     header{
       display:flex;
       align-items:flex-start;
@@ -27,9 +36,6 @@
       gap:12px;
       margin-bottom:18px;
     }
-    h1{ margin:0 0 6px; font-size:1.6rem; }
-    .muted{ color:#555; margin:0 0 12px; }
-
     .topbar{
       display:flex;
       flex-wrap:wrap;
@@ -48,16 +54,32 @@
       text-decoration:none;
       user-select:none;
     }
-    .btn.secondary{ border-color:#bbb; }
-    .btn.danger{ border-color:#b00020; color:#b00020; }
-    .btn:disabled{ opacity:.5; cursor:not-allowed; }
-
-    /* ARKIV-ID: CR-08 | Aktiv nav-stil (grön) för Relationer */
-    .btn.navActive{
-      background:#2e7d32;
-      border-color:#2e7d32;
-      color:#fff;
+    .btn.secondary{
+      border-color:#bbb;
     }
+    .btn:disabled,
+    button:disabled{
+      opacity:.55;
+      cursor:not-allowed;
+    }
+    .btn.navActive{
+      background:#f5fff5;
+      border-color:#cfe8cf;
+      color:#111;
+    }
+    .liftBoxGreen{
+      border: 1px solid #cfe8cf;
+      background: #f5fff5;
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+
+    /* --- Sida: Relationer (behåll funktionellt oförändrat, men utan krockar) --- */
+    h1{ margin:0 0 6px; font-size:1.6rem; }
+    .muted{ color:#555; margin:0 0 12px; }
+
+    /* Behåll .danger-stil men låt global .btn styra baseline */
+    .btn.danger{ border-color:#b00020; color:#b00020; }
 
     .pillRow{
       display:flex;
@@ -128,24 +150,23 @@
       margin-top: 12px;
     }
 
-    .hintBox{
-      margin-top: 10px;
-      padding: 10px 12px;
-      border-radius: 12px;
-      border: 1px solid #ffe1a6;
-      background: #fff9ee;
-    }
-    .okBox{
-      margin-top: 10px;
-      padding: 10px 12px;
-      border-radius: 12px;
-      border: 1px solid #cfe8cf;
-      background: #f5fff5;
-    }
+    /* Info/statusrutor: behåll varianter men matcha "lyft" */
+    .hintBox,
+    .okBox,
     .errBox{
       margin-top: 10px;
       padding: 10px 12px;
       border-radius: 12px;
+    }
+    .hintBox{
+      border: 1px solid #ffe1a6;
+      background: #fff9ee;
+    }
+    .okBox{
+      border: 1px solid #cfe8cf;
+      background: #f5fff5;
+    }
+    .errBox{
       border: 1px solid #ffb3b3;
       background: #fff2f2;
     }
@@ -181,7 +202,6 @@
       overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
     }
 
-    /* ARKIV-ID: CR-03 | Sök + förslag – UI-komponenter */
     .searchWrap{ position: relative; }
     .suggest{
       position:absolute;
@@ -210,7 +230,7 @@
     .sItem:last-child{ border-bottom:0; }
     .sItem:hover{ background:#fafafa; }
 
-    /* ARKIV-ID: CR-08 | Familjebild (centrerad) */
+    /* Familjebild (centrerad) */
     .familyWrap{
       display:flex;
       justify-content:center;
@@ -1080,8 +1100,6 @@
       return;
     }
 
-    const wasEditing = !!editingId;
-
     if(editingId){
       const idx = rels.findIndex(x => String(x.id) === String(editingId));
       if(idx === -1){
@@ -1102,7 +1120,6 @@
     /* ARKIV-ID: CR-09 | Reset efter lyckad sparning */
     resetAfterSuccess();
 
-    // behåll ett lugnt kvitto kort
     clearTimeout(window.__okTimer);
     window.__okTimer = setTimeout(() => { okEl.hidden = true; okEl.innerHTML = ""; }, 1200);
   }
