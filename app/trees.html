@@ -3,63 +3,32 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Träd – Skapa & välj</title>
-  <meta name="description" content="Skapa och välj aktivt släktträd (localStorage)." />
+  <title>Träd – Släktkort</title>
+  <meta name="description" content="Skapa och välj aktivt träd (localStorage-first)." />
 
   <style>
-    :root{
-      color-scheme: light;
-
-      /* Samma typ av lugna toner som din start.html (varm/grå + mild grön) */
-      --bg: #ffffff;
-      --text: #111111;
-      --muted: #555555;
-
-      --border: #eaeaea;
-      --card: #ffffff;
-      --shadow: 0 8px 28px rgba(0,0,0,.05);
-
-      --pill-bg: #fafafa;
-      --pill-border: #e6e6e6;
-
-      --warn-bg: #fff9ee;
-      --warn-border: #ffe1a6;
-
-      --ok-bg: #f5fff5;
-      --ok-border: #cfe8cf;
-
-      /* Ljusgrön markering (dämpad) */
-      --active-text: #1f7a3f;
-      --active-bg: #f3fbf5;
-      --active-border: #cfe8cf;
-
-      --focus: rgba(0,0,0,.18);
-    }
-
+    :root { color-scheme: light; }
     body{
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       line-height: 1.5;
       margin: 0;
       padding: 24px;
-      max-width: 980px;
+      max-width: 1180px;
       margin-inline: auto;
-      background: var(--bg);
-      color: var(--text);
+      background: #fff;
+      color: #111;
     }
-
-    a{ color: inherit; text-decoration: none; }
+    a{ color: inherit; text-decoration:none; }
 
     header{
       display:flex;
       align-items:flex-start;
       justify-content:space-between;
-      gap: 12px;
-      margin-bottom: 18px;
+      gap:12px;
+      margin-bottom:18px;
     }
-
-    h1{ margin: 0 0 6px; font-size: 1.6rem; letter-spacing:-0.01em; }
-    p{ margin: 0 0 12px; }
-    .muted{ color: var(--muted); }
+    h1{ margin:0 0 6px; font-size:1.6rem; }
+    .muted{ color:#555; margin:0 0 12px; }
 
     .topbar{
       display:flex;
@@ -68,26 +37,20 @@
       align-items:center;
       margin: 10px 0 0;
     }
-
     .btn, button{
       display:inline-block;
-      padding: 10px 12px;
-      border: 1px solid #bbb;
-      border-radius: 12px;
-      background: #fff;
-      font: inherit;
-      cursor: pointer;
+      padding:10px 12px;
+      border:1px solid #333;
+      border-radius:10px;
+      background:#fff;
+      font:inherit;
+      cursor:pointer;
       text-decoration:none;
+      user-select:none;
     }
-    .btn.secondary{
-      border-color:#bbb;
-      color: var(--text);
-    }
-    .btn:focus-visible, button:focus-visible, a:focus-visible{
-      outline: 3px solid var(--focus);
-      outline-offset: 2px;
-      border-radius: 12px;
-    }
+    .btn.secondary{ border-color:#bbb; }
+    .btn.danger{ border-color:#b00020; color:#b00020; }
+    .btn:disabled{ opacity:.5; cursor:not-allowed; }
 
     .pillRow{
       display:flex;
@@ -100,245 +63,186 @@
       display:inline-flex;
       align-items:center;
       gap:8px;
-      padding: 8px 10px;
-      border: 1px solid var(--pill-border);
-      border-radius: 999px;
-      background: var(--pill-bg);
-      font-size: .95rem;
-      white-space: nowrap;
+      padding:8px 10px;
+      border:1px solid #ddd;
+      border-radius:999px;
+      background:#fafafa;
+      font-size:.95rem;
     }
-    .pill strong{ font-weight: 900; }
-    .pill.ok{ border-color: var(--ok-border); background: var(--ok-bg); }
-    .pill.warn{ border-color: var(--warn-border); background: var(--warn-bg); }
-
-    .note{
-      margin: 0 0 18px;
-      padding: 12px 14px;
-      border-radius: 14px;
-      border: 1px solid var(--warn-border);
-      background: var(--warn-bg);
-    }
-    .note strong{ font-weight: 900; }
+    .pill strong{ font-weight:900; }
+    .pill.ok{ border-color:#cfe8cf; background:#f5fff5; }
+    .pill.warn{ border-color:#ffe1a6; background:#fff9ee; }
+    .pill.err{ border-color:#ffb3b3; background:#fff2f2; }
 
     .grid{
       display:grid;
-      gap: 14px;
+      gap:14px;
       grid-template-columns: 1fr;
     }
-    @media (min-width: 860px){
-      .grid{ grid-template-columns: 1fr 1fr; }
+    @media (min-width: 1080px){
+      .grid{ grid-template-columns: 420px 1fr; }
     }
 
     .card{
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 16px;
-      background: var(--card);
-      box-shadow: var(--shadow);
-    }
-    .card h2{
-      margin: 0 0 6px;
-      font-size: 1.15rem;
-      letter-spacing:-0.01em;
-    }
-    .small{ font-size: .95rem; color: var(--muted); margin: 0 0 10px; }
-
-    label{ display:block; margin: 10px 0 6px; font-weight: 800; }
-    input{
-      width: 100%;
-      box-sizing: border-box;
-      padding: 10px;
-      border-radius: 12px;
-      border: 1px solid #bbb;
-      font: inherit;
-      background: #fff;
-    }
-
-    .row{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      align-items:center;
-      margin-top: 10px;
-    }
-    .row > *{ flex: 1; min-width: 160px; }
-
-    .msg{ margin: 10px 0 0; color: var(--muted); }
-    .msg strong{ color: var(--text); }
-
-    /* ---------- Trädlista (kryssruta + ljusgrön aktiv markering) ---------- */
-    .treeList{
-      margin: 10px 0 0;
-      padding: 0;
-      list-style: none;
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-    }
-
-    .treeRow{
-      display:flex;
-      gap:12px;
-      align-items:center;
-      padding: 12px 12px;
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      background: #fff;
-      cursor:pointer;
-      transition: background .12s ease, transform .12s ease;
-    }
-    .treeRow:hover{
-      background:#fcfcfc;
-      transform: translateY(-1px);
-    }
-    .treeRow.active{
-      border-color: var(--active-border);
-      background: var(--active-bg);
-    }
-
-    /* Visuell "kryssruta" (men radio-beteende) */
-    .check{
-      width: 20px;
-      height: 20px;
-      border-radius: 6px;
-      border: 1px solid #bbb;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      flex: 0 0 auto;
+      border:1px solid #ddd;
+      border-radius:12px;
+      padding:16px;
       background:#fff;
-      color: transparent;
-      font-weight: 900;
-      line-height: 1;
+      position: relative;
     }
-    .treeRow.active .check{
-      border-color: var(--active-border);
-      background: #fff;
-      color: var(--active-text);
+    .card h2{ margin:0 0 6px; font-size:1.15rem; }
+    .small{ font-size:.95rem; color:#555; margin:0 0 10px; }
+
+    label{ display:block; margin:10px 0 6px; font-weight:800; }
+    input{
+      width:100%;
+      box-sizing:border-box;
+      padding:10px;
+      border-radius:10px;
+      border:1px solid #bbb;
+      font:inherit;
+      background:#fff;
     }
 
-    .treeMain{ min-width:0; flex:1; }
-    .treeName{
-      margin:0;
-      font-weight: 950;
-      letter-spacing:-0.01em;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      white-space:nowrap;
-    }
-    .treeRow.active .treeName{ color: var(--active-text); }
-
-    .treeMeta{
-      margin: 2px 0 0;
-      color: var(--muted);
-      font-size: .95rem;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      white-space:nowrap;
-    }
-
-    .emptyBox{
-      border: 1px dashed var(--border);
-      border-radius: 16px;
-      padding: 12px;
-      color: var(--muted);
-      background: #fff;
-    }
-
-    .continueWrap{
+    .actions{
       display:flex;
       gap:10px;
       flex-wrap:wrap;
       align-items:center;
       margin-top: 12px;
     }
-    .btn.disabled{
-      opacity: .45;
-      cursor: not-allowed;
-      pointer-events: none;
-    }
 
-    code{ background:#f4f4f4; padding: 2px 6px; border-radius: 8px; }
-
-    footer{
-      margin-top: 18px;
-      color:#666;
-      font-size: .95rem;
+    .list{
+      margin: 10px 0 0;
+      padding: 0;
+      list-style:none;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      max-height: 560px;
+      overflow:auto;
+      border-top: 1px solid #eee;
+      padding-top: 10px;
     }
+    .item{
+      border:1px solid #eee;
+      border-radius:12px;
+      padding:10px;
+      background:#fff;
+      cursor:pointer;
+    }
+    .item:hover{ background:#fafafa; }
+    .item.active{
+      border-color:#7fcf9b;
+      box-shadow: 0 0 0 4px rgba(183,228,199,.35);
+    }
+    .itemTitle{ font-weight:900; margin:0 0 2px; display:flex; align-items:center; gap:8px; }
+    .badge{
+      font-size:.85rem;
+      border:1px solid #ddd;
+      padding:2px 8px;
+      border-radius:999px;
+      background:#fafafa;
+    }
+    .itemMeta{ margin:0; color:#555; font-size:.95rem; }
+    .itemSub{ margin:4px 0 0; color:#333; font-size:.95rem; }
+
+    .hintBox{
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid #ffe1a6;
+      background: #fff9ee;
+    }
+    .okBox{
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid #cfe8cf;
+      background: #f5fff5;
+    }
+    code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
   </style>
 </head>
 
 <body>
 <header>
   <div>
-    <h1>🌳 Träd</h1>
-    <p class="muted">
-      GitHub Pages-läge: allt sparas lokalt i <code>localStorage</code>. Välj ett träd som resten av sidorna använder.
-    </p>
+    <h1>Träd</h1>
+    <p class="muted">Skapa träd och välj vilket du arbetar i. Aktivt träd styr Personer, Relationer och Karta.</p>
 
     <nav class="topbar" aria-label="Navigation">
       <a class="btn secondary" href="../start.html">Start</a>
-      <a class="btn secondary" href="./trees.html" aria-current="page">Träd</a>
+      <a class="btn" href="./trees.html">Träd</a>
       <a class="btn secondary" href="./slaktkort.html">Personer</a>
       <a class="btn secondary" href="./create-relation.html">Relationer</a>
       <a class="btn secondary" href="./map.html">Karta</a>
     </nav>
   </div>
 
-  <div class="row" style="justify-content:flex-end; max-width: 320px;">
+  <div class="actions" style="justify-content:flex-end;">
     <button id="logoutBtn" class="btn secondary" type="button">Logga ut</button>
   </div>
 </header>
 
 <section class="pillRow" aria-label="Status">
-  <span id="pillTree" class="pill warn">Valt träd: <strong>—</strong></span>
-  <span id="pillTrees" class="pill">Träd sparade: <strong>0</strong></span>
+  <span id="pillActive" class="pill warn">Aktivt träd: <strong>—</strong></span>
+  <span id="pillTrees" class="pill">Träd: <strong>0</strong></span>
 </section>
 
-<div id="noteBox" class="note" hidden></div>
+<div class="grid">
+  <!-- VÄNSTER: LISTA -->
+  <section class="card" aria-label="Trädlista">
+    <h2>Trädlista</h2>
+    <p class="small">Klicka ett träd för att markera. Använd knapparna till höger för att byta namn eller ta bort.</p>
 
-<section class="grid" aria-label="Trädfunktioner">
-  <article class="card">
-    <h2>Skapa nytt träd</h2>
-    <p class="small">Skapar ett nytt träd och markerar det direkt som valt.</p>
-
-    <label for="treeName">Namn på träd</label>
-    <input id="treeName" placeholder="t.ex. Anderssons släkt" />
-
-    <div class="row">
-      <button id="createBtn" type="button" class="btn">Skapa träd</button>
+    <div class="actions">
+      <button id="reloadBtn" type="button" class="btn secondary">Ladda om</button>
+      <button id="newBtn" type="button" class="btn">Skapa nytt träd</button>
     </div>
 
-    <p class="msg" id="createMsg" aria-live="polite"></p>
-  </article>
+    <div id="leftHint" class="hintBox" hidden></div>
 
-  <article class="card">
-    <h2>Välj träd</h2>
-    <p class="small">Kryssa i ett träd för att arbeta i det.</p>
+    <ul id="list" class="list" aria-label="Träd"></ul>
+  </section>
 
-    <div id="listWrap">
-      <div class="emptyBox" id="emptyBox" hidden>
-        Inga träd sparade ännu. Skapa ett träd först.
+  <!-- HÖGER: EDIT -->
+  <section class="card" aria-label="Redigera träd">
+    <h2 id="panelTitle">Skapa nytt träd</h2>
+    <p class="small" id="panelSub">Ge trädet ett namn och spara.</p>
+
+    <label for="name">Trädnamn</label>
+    <input id="name" placeholder="t.ex. Släkten Nilsson" autocomplete="off" />
+
+    <div class="actions">
+      <button id="saveBtn" type="button" class="btn">Spara</button>
+      <button id="setActiveBtn" type="button" class="btn secondary" disabled>Gör aktivt</button>
+      <button id="deleteBtn" type="button" class="btn danger" disabled>Ta bort</button>
+      <button id="resetBtn" type="button" class="btn secondary">Återställ</button>
+    </div>
+
+    <div id="statusBox" class="okBox" hidden></div>
+
+    <div class="hintBox" style="margin-top:14px;">
+      <strong>Nycklar (tekniskt)</strong>
+      <div class="small" style="margin-top:6px;">
+        Träd sparas i <code>slakttradet_trees</code><br/>
+        Aktivt träd: <code>slakttradet_active_tree_id</code><br/>
+        Personer per träd: <code>slakttradet_slaktkort_&lt;treeId&gt;</code><br/>
+        Relationer per träd: <code>slakttradet_relationer_&lt;treeId&gt;</code>
       </div>
-      <ul id="treeList" class="treeList" aria-label="Trädlista"></ul>
     </div>
 
-    <div class="continueWrap">
-      <a id="continueBtn" class="btn disabled" href="./slaktkort.html" aria-disabled="true" tabindex="-1">Fortsätt → Personer</a>
-    </div>
-
-    <p class="msg" id="selectMsg" aria-live="polite"></p>
-  </article>
-</section>
-
-<footer class="muted">
-  Tips: När ett träd är markerat (ljusgrönt) är du klar och kan gå vidare till Personer.
-</footer>
+    <p class="small" id="tech" style="margin-top:10px;">—</p>
+  </section>
+</div>
 
 <script>
-  // ============================
-  // DEMO AUTH-GUARD
-  // ============================
+  "use strict";
+
+  // =====================================================
+  // DEMO AUTH GUARD (matchar dina andra sidor)
+  // =====================================================
   (function authGuard(){
     try{
       if(sessionStorage.getItem("demo_auth") !== "1"){
@@ -347,68 +251,54 @@
     }catch{}
   })();
 
-  // ============================
-  // LocalStorage keys
-  // ============================
+  // =====================================================
+  // STORAGE KEYS (LÅSTA)
+  // =====================================================
   const KEY_TREES  = "slakttradet_trees";
   const KEY_ACTIVE = "slakttradet_active_tree_id";
+  const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
+  const relKey   = (treeId) => "slakttradet_relationer_" + String(treeId);
 
+  // =====================================================
   // DOM
-  const pillTree  = document.getElementById("pillTree");
-  const pillTrees = document.getElementById("pillTrees");
-  const noteBox   = document.getElementById("noteBox");
-
-  const treeName  = document.getElementById("treeName");
-  const createBtn = document.getElementById("createBtn");
-  const createMsg = document.getElementById("createMsg");
-
-  const treeList  = document.getElementById("treeList");
-  const emptyBox  = document.getElementById("emptyBox");
-
-  const continueBtn = document.getElementById("continueBtn");
-  const selectMsg   = document.getElementById("selectMsg");
-
+  // =====================================================
   const logoutBtn = document.getElementById("logoutBtn");
 
+  const pillActive = document.getElementById("pillActive");
+  const pillTrees = document.getElementById("pillTrees");
+
+  const reloadBtn = document.getElementById("reloadBtn");
+  const newBtn = document.getElementById("newBtn");
+
+  const leftHint = document.getElementById("leftHint");
+  const listEl = document.getElementById("list");
+
+  const panelTitle = document.getElementById("panelTitle");
+  const panelSub = document.getElementById("panelSub");
+  const nameEl = document.getElementById("name");
+
+  const saveBtn = document.getElementById("saveBtn");
+  const setActiveBtn = document.getElementById("setActiveBtn");
+  const deleteBtn = document.getElementById("deleteBtn");
+  const resetBtn = document.getElementById("resetBtn");
+
+  const statusBox = document.getElementById("statusBox");
+  const techEl = document.getElementById("tech");
+
+  // =====================================================
+  // HELPERS
+  // =====================================================
   function safeParse(raw, fallback){
-    try { return JSON.parse(raw); } catch { return fallback; }
+    try{ return JSON.parse(raw); }catch{ return fallback; }
   }
-
-  function loadTrees(){
-    const raw = localStorage.getItem(KEY_TREES);
-    const trees = safeParse(raw, []);
-    return Array.isArray(trees) ? trees : [];
+  function loadJson(key, fallback){
+    const raw = localStorage.getItem(key);
+    return raw ? safeParse(raw, fallback) : fallback;
   }
-
-  function saveTrees(trees){
-    localStorage.setItem(KEY_TREES, JSON.stringify(trees));
+  function saveJson(key, value){
+    localStorage.setItem(key, JSON.stringify(value));
   }
-
-  function getActiveTreeId(){
-    return localStorage.getItem(KEY_ACTIVE) || "";
-  }
-
-  function setActiveTreeId(id){
-    localStorage.setItem(KEY_ACTIVE, String(id || ""));
-  }
-
-  function makeId(){
-    return "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  }
-
-  function setDisabled(el, disabled){
-    if(disabled){
-      el.classList.add("disabled");
-      el.setAttribute("aria-disabled","true");
-      el.setAttribute("tabindex","-1");
-    }else{
-      el.classList.remove("disabled");
-      el.removeAttribute("aria-disabled");
-      el.removeAttribute("tabindex");
-    }
-  }
-
-  function esc(s){
+  function escapeHtml(s){
     return String(s || "")
       .replaceAll("&","&amp;")
       .replaceAll("<","&lt;")
@@ -416,110 +306,314 @@
       .replaceAll('"',"&quot;")
       .replaceAll("'","&#039;");
   }
+  function tid(){
+    return "t_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,8);
+  }
+  function activeTreeId(){
+    return localStorage.getItem(KEY_ACTIVE) || "";
+  }
+  function setActiveTreeId(id){
+    if(id) localStorage.setItem(KEY_ACTIVE, String(id));
+    else localStorage.removeItem(KEY_ACTIVE);
+  }
+  function getTrees(){
+    const arr = loadJson(KEY_TREES, []);
+    return Array.isArray(arr) ? arr : [];
+  }
+  function saveTrees(arr){
+    saveJson(KEY_TREES, Array.isArray(arr) ? arr : []);
+  }
+  function treeLabel(t){
+    return String(t && (t.name || t.namn || t.id) ? (t.name || t.namn || t.id) : "—");
+  }
+  function countPeople(treeId){
+    const arr = loadJson(cardsKey(treeId), []);
+    return Array.isArray(arr) ? arr.length : 0;
+  }
+  function countRelations(treeId){
+    const arr = loadJson(relKey(treeId), []);
+    return Array.isArray(arr) ? arr.length : 0;
+  }
+  function showStatus(html){
+    statusBox.hidden = false;
+    statusBox.innerHTML = html;
+    setTimeout(() => { try{ statusBox.hidden = true; }catch{} }, 1800);
+  }
 
-  function updateStatus(){
-    const trees = loadTrees();
-    const activeId = getActiveTreeId();
-    const active = trees.find(t => String(t.id) === String(activeId));
+  // =====================================================
+  // STATE
+  // =====================================================
+  let trees = [];
+  let selectedId = ""; // "" = create mode
 
-    pillTrees.innerHTML = 'Träd sparade: <strong>' + trees.length + '</strong>';
+  // =====================================================
+  // UI
+  // =====================================================
+  function renderPills(){
+    const act = activeTreeId();
+    const hasActive = !!act;
+    const exists = hasActive && trees.some(t => String(t.id) === String(act));
+    const label = exists ? treeLabel(trees.find(t => String(t.id) === String(act))) : "—";
 
-    if(!trees.length){
-      pillTree.className = "pill warn";
-      pillTree.innerHTML = 'Valt träd: <strong>—</strong>';
-      noteBox.hidden = false;
-      noteBox.innerHTML = '<strong>🚩 Inga träd sparade:</strong> Skapa ett träd för att börja.';
-      setDisabled(continueBtn, true);
-      return;
-    }
+    pillActive.className = "pill " + (exists ? "ok" : (trees.length ? "warn" : "err"));
+    pillActive.innerHTML = "Aktivt träd: <strong>" + escapeHtml(exists ? label : "—") + "</strong>";
 
-    if(!active){
-      pillTree.className = "pill warn";
-      pillTree.innerHTML = 'Valt träd: <strong>—</strong>';
-      noteBox.hidden = false;
-      noteBox.innerHTML = '<strong>🚩 Välj ett träd:</strong> Kryssa i ett träd i listan.';
-      setDisabled(continueBtn, true);
-      return;
-    }
-
-    pillTree.className = "pill ok";
-    pillTree.innerHTML = 'Valt träd: <strong>' + esc(active.name || active.id) + '</strong>';
-    noteBox.hidden = true;
-    setDisabled(continueBtn, false);
+    pillTrees.innerHTML = "Träd: <strong>" + trees.length + "</strong>";
   }
 
   function renderList(){
-    const trees = loadTrees();
-    const activeId = getActiveTreeId();
+    listEl.innerHTML = "";
 
-    treeList.innerHTML = "";
-
-    if(!trees.length){
-      emptyBox.hidden = false;
+    if(trees.length === 0){
+      leftHint.hidden = false;
+      leftHint.innerHTML = "<strong>Inga träd ännu.</strong> Klicka <code>Skapa nytt träd</code>.";
+      const li = document.createElement("li");
+      li.className = "item";
+      li.style.cursor = "default";
+      li.innerHTML = "<p class='itemTitle'>—</p><p class='itemMeta'>Skapa ett träd för att börja.</p>";
+      listEl.appendChild(li);
       return;
     }
-    emptyBox.hidden = true;
+
+    leftHint.hidden = true;
+    leftHint.innerHTML = "";
+
+    const act = activeTreeId();
 
     for(const t of trees){
-      const id = String(t.id);
-      const isActive = id === String(activeId);
-
       const li = document.createElement("li");
+      const isSel = String(t.id) === String(selectedId);
+      const isAct = act && String(t.id) === String(act);
 
-      const row = document.createElement("button");
-      row.type = "button";
-      row.className = "treeRow" + (isActive ? " active" : "");
-      row.setAttribute("aria-pressed", isActive ? "true" : "false");
-      row.setAttribute("data-id", id);
+      li.className = "item" + (isSel ? " active" : "");
+      li.dataset.id = String(t.id);
 
-      row.innerHTML =
-        "<span class='check' aria-hidden='true'>" + (isActive ? "✓" : "") + "</span>" +
-        "<span class='treeMain'>" +
-          "<p class='treeName'>" + esc(t.name || ("Träd " + t.id)) + "</p>" +
-          "<p class='treeMeta'>Kryssa i för att välja</p>" +
-        "</span>";
+      const ppl = countPeople(t.id);
+      const rel = countRelations(t.id);
 
-      row.addEventListener("click", () => {
-        createMsg.textContent = "";
-        selectMsg.textContent = "";
+      li.innerHTML =
+        "<p class='itemTitle'>" +
+          escapeHtml(treeLabel(t)) +
+          (isAct ? " <span class='badge'>Aktivt</span>" : "") +
+        "</p>" +
+        "<p class='itemMeta'>ID: " + escapeHtml(String(t.id)) + "</p>" +
+        "<p class='itemSub'>Personer: " + ppl + " · Relationer: " + rel + "</p>";
 
-        setActiveTreeId(id);
-        selectMsg.innerHTML = "<strong>Valt:</strong> Trädet är nu markerat.";
+      li.addEventListener("click", () => selectTree(String(t.id)));
 
-        renderList();
-        updateStatus();
-      });
-
-      li.appendChild(row);
-      treeList.appendChild(li);
+      listEl.appendChild(li);
     }
   }
 
-  // ============================
-  // Actions
-  // ============================
-  createBtn.addEventListener("click", () => {
-    createMsg.textContent = "";
-    selectMsg.textContent = "";
+  function setPanelMode(){
+    if(selectedId){
+      const t = trees.find(x => String(x.id) === String(selectedId));
+      panelTitle.textContent = "Redigera träd";
+      panelSub.textContent = "Byt namn, gör aktivt eller ta bort.";
+      nameEl.value = t ? (t.name || "") : "";
+      setActiveBtn.disabled = false;
+      deleteBtn.disabled = false;
+    }else{
+      panelTitle.textContent = "Skapa nytt träd";
+      panelSub.textContent = "Ge trädet ett namn och spara.";
+      nameEl.value = "";
+      setActiveBtn.disabled = true;
+      deleteBtn.disabled = true;
+    }
+    renderTech();
+  }
 
-    const name = String(treeName.value || "").trim();
+  function renderTech(){
+    const act = activeTreeId();
+    techEl.textContent =
+      "Valt: " + (selectedId ? selectedId : "— (ny)") +
+      " · Aktivt: " + (act || "—") +
+      " · Träd-nyckel: " + KEY_TREES;
+  }
+
+  // =====================================================
+  // ACTIONS
+  // =====================================================
+  function selectTree(id){
+    const t = trees.find(x => String(x.id) === String(id));
+    if(!t) return;
+    selectedId = String(t.id);
+    setPanelMode();
+    renderList();
+  }
+
+  function resetPanel(){
+    selectedId = "";
+    setPanelMode();
+    renderList();
+  }
+
+  function createTree(){
+    const name = String(nameEl.value || "").trim();
     if(!name){
-      createMsg.textContent = "Skriv ett namn först.";
+      showStatus("<strong>Skriv ett trädnamn.</strong>");
       return;
     }
 
-    const trees = loadTrees();
-    const id = makeId();
+    const t = {
+      id: tid(),
+      name,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
 
-    trees.push({ id, name, createdAt: new Date().toISOString() });
+    trees.unshift(t);
     saveTrees(trees);
-    setActiveTreeId(id);
 
-    treeName.value = "";
-    createMsg.innerHTML = "<strong>Klart:</strong> Träd skapat och markerat.";
+    // om inget aktivt finns: gör det nya aktivt
+    if(!activeTreeId()){
+      setActiveTreeId(t.id);
+    }
 
+    selectedId = String(t.id);
+    showStatus("<strong>Skapat.</strong>");
+    refresh();
+  }
+
+  function renameTree(){
+    const t = trees.find(x => String(x.id) === String(selectedId));
+    if(!t){
+      showStatus("<strong>Välj ett träd.</strong>");
+      return;
+    }
+
+    const name = String(nameEl.value || "").trim();
+    if(!name){
+      showStatus("<strong>Skriv ett trädnamn.</strong>");
+      return;
+    }
+
+    t.name = name;
+    t.updatedAt = Date.now();
+    saveTrees(trees);
+
+    showStatus("<strong>Sparat.</strong>");
+    refresh();
+  }
+
+  function setActive(){
+    if(!selectedId){
+      showStatus("<strong>Välj ett träd.</strong>");
+      return;
+    }
+    const exists = trees.some(t => String(t.id) === String(selectedId));
+    if(!exists){
+      showStatus("<strong>Trädet finns inte.</strong>");
+      return;
+    }
+    setActiveTreeId(selectedId);
+    showStatus("<strong>Aktivt träd uppdaterat.</strong>");
+    refresh();
+  }
+
+  function deleteTree(){
+    const t = trees.find(x => String(x.id) === String(selectedId));
+    if(!t) return;
+
+    const ppl = countPeople(t.id);
+    const rel = countRelations(t.id);
+
+    const ok = confirm(
+      "Ta bort trädet:\n\n" +
+      (t.name || t.id) + "\n\n" +
+      "Detta tar även bort åtkomst till data som ligger under nycklarna:\n" +
+      cardsKey(t.id) + " (" + ppl + " personer)\n" +
+      relKey(t.id) + " (" + rel + " relationer)\n\n" +
+      "OBS: Data tas bort endast om du väljer 'OK'."
+    );
+    if(!ok) return;
+
+    // ta bort data för trädet
+    try{ localStorage.removeItem(cardsKey(t.id)); }catch{}
+    try{ localStorage.removeItem(relKey(t.id)); }catch{}
+
+    // ta bort trädet
+    trees = trees.filter(x => String(x.id) !== String(t.id));
+    saveTrees(trees);
+
+    // om aktivt träd var detta -> välj nytt aktivt eller rensa
+    const act = activeTreeId();
+    if(act && String(act) === String(t.id)){
+      if(trees.length){
+        setActiveTreeId(trees[0].id);
+      }else{
+        setActiveTreeId("");
+      }
+    }
+
+    showStatus("<strong>Borttaget.</strong>");
+    selectedId = "";
+    refresh();
+  }
+
+  // =====================================================
+  // REFRESH
+  // =====================================================
+  function refresh(){
+    trees = getTrees();
+    // om aktivt pekar på icke-existerande: fixa
+    const act = activeTreeId();
+    if(act && !trees.some(t => String(t.id) === String(act))){
+      if(trees.length) setActiveTreeId(trees[0].id);
+      else setActiveTreeId("");
+    }
+
+    renderPills();
     renderList();
-    updateStatus();
+
+    // om selectedId inte finns längre
+    if(selectedId && !trees.some(t => String(t.id) === String(selectedId))){
+      selectedId = "";
+    }
+    setPanelMode();
+  }
+
+  // =====================================================
+  // EVENTS
+  // =====================================================
+  reloadBtn.addEventListener("click", () => {
+    refresh();
+    showStatus("<strong>Omladdat.</strong>");
+  });
+
+  newBtn.addEventListener("click", () => {
+    selectedId = "";
+    setPanelMode();
+    try{ nameEl.focus(); }catch{}
+    showStatus("<strong>Nytt träd.</strong>");
+  });
+
+  saveBtn.addEventListener("click", () => {
+    if(selectedId) renameTree();
+    else createTree();
+  });
+
+  setActiveBtn.addEventListener("click", setActive);
+  deleteBtn.addEventListener("click", deleteTree);
+
+  resetBtn.addEventListener("click", () => {
+    if(selectedId){
+      // återställ namn från storage
+      const t = trees.find(x => String(x.id) === String(selectedId));
+      nameEl.value = t ? (t.name || "") : "";
+      showStatus("<strong>Återställt.</strong>");
+    }else{
+      nameEl.value = "";
+      showStatus("<strong>Återställt.</strong>");
+    }
+  });
+
+  // Enter = spara
+  nameEl.addEventListener("keydown", (e) => {
+    if(e.key === "Enter"){
+      e.preventDefault();
+      saveBtn.click();
+    }
   });
 
   logoutBtn.addEventListener("click", () => {
@@ -527,11 +621,10 @@
     window.location.href = "../index.html";
   });
 
-  // ============================
-  // Start
-  // ============================
-  renderList();
-  updateStatus();
+  // =====================================================
+  // START
+  // =====================================================
+  refresh();
 </script>
 </body>
 </html>
