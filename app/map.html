@@ -6,7 +6,9 @@
   <title>Karta – Släktkort</title>
   <meta name="description" content="Visa personer med koordinater och kopplingar (relationer) i aktivt träd." />
 
-  <!-- LEAFLET (CDN) -->
+  <!-- =====================================================
+       LEAFLET (CDN)
+       ===================================================== -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -21,7 +23,6 @@
 
   <style>
     :root { color-scheme: light; }
-
     body{
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       line-height: 1.5;
@@ -144,25 +145,16 @@
       margin:0;
     }
 
-    /* Kartkort: gör kartan "lika stor som rutan" (fyller kortet bättre) */
-    .mapCard{
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-      min-height: 640px;
-    }
     #map{
       width:100%;
-      flex: 1 1 auto;
-      min-height: 560px;
+      height: 560px;
       border-radius:12px;
       border: 1px solid #ddd;
       overflow:hidden;
       background:#f4f4f4;
     }
     @media (max-width: 520px){
-      .mapCard{ min-height: 520px; }
-      #map{ min-height: 440px; }
+      #map{ height: 440px; }
     }
 
     .error{ color:#b00020; font-weight:900; }
@@ -201,13 +193,10 @@
     }
     code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
 
-    /* Dockad panel: lägg den HÖGST UPP i vänsterspalten och gör sticky */
+    /* =====================================================
+       DOCKAD VÄNSTERPANEL (täcker aldrig kartan)
+       ===================================================== */
     #dockPanel[hidden]{ display:none; }
-    #dockPanel{
-      position: sticky;
-      top: 12px;
-      z-index: 5;
-    }
 
     .panelHeader{
       padding: 14px 14px 10px;
@@ -246,6 +235,13 @@
       font-size: 1.02rem;
       font-weight: 950;
     }
+    .panelActions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-top: 12px;
+    }
 
     /* Mini-tree (chips) */
     .miniTree{
@@ -266,14 +262,13 @@
     .slotFocus{ grid-column: 2; grid-row: 2; display:flex; justify-content:center; }
     .slotChildren{ grid-column: 1 / 4; grid-row: 3; display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
 
-    /* Chip: namn överst + roll (Partner/Fokus/Barn/Förälder) UNDER, centrerat */
     .chip{
       display:inline-flex;
-      flex-direction:column;
+      flex-direction:column;          /* <-- partner/fokus under namnet */
       align-items:center;
       justify-content:center;
-      gap:6px;
-      padding:10px 12px;
+      gap:4px;
+      padding:8px 10px;
       border:1px solid #ddd;
       border-radius:999px;
       background:#fafafa;
@@ -281,7 +276,7 @@
       cursor:pointer;
       max-width: 100%;
       text-align:center;
-      line-height: 1.15;
+      line-height:1.15;
     }
     .chip:hover{ background:#f5f5f5; }
     .chip.primary{
@@ -299,13 +294,11 @@
       text-overflow:ellipsis;
       white-space:nowrap;
       max-width: 240px;
-      text-align:center;
-      font-weight: 900;
+      font-weight:950;
     }
     .chip small{
       color:#555;
-      font-weight:800;
-      display:block;
+      font-weight:700;
     }
 
     .expandBox{
@@ -337,7 +330,9 @@
     }
     .expandItemBtn:hover{ background:#fafafa; }
 
-    /* MARKÖRER (ingen popup) */
+    /* =====================================================
+       MARKÖRER (ingen popup, fokus + toning)
+       ===================================================== */
     :root{
       --accentGreen: #b7e4c7;
       --accentGreenDeep: #7fcf9b;
@@ -355,6 +350,7 @@
       background: rgba(255,255,255,.92);
       border: 1px solid var(--markerBorder);
       box-shadow: 0 6px 18px rgba(0,0,0,.08);
+      transform: translate3d(0,0,0);
       transition: transform .12s ease, box-shadow .12s ease, opacity .12s ease, border-color .12s ease;
       user-select:none;
     }
@@ -363,6 +359,7 @@
       line-height: 1;
       transform: translateY(0.5px);
     }
+
     .mkWrap.isActive{
       border-color: rgba(127,207,155,.85);
       box-shadow:
@@ -371,30 +368,17 @@
         0 0 0 10px rgba(183,228,199,.22);
       transform: scale(1.06);
     }
+
     .mkWrap.isDim{
       opacity: var(--markerDim);
       box-shadow: 0 4px 14px rgba(0,0,0,.06);
       transform: scale(0.98);
     }
+
     .leaflet-marker-icon.mkIcon{
       background: transparent;
       border: 0;
     }
-
-    /* Pick-mode markör (tydlig) */
-    .pickWrap{
-      width: 26px;
-      height: 26px;
-      border-radius: 999px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      background: rgba(255,255,255,.96);
-      border: 2px solid rgba(176,0,32,.6);
-      box-shadow: 0 10px 24px rgba(0,0,0,.12);
-    }
-    .pickFlag{ font-size: 16px; line-height:1; }
-    .leaflet-marker-icon.pickIcon{ background: transparent; border: 0; }
   </style>
 </head>
 
@@ -402,7 +386,7 @@
 <header>
   <div>
     <h1>Karta</h1>
-    <p class="muted">Klicka en markör (eller en person i listan) för att öppna släktöversikt i vänsterspalten.</p>
+    <p class="muted">Klicka en markör (eller en person i listan) för att öppna släktöversikt i vänsterpanelen. Inga popups.</p>
 
     <nav class="topbar" aria-label="Navigation">
       <a class="btn secondary" href="../start.html">Start</a>
@@ -426,10 +410,60 @@
 </section>
 
 <div class="grid">
-  <!-- VÄNSTERSPALT -->
   <section class="card" aria-label="Kontroller" id="leftCard">
-    <!-- DOCKAD PANEL (HÖGST UPP) -->
-    <section id="dockPanel" class="card" aria-label="Släktöversikt" hidden>
+    <h2>Filter & vy</h2>
+    <p class="small">Sök på namn eller plats. Klick i listan/markör öppnar panelen. Vald markör lyser, övriga tonas.</p>
+
+    <label for="search">Sök</label>
+    <input id="search" placeholder="Sök namn eller plats…" autocomplete="off" />
+
+    <div class="actions" style="margin-top:10px;">
+      <button id="clearSearchBtn" type="button" class="btn secondary">Rensa sök</button>
+      <span id="matchInfo" class="small" aria-live="polite">—</span>
+    </div>
+
+    <div class="toggleRow" role="group" aria-label="Visningsval">
+      <label>
+        <input id="toggleParentChild" type="checkbox" checked />
+        Visa kopplingar (Förälder→Barn)
+      </label>
+      <label>
+        <input id="togglePartner" type="checkbox" />
+        Visa kopplingar (Partner)
+      </label>
+      <label>
+        <input id="toggleFocusOnly" type="checkbox" />
+        Visa bara kopplingar för fokus
+      </label>
+    </div>
+
+    <div class="actions">
+      <button id="refreshBtn" type="button" class="btn secondary">Uppdatera</button>
+      <button id="fitBtn" type="button" class="btn">Zooma till alla</button>
+      <a class="btn secondary" href="./slaktkort.html">Gå till Personer</a>
+    </div>
+
+    <!-- =====================================================
+         VÄLJ PLATS (NYTT) – spara koordinater till slaktkort.html
+         ===================================================== -->
+    <div id="pickBox" class="hintBox">
+      <strong>Välj plats till person</strong>
+      <div class="small" style="margin-top:6px;">
+        Klicka <strong>Välj plats</strong>, klicka sedan på kartan där flaggan ska stå och tryck <strong>Spara</strong>.
+      </div>
+      <div class="actions" style="margin-top:10px;">
+        <button id="pickStartBtn" type="button" class="btn">Välj plats</button>
+        <button id="pickSaveBtn" type="button" class="btn secondary" disabled>Spara plats</button>
+        <button id="pickCancelBtn" type="button" class="btn secondary" disabled>Avbryt</button>
+      </div>
+      <div class="small" id="pickInfo" style="margin-top:8px;">—</div>
+    </div>
+
+    <div id="hint" class="hintBox" hidden></div>
+
+    <ul id="list" class="list" aria-label="Personer med koordinater"></ul>
+
+    <section id="dockPanel" class="card" style="margin-top:14px;" aria-label="Släktöversikt" hidden>
       <div class="panelHeader">
         <div style="min-width:0;">
           <h2 id="panelName" class="panelTitle">—</h2>
@@ -439,7 +473,7 @@
       </div>
 
       <div class="panelSection">
-        <h3>Släkt</h3>
+        <h3>Släkt (översikt)</h3>
 
         <div class="miniTree" aria-label="Mini-träd">
           <div class="miniGrid">
@@ -451,72 +485,36 @@
 
           <div id="expandBox" class="expandBox" hidden>
             <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-              <strong id="expandTitle">Lista</strong>
-              <button id="expandClose" class="btn secondary" type="button" style="padding:8px 10px;">Stäng</button>
+              <strong id="expandTitle">Barn</strong>
+              <button id="expandClose" class="btn secondary" type="button" style="padding:8px 10px;">Stäng lista</button>
             </div>
             <ul id="expandList" class="expandList" aria-label="Lista"></ul>
           </div>
         </div>
+
+        <div class="panelActions">
+          <a class="btn secondary" href="./slaktkort.html">Gå till Personer</a>
+          <a class="btn secondary" href="./create-relation.html">Gå till Relationer</a>
+        </div>
       </div>
 
       <div class="panelSection">
-        <h3>Koordinater</h3>
-        <p class="small" id="panelTech">—</p>
+        <h3>Teknisk info</h3>
+        <p class="small" id="panelTech">Koordinater: —</p>
       </div>
     </section>
 
-    <!-- PICK MODE -->
-    <div id="pickBox" class="hintBox" hidden>
-      <strong>Välj plats för personen</strong>
-      <div class="small" style="margin-top:6px;">
-        Klicka i kartan för att sätta en ny flagga. Tryck sedan <code>Spara plats</code>.
-      </div>
-      <div class="actions" style="margin-top:10px;">
-        <button id="pickSaveBtn" class="btn disabled" type="button" aria-disabled="true">Spara plats</button>
-        <button id="pickCancelBtn" class="btn secondary" type="button">Avbryt</button>
-      </div>
-      <div class="small" id="pickCoordsText" style="margin-top:8px;">Koordinater: —</div>
+    <div class="actions" style="margin-top:14px;">
+      <a class="btn secondary" href="./create-relation.html">← Tillbaka (Relationer)</a>
+      <a class="btn secondary" href="./slaktkort.html">← Tillbaka (Personer)</a>
     </div>
-
-    <h2>Filter</h2>
-    <p class="small">Sök på namn eller plats. Vald markör lyser, övriga tonas.</p>
-
-    <label for="search">Sök</label>
-    <input id="search" placeholder="Sök namn eller plats…" autocomplete="off" />
-
-    <div class="actions" style="margin-top:10px;">
-      <button id="clearSearchBtn" type="button" class="btn secondary">Rensa</button>
-      <span id="matchInfo" class="small" aria-live="polite">—</span>
-    </div>
-
-    <div class="toggleRow" role="group" aria-label="Visningsval">
-      <label>
-        <input id="toggleParentChild" type="checkbox" checked />
-        Visa Förälder→Barn
-      </label>
-      <label>
-        <input id="togglePartner" type="checkbox" />
-        Visa Partner
-      </label>
-      <label>
-        <input id="toggleFocusOnly" type="checkbox" />
-        Visa bara fokus
-      </label>
-    </div>
-
-    <div id="hint" class="hintBox" hidden></div>
-
-    <ul id="list" class="list" aria-label="Personer med koordinater"></ul>
   </section>
 
-  <!-- HÖGERSPALT (karta) -->
-  <section class="card mapCard" aria-label="Karta">
-    <div>
-      <h2 style="margin:0;">Karta</h2>
-      <p class="small" style="margin:6px 0 0;">OpenStreetMap via Leaflet.</p>
-    </div>
+  <section class="card" aria-label="Karta">
+    <h2>Karta</h2>
+    <p class="small">OpenStreetMap via Leaflet. (Klicka på kartan för att sätta flagga i “Välj plats”-läge.)</p>
     <div id="map" role="application" aria-label="Karta med markörer och kopplingar"></div>
-    <p id="msg" class="muted" aria-live="polite" style="margin:0;"></p>
+    <p id="msg" class="muted" aria-live="polite" style="margin-top:10px;"></p>
   </section>
 </div>
 
@@ -533,7 +531,7 @@
   })();
 
   // =====================================================
-  // STORAGE KEYS
+  // STORAGE KEYS (MÅSTE MATCHA ANDRA SIDOR)
   // =====================================================
   const KEY_TREES  = "slakttradet_trees";
   const KEY_ACTIVE = "slakttradet_active_tree_id";
@@ -541,11 +539,16 @@
   const relKey   = (treeId) => "slakttradet_relationer_" + String(treeId);
 
   // =====================================================
+  // MAP PICK RESULT (matchar slaktkort.html)
+  // =====================================================
+  const PICK_RESULT_KEY = "slaktkort_map_pick_result";
+
+  // =====================================================
   // DOM
   // =====================================================
   const leftCard = document.getElementById("leftCard");
-  const logoutBtn = document.getElementById("logoutBtn");
 
+  const logoutBtn = document.getElementById("logoutBtn");
   const msg = document.getElementById("msg");
   const hint = document.getElementById("hint");
 
@@ -562,11 +565,20 @@
   const togglePartnerEl = document.getElementById("togglePartner");
   const toggleFocusOnlyEl = document.getElementById("toggleFocusOnly");
 
+  const refreshBtn = document.getElementById("refreshBtn");
+  const fitBtn = document.getElementById("fitBtn");
   const listEl = document.getElementById("list");
 
-  // Dockpanel DOM
+  // PICK UI
+  const pickStartBtn = document.getElementById("pickStartBtn");
+  const pickSaveBtn = document.getElementById("pickSaveBtn");
+  const pickCancelBtn = document.getElementById("pickCancelBtn");
+  const pickInfo = document.getElementById("pickInfo");
+
+  // DOCK PANEL DOM
   const dockPanel = document.getElementById("dockPanel");
   const panelClose = document.getElementById("panelClose");
+
   const panelName = document.getElementById("panelName");
   const panelMeta = document.getElementById("panelMeta");
   const panelTech = document.getElementById("panelTech");
@@ -580,12 +592,6 @@
   const expandTitle = document.getElementById("expandTitle");
   const expandClose = document.getElementById("expandClose");
   const expandList = document.getElementById("expandList");
-
-  // Pick mode DOM
-  const pickBox = document.getElementById("pickBox");
-  const pickSaveBtn = document.getElementById("pickSaveBtn");
-  const pickCancelBtn = document.getElementById("pickCancelBtn");
-  const pickCoordsText = document.getElementById("pickCoordsText");
 
   // =====================================================
   // JSON HELPERS
@@ -640,25 +646,20 @@
   }
 
   // =====================================================
-  // COORDS PARSE + RANGE CHECK (tål flera format)
+  // COORDS PARSE + RANGE CHECK
   // =====================================================
   function inLatLonRange(lat, lon){
     return Number.isFinite(lat) && Number.isFinite(lon) &&
       lat >= -90 && lat <= 90 &&
       lon >= -180 && lon <= 180;
   }
-
   function coordsFromPerson(p){
-    if(!p) return null;
-
-    // 1) object p.coords {lat, lon|lng}
-    if(p.coords && typeof p.coords === "object"){
+    if(p && typeof p.coords === "object" && p.coords){
       const lat = Number(p.coords.lat);
-      const lon = Number(p.coords.lon ?? p.coords.lng);
+      const lon = Number(p.coords.lon);
       if(inLatLonRange(lat, lon)) return { lat, lon };
+      return null;
     }
-
-    // 2) string "lat, lon"
     if(typeof p.coords === "string"){
       const s = p.coords.trim();
       const parts = s.split(",").map(x => x.trim()).filter(Boolean);
@@ -668,42 +669,7 @@
         if(inLatLonRange(lat, lon)) return { lat, lon };
       }
     }
-
-    // 3) p.lat / p.lon|lng
-    const lat3 = Number(p.lat);
-    const lon3 = Number(p.lon ?? p.lng);
-    if(inLatLonRange(lat3, lon3)) return { lat: lat3, lon: lon3 };
-
     return null;
-  }
-
-  // =====================================================
-  // LOADERS
-  // =====================================================
-  function loadPeople(){
-    const t = activeTreeId();
-    if(!t) return [];
-    const arr = loadJson(cardsKey(t), []);
-    return Array.isArray(arr) ? arr : [];
-  }
-
-  function loadRelations(){
-    const t = activeTreeId();
-    if(!t) return [];
-    const arr = loadJson(relKey(t), []);
-    return Array.isArray(arr) ? arr : [];
-  }
-
-  function getPersonById(people, id){
-    return people.find(p => String(p.id) === String(id)) || null;
-  }
-
-  // =====================================================
-  // UI HELPERS
-  // =====================================================
-  function setPill(el, kind, html){
-    el.className = "pill " + (kind || "");
-    el.innerHTML = html;
   }
 
   // =====================================================
@@ -724,17 +690,38 @@
       Math.cos(lat1) * Math.cos(toRad(b.lat)) * (Math.sin(dLon/2)**2);
     return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
   }
-
   function inBox(c, box){
     return c.lat >= box.minLat && c.lat <= box.maxLat && c.lon >= box.minLon && c.lon <= box.maxLon;
   }
-
   function placeFromCoords(coords){
     if(!coords) return { primary:"", secondary:"" };
     const kmToFalun = haversineKm(coords, FALUN);
-    if(kmToFalun <= FALUN_RADIUS_KM) return { primary: "Falun", secondary: "Dalarna" };
-    if(inBox(coords, DALARNA_BOX)) return { primary: "Dalarna", secondary: "" };
+    if(kmToFalun <= FALUN_RADIUS_KM){
+      return { primary: "Falun", secondary: "Dalarna" };
+    }
+    if(inBox(coords, DALARNA_BOX)){
+      return { primary: "Dalarna", secondary: "" };
+    }
     return { primary: "Sverige", secondary: "" };
+  }
+
+  // =====================================================
+  // LOADERS
+  // =====================================================
+  function loadPeople(){
+    const t = activeTreeId();
+    if(!t) return [];
+    const arr = loadJson(cardsKey(t), []);
+    return Array.isArray(arr) ? arr : [];
+  }
+  function loadRelations(){
+    const t = activeTreeId();
+    if(!t) return [];
+    const arr = loadJson(relKey(t), []);
+    return Array.isArray(arr) ? arr : [];
+  }
+  function getPersonById(people, id){
+    return people.find(p => String(p.id) === String(id)) || null;
   }
 
   // =====================================================
@@ -752,8 +739,8 @@
   const markerLayer = L.layerGroup().addTo(map);
   const linkLayer = L.layerGroup().addTo(map);
 
-  const markersById = new Map();
-  const coordsById = new Map();
+  const markersById = new Map(); // personId -> marker
+  const coordsById = new Map();  // personId -> coords
 
   let focusedMarkerId = "";
 
@@ -761,11 +748,9 @@
     markerLayer.clearLayers();
     markersById.clear();
   }
-
   function clearLinks(){
     linkLayer.clearLayers();
   }
-
   function rebuildCoordsIndex(peopleWithCoordsAll){
     coordsById.clear();
     for(const p of peopleWithCoordsAll){
@@ -773,6 +758,12 @@
       if(!c) continue;
       coordsById.set(String(p.id), c);
     }
+  }
+  function fitToAllCoords(){
+    const ll = [];
+    coordsById.forEach(c => ll.push(L.latLng(c.lat, c.lon)));
+    if(ll.length === 0) return;
+    map.fitBounds(L.latLngBounds(ll).pad(0.2));
   }
 
   // =====================================================
@@ -790,7 +781,6 @@
 
   function applyMarkerFocusStyles(){
     const hasFocus = !!focusedMarkerId;
-
     for(const [pid, marker] of markersById.entries()){
       const el = marker.getElement();
       if(!el) continue;
@@ -804,12 +794,10 @@
       else wrap.classList.add("isDim");
     }
   }
-
   function setFocusMarker(personId){
     focusedMarkerId = String(personId || "");
     applyMarkerFocusStyles();
   }
-
   function clearFocusMarker(){
     focusedMarkerId = "";
     applyMarkerFocusStyles();
@@ -875,7 +863,7 @@
         }
 
         setFocusMarker(id);
-        openMarker(id, { openPanel: true });
+        openPanel(id, { focusMap: true, fromMarker: false });
       });
 
       listEl.appendChild(li);
@@ -895,17 +883,12 @@
       const m = L.marker([c.lat, c.lon], { icon: MK_ICON }).addTo(markerLayer);
 
       m.on("click", () => {
-        // I pick-mode ska klick på vanliga markörer inte stjäla fokus
-        if(isPickModeActive()) return;
-
         const id = String(p.id);
-
         if(String(focusedMarkerId) === id && !dockPanel.hidden){
           closePanel();
           clearFocusMarker();
           return;
         }
-
         setFocusMarker(id);
         openPanel(id, { focusMap: false, fromMarker: true });
       });
@@ -954,6 +937,7 @@
     let drawnPartner = 0;
 
     const seen = new Set();
+
     const focus = String(focusId || "");
     const useFocusFilter = focusOnly && !!focus;
 
@@ -1018,13 +1002,14 @@
     const total = drawnPC + drawnPartner;
 
     pillLinks.innerHTML =
-      "Kopplingar ritade: <strong>" + total + "</strong>";
+      "Kopplingar ritade: <strong>" + total + "</strong>" +
+      " <span class='muted'>(Förälder→Barn: " + drawnPC + ", Partner: " + drawnPartner + ")</span>";
 
     return { parentChild: drawnPC, partner: drawnPartner, total };
   }
 
   // =====================================================
-  // HINT
+  // HINT RENDER
   // =====================================================
   function renderHint(hasTrees, hasActive, peopleWithCoords){
     if(!hasTrees){
@@ -1040,8 +1025,8 @@
     if(peopleWithCoords.length === 0){
       hint.hidden = false;
       hint.innerHTML =
-        "<strong>Tips:</strong> Inga personer har koordinater ännu. " +
-        "Gå till <a href='./slaktkort.html'><code>Personer</code></a> och sätt coords.";
+        "<strong>Tips:</strong> Inga personer har plats ännu. " +
+        "Gå till <a href='./slaktkort.html'><code>Personer</code></a> och sätt coords (via “Välj plats till person” här eller genom att skriva coords).";
       return;
     }
     hint.hidden = true;
@@ -1069,20 +1054,20 @@
     expandedMode = "NONE";
 
     renderPanel(panelPersonId);
+
     try{ refreshLinksOnly(); }catch{}
 
-    // Panelen ska kännas "högst upp" i vänsterspalten:
-    try{ leftCard.scrollIntoView({ behavior: "smooth", block: "start" }); }catch{}
-  }
+    if(opts && opts.focusMap){
+      const m = markersById.get(panelPersonId);
+      if(m){
+        map.setView(m.getLatLng(), Math.max(map.getZoom(), 10), { animate: true });
+      }
+    }
 
-  function openMarker(personId, opts){
-    const m = markersById.get(String(personId));
-    if(m){
-      map.setView(m.getLatLng(), Math.max(map.getZoom(), 10), { animate: true });
-    }
-    if(opts && opts.openPanel){
-      openPanel(String(personId), { focusMap: false, fromMarker: true });
-    }
+    // Viktigt: panelen ska kännas "högst upp i vänsterspalten"
+    try{
+      leftCard.scrollIntoView({ behavior:"smooth", block:"start" });
+    }catch{}
   }
 
   function makeChip(label, sub, personId, kind){
@@ -1188,7 +1173,7 @@
       slotChildren.innerHTML = "";
       expandBox.hidden = true;
       expandList.innerHTML = "";
-      panelTech.textContent = "—";
+      panelTech.textContent = "Koordinater: —";
       return;
     }
 
@@ -1219,7 +1204,6 @@
     slotFocus.innerHTML = "";
     slotChildren.innerHTML = "";
 
-    // Parents
     if(fam.parents.length > 0){
       for(const par of fam.parents.slice(0, 2)){
         slotParents.appendChild(makeChip(personName(par), "Förälder", par.id, ""));
@@ -1231,7 +1215,6 @@
       slotParents.appendChild(makeChip("—", "Föräldrar", null, "muted"));
     }
 
-    // Partner
     if(fam.partners.length > 0){
       const first = fam.partners[0];
       slotPartner.appendChild(makeChip(personName(first), "Partner", first.id, ""));
@@ -1252,10 +1235,8 @@
       slotPartner.appendChild(makeChip("—", "Partner", null, "muted"));
     }
 
-    // Focus
     slotFocus.appendChild(makeChip(name, "Fokus", focusId, "primary"));
 
-    // Children
     if(fam.children.length > 0){
       const visible = fam.children.slice(0, 4);
       for(const ch of visible){
@@ -1266,7 +1247,7 @@
         const more = document.createElement("button");
         more.type = "button";
         more.className = "chip";
-        more.innerHTML = "<span class='chipLabel'>+" + moreN + "</span><small>fler</small>";
+        more.innerHTML = "<span class='chipLabel'>+" + moreN + "</span><small>Visa fler</small>";
         more.addEventListener("click", () => {
           expandedMode = "BARN";
           expandBox.hidden = false;
@@ -1299,131 +1280,81 @@
   });
 
   // =====================================================
-  // PICK MODE (handshake med slaktkort.html)
+  // PICK MODE (NYTT)
   // =====================================================
-  function urlHasPick(){
+  let pickMode = false;
+  let pickLatLng = null;
+  let pickMarker = null;
+
+  function setPickInfo(text){
+    pickInfo.textContent = text;
+  }
+  function setPickButtons(){
+    pickStartBtn.disabled = pickMode;
+    pickCancelBtn.disabled = !pickMode;
+    pickSaveBtn.disabled = !(pickMode && pickLatLng);
+  }
+  function enterPickMode(){
+    pickMode = true;
+    pickLatLng = null;
+    if(pickMarker){
+      try{ map.removeLayer(pickMarker); }catch{}
+      pickMarker = null;
+    }
+    setPickInfo("Välj plats: klicka på kartan…");
+    setPickButtons();
     try{
-      const u = new URL(window.location.href);
-      return u.searchParams.get("pick") === "1";
-    }catch{
-      return false;
-    }
+      map.getContainer().style.cursor = "crosshair";
+    }catch{}
   }
-
-  function loadPickCtx(){
+  function exitPickMode(){
+    pickMode = false;
+    pickLatLng = null;
+    if(pickMarker){
+      try{ map.removeLayer(pickMarker); }catch{}
+      pickMarker = null;
+    }
+    setPickInfo("—");
+    setPickButtons();
     try{
-      const raw = sessionStorage.getItem("slaktkort_map_pick_ctx");
-      if(!raw) return null;
-      const ctx = JSON.parse(raw);
-      return (ctx && typeof ctx === "object") ? ctx : null;
-    }catch{
-      return null;
-    }
+      map.getContainer().style.cursor = "";
+    }catch{}
   }
+  function setPickAt(latlng){
+    pickLatLng = latlng;
 
-  function isPickModeActive(){
-    return !!pickState.active;
-  }
-
-  const pickState = {
-    active: false,
-    ctx: null,
-    coords: null,
-    marker: null
-  };
-
-  const PICK_ICON = L.divIcon({
-    className: "pickIcon",
-    html: "<div class='pickWrap'><span class='pickFlag'>🚩</span></div>",
-    iconSize: [26, 26],
-    iconAnchor: [13, 13]
-  });
-
-  function enablePickMode(ctx){
-    pickState.active = true;
-    pickState.ctx = ctx;
-    pickBox.hidden = false;
-    pickSaveBtn.classList.add("disabled");
-    pickSaveBtn.setAttribute("aria-disabled","true");
-    pickCoordsText.textContent = "Koordinater: —";
-  }
-
-  function disablePickMode(){
-    pickState.active = false;
-    pickState.ctx = null;
-    pickState.coords = null;
-    if(pickState.marker){
-      try{ map.removeLayer(pickState.marker); }catch{}
-      pickState.marker = null;
+    if(!pickMarker){
+      pickMarker = L.marker(latlng, { icon: MK_ICON, keyboard: false }).addTo(map);
+    }else{
+      pickMarker.setLatLng(latlng);
     }
-    pickBox.hidden = true;
+
+    setPickInfo("Vald plats: " + latlng.lat.toFixed(4) + ", " + latlng.lng.toFixed(4));
+    setPickButtons();
   }
-
-  function setPickCoords(lat, lon){
-    pickState.coords = { lat, lon };
-
-    pickCoordsText.textContent = "Koordinater: " + lat.toFixed(4) + ", " + lon.toFixed(4);
-
-    pickSaveBtn.classList.remove("disabled");
-    pickSaveBtn.removeAttribute("aria-disabled");
-
-    if(pickState.marker){
-      try{ map.removeLayer(pickState.marker); }catch{}
-    }
-    pickState.marker = L.marker([lat, lon], { icon: PICK_ICON }).addTo(map);
-
-    // liten zoom så det känns tydligt
-    try{ map.setView([lat, lon], Math.max(map.getZoom(), 10), { animate: true }); }catch{}
-  }
-
-  // Kartklick i pick-mode -> ny flagga
-  map.on("click", (e) => {
-    if(!isPickModeActive()) return;
-    const lat = Number(e.latlng.lat);
-    const lon = Number(e.latlng.lng);
-    if(inLatLonRange(lat, lon)){
-      setPickCoords(lat, lon);
-    }
-  });
-
-  pickCancelBtn.addEventListener("click", () => {
-    const ctx = pickState.ctx;
-    disablePickMode();
-    // tillbaka direkt
-    try{
-      const back = (ctx && ctx.returnUrl) ? String(ctx.returnUrl) : "./slaktkort.html";
-      window.location.href = back;
-    }catch{
-      window.location.href = "./slaktkort.html";
-    }
-  });
-
-  pickSaveBtn.addEventListener("click", () => {
-    if(pickSaveBtn.classList.contains("disabled")) return;
-    if(!pickState.coords) return;
-
-    const ctx = pickState.ctx || loadPickCtx();
-    const t = activeTreeId();
-
-    const payload = {
-      treeId: ctx && ctx.treeId ? String(ctx.treeId) : (t ? String(t) : ""),
-      lat: pickState.coords.lat,
-      lon: pickState.coords.lon,
-      target: ctx && ctx.target ? ctx.target : { type: "draft" },
-      ts: Date.now()
-    };
+  function savePickAndReturn(){
+    if(!pickLatLng) return;
 
     try{
-      sessionStorage.setItem("slaktkort_map_pick_result", JSON.stringify(payload));
+      localStorage.setItem(PICK_RESULT_KEY, JSON.stringify({
+        lat: Number(pickLatLng.lat),
+        lon: Number(pickLatLng.lng),
+        ts: Date.now()
+      }));
     }catch{}
 
-    // tillbaka till slaktkort
-    try{
-      const back = (ctx && ctx.returnUrl) ? String(ctx.returnUrl) : "./slaktkort.html";
-      window.location.href = back;
-    }catch{
-      window.location.href = "./slaktkort.html";
-    }
+    // tillbaka till personkort
+    window.location.href = "./slaktkort.html";
+  }
+
+  pickStartBtn.addEventListener("click", enterPickMode);
+  pickCancelBtn.addEventListener("click", exitPickMode);
+  pickSaveBtn.addEventListener("click", savePickAndReturn);
+
+  map.on("click", (e) => {
+    if(!pickMode) return;
+    if(!e || !e.latlng) return;
+    setPickAt(e.latlng);
   });
 
   // =====================================================
@@ -1438,15 +1369,12 @@
   }
 
   function renderHintAndCounts(hasTrees, hasActive, allPeople, peopleWithCoordsAll, filtered){
-    setPill(
-      pillTree,
-      hasActive ? "ok" : (hasTrees ? "warn" : "err"),
-      "Aktivt träd: <strong>" + (hasActive ? escapeHtml(activeTreeLabel()) : "—") + "</strong>"
-    );
+    pillTree.className = "pill " + (hasActive ? "ok" : (hasTrees ? "warn" : "err"));
+    pillTree.innerHTML = "Aktivt träd: <strong>" + (hasActive ? escapeHtml(activeTreeLabel()) : "—") + "</strong>";
     pillPeople.innerHTML = "Personer: <strong>" + allPeople.length + "</strong>";
     pillWithCoords.innerHTML = "Med koordinater: <strong>" + peopleWithCoordsAll.length + "</strong>";
     matchInfo.textContent =
-      filtered.length + " matchar" +
+      filtered.length + " matchar filtret" +
       (peopleWithCoordsAll.length ? (" (av " + peopleWithCoordsAll.length + ")") : "");
     renderHint(hasTrees, hasActive, peopleWithCoordsAll);
   }
@@ -1481,14 +1409,14 @@
     if(coordsById.size > 0){
       msg.innerHTML =
         "<span class='ok'>Klar.</span> Visar " +
-        markersById.size + " markör(er) och " +
+        markersById.size + " markör(er), " +
+        coordsById.size + " med koordinater och " +
         (drawn && drawn.total != null ? drawn.total : 0) + " koppling(ar).";
     }else{
       msg.innerHTML =
         "<span class='error'>Inga markörer.</span> Inga personer i aktivt träd har koordinater (eller matchar filtret).";
     }
 
-    // Om panelen är öppen men personen finns inte längre: stäng + släpp fokus.
     if(!dockPanel.hidden && panelPersonId){
       const exists = allPeople.some(p => String(p.id) === String(panelPersonId));
       if(!exists){
@@ -1499,7 +1427,6 @@
       }
     }
 
-    // Om fokus-id inte syns i filtrerade markörer: släpp fokus
     if(focusedMarkerId && !markersById.has(String(focusedMarkerId))){
       clearFocusMarker();
       if(!dockPanel.hidden) closePanel();
@@ -1511,10 +1438,10 @@
   // =====================================================
   // EVENTS
   // =====================================================
-  clearSearchBtn.addEventListener("click", () => {
-    searchEl.value = "";
-    refresh();
-    try{ searchEl.focus(); }catch{}
+  refreshBtn.addEventListener("click", refresh);
+
+  fitBtn.addEventListener("click", () => {
+    if(coordsById.size > 0) fitToAllCoords();
   });
 
   let searchTimer = null;
@@ -1530,6 +1457,12 @@
     }
   });
 
+  clearSearchBtn.addEventListener("click", () => {
+    searchEl.value = "";
+    refresh();
+    try{ searchEl.focus(); }catch{}
+  });
+
   toggleParentChildEl.addEventListener("change", refreshLinksOnly);
   togglePartnerEl.addEventListener("change", refreshLinksOnly);
   toggleFocusOnlyEl.addEventListener("change", refreshLinksOnly);
@@ -1539,23 +1472,11 @@
     window.location.href = "../index.html";
   });
 
-  window.addEventListener("storage", () => {
-    try{ refresh(); }catch{}
-  });
-
   // =====================================================
   // START
   // =====================================================
-  (function init(){
-    // Aktivera pick-mode om vi kom från slaktkort
-    if(urlHasPick()){
-      const ctx = loadPickCtx();
-      if(ctx){
-        enablePickMode(ctx);
-      }
-    }
-    refresh();
-  })();
+  setPickButtons();
+  refresh();
 </script>
 </body>
 </html>
