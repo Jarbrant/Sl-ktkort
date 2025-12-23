@@ -1,66 +1,1179 @@
-🟨 ARBETORDER 6 – Efter “Skapa relation”: nollställ så man kan skapa nästa direkt
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Relationer – Släktkort</title>
+  <meta name="description" content="Koppla personer i släkten (localStorage-first)." />
 
-Projekt: Släktkort
-Fil: app/create-relation.html
-Typ: UI-flöde / state-reset (ingen ny datamodell)
-Risk: Låg–medel
-Arkiv: Gäller under ARKIV-CODE (keys/logikformat låst)
+  <style>
+    :root { color-scheme: light; }
+    body{
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      line-height: 1.5;
+      margin: 0;
+      padding: 24px;
+      max-width: 1180px;
+      margin-inline: auto;
+      background: #fff;
+      color: #111;
+    }
+    a{ color: inherit; text-decoration:none; }
 
-🎯 Problem
+    header{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:18px;
+    }
+    h1{ margin:0 0 6px; font-size:1.6rem; }
+    .muted{ color:#555; margin:0 0 12px; }
 
-Efter att en relation skapats går det inte att skapa en ny direkt. Sidan fastnar i ett läge (t.ex. kvar i redigering eller kvar med val) som blockerar nästa relation.
+    .topbar{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin: 10px 0 0;
+    }
+    .btn, button{
+      display:inline-block;
+      padding:10px 12px;
+      border:1px solid #333;
+      border-radius:10px;
+      background:#fff;
+      font:inherit;
+      cursor:pointer;
+      text-decoration:none;
+      user-select:none;
+    }
+    .btn.secondary{ border-color:#bbb; }
+    .btn.danger{ border-color:#b00020; color:#b00020; }
+    .btn:disabled{ opacity:.5; cursor:not-allowed; }
 
-✅ Mål
+    /* ARKIV-ID: CR-08 | Aktiv nav-stil (grön) för Relationer */
+    .btn.navActive{
+      background:#2e7d32;
+      border-color:#2e7d32;
+      color:#fff;
+    }
 
-Efter lyckad sparning (Skapa relation eller Spara vid redigering) ska formuläret bli redo för nästa relation direkt.
+    .pillRow{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin: 10px 0 18px;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 10px;
+      border:1px solid #ddd;
+      border-radius:999px;
+      background:#fafafa;
+      font-size:.95rem;
+    }
+    .pill strong{ font-weight:900; }
+    .pill.ok{ border-color:#cfe8cf; background:#f5fff5; }
+    .pill.warn{ border-color:#ffe1a6; background:#fff9ee; }
+    .pill.err{ border-color:#ffb3b3; background:#fff2f2; }
 
-✅ Ska göras (exakt beteende)
+    .grid{
+      display:grid;
+      gap:14px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 1080px){
+      .grid{ grid-template-columns: 420px 1fr; }
+    }
 
-Efter lyckad sparning:
+    .card{
+      border:1px solid #ddd;
+      border-radius:12px;
+      padding:16px;
+      background:#fff;
+      position: relative;
+    }
+    .card h2{ margin:0 0 6px; font-size:1.15rem; }
+    .small{ font-size:.95rem; color:#555; margin:0 0 10px; }
 
-Lämna redigeringsläge
+    label{ display:block; margin:10px 0 6px; font-weight:800; }
+    select, input{
+      width:100%;
+      box-sizing:border-box;
+      padding:10px;
+      border-radius:10px;
+      border:1px solid #bbb;
+      font:inherit;
+      background:#fff;
+    }
 
-Om sidan är i “Redigera relation” → gå tillbaka till “Skapa relation”.
+    .row2{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:12px;
+    }
+    @media (min-width: 720px){
+      .row2{ grid-template-columns: 1fr 1fr; }
+    }
 
-Nollställ val så nästa relation kan skapas
+    .actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-top: 12px;
+    }
 
-Töm vald fokusperson och målperson
+    .hintBox{
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid #ffe1a6;
+      background: #fff9ee;
+    }
+    .okBox{
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid #cfe8cf;
+      background: #f5fff5;
+    }
+    .errBox{
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid #ffb3b3;
+      background: #fff2f2;
+    }
 
-Töm sökfälten (så det känns som “ny relation”)
+    .list{
+      margin: 10px 0 0;
+      padding: 0;
+      list-style:none;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      max-height: 460px;
+      overflow:auto;
+      border-top: 1px solid #eee;
+      padding-top: 10px;
+    }
+    .item{
+      border:1px solid #eee;
+      border-radius:12px;
+      padding:10px;
+      background:#fff;
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .itemTitle{ font-weight:900; margin:0 0 2px; }
+    .itemMeta{ margin:0; color:#555; font-size:.95rem; }
+    .itemLeft{ min-width:0; }
 
-Behåll rimliga defaults
+    .sr-only{
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
 
-Relationstyp får gärna återgå till standard (t.ex. Förälder) eller behålla senaste val
-(välj det som är enklast och minst riskfyllt, men var konsekvent)
+    /* ARKIV-ID: CR-03 | Sök + förslag – UI-komponenter */
+    .searchWrap{ position: relative; }
+    .suggest{
+      position:absolute;
+      left:0; right:0;
+      top: calc(100% + 6px);
+      border:1px solid #ddd;
+      background:#fff;
+      border-radius:12px;
+      overflow:hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,.06);
+      max-height: 220px;
+      overflow:auto;
+      z-index: 10;
+    }
+    .sItem{
+      display:block;
+      width:100%;
+      text-align:left;
+      border:0;
+      border-bottom:1px solid #f1f1f1;
+      padding:10px 10px;
+      background:#fff;
+      cursor:pointer;
+      font:inherit;
+    }
+    .sItem:last-child{ border-bottom:0; }
+    .sItem:hover{ background:#fafafa; }
 
-Fokus på nästa steg
+    /* ARKIV-ID: CR-08 | Familjebild (centrerad) */
+    .familyWrap{
+      display:flex;
+      justify-content:center;
+      padding: 6px 0 2px;
+    }
+    .family{
+      display:inline-block;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 14px;
+      line-height: 1.35;
+      white-space: pre;
+      margin: 0;
+      text-align:left;
+    }
 
-Sätt fokus i första sökrutan (“Välj person”) så man kan börja direkt.
+    .backupHidden{ display:none; }
+  </style>
+</head>
 
-❌ Får inte göras
+<body>
+<header>
+  <div>
+    <h1>Relationer</h1>
+    <p class="muted">Koppla personer i släkten.</p>
 
-Inga nya storage-keys
+    <nav class="topbar" aria-label="Navigation">
+      <a class="btn secondary" href="../start.html">Start</a>
+      <a class="btn secondary" href="./trees.html">Träd</a>
+      <a class="btn secondary" href="./slaktkort.html">Personer</a>
+      <a class="btn navActive" href="./create-relation.html" aria-current="page">Relationer</a>
+      <a class="btn secondary" href="./map.html">Karta</a>
+    </nav>
+  </div>
 
-Ingen ändring av hur relationer sparas
+  <div class="actions" style="justify-content:flex-end;">
+    <button id="logoutBtn" class="btn secondary" type="button">Logga ut</button>
+  </div>
+</header>
 
-Inga ändringar i relationernas datamodell
+<section class="pillRow" aria-label="Status">
+  <span id="pillTree" class="pill warn">Aktivt träd: <strong>—</strong></span>
+  <span id="pillPeople" class="pill">Personer: <strong>0</strong></span>
+  <span id="pillRel" class="pill">Relationer: <strong>0</strong></span>
+</section>
 
-Ingen påverkan på andra sidor (karta/personer)
+<div class="grid">
+  <section class="card" aria-label="Skapa relation">
+    <h2 id="formTitle">Skapa relation</h2>
 
-🧪 Testkrav
+    <div id="hint" class="hintBox" hidden></div>
+    <div id="ok" class="okBox" hidden></div>
+    <div id="err" class="errBox" hidden></div>
 
-Skapa relation A→B → kan direkt skapa relation C→D
+    <!-- ARKIV-ID: CR-03 | Fokusperson (sök + förslag) -->
+    <label for="focusSearch">Välj person</label>
+    <div class="searchWrap">
+      <input id="focusSearch" type="text" autocomplete="off" placeholder="Sök person…" />
+      <div id="focusSuggest" class="suggest" hidden aria-label="Förslag person"></div>
+    </div>
 
-Skapa relation A→B → formulär känns “tomt” igen
+    <!-- ARKIV-ID: CR-04 | Relationstyp + variant -->
+    <label for="relType">Välj relationstyp</label>
+    <select id="relType">
+      <option value="FORALDER_BARN">Förälder</option>
+      <option value="PARTNER">Partner</option>
+    </select>
 
-Redigera relation → Spara → tillbaka till Skapa relation och redo
+    <label for="relVariant">Välj variant</label>
+    <select id="relVariant"></select>
 
-Refresh sidan → relationer finns kvar (inget tapp)
+    <!-- ARKIV-ID: CR-03 | Målperson (sök + förslag) -->
+    <label for="targetSearch">Välj målperson</label>
+    <div class="searchWrap">
+      <input id="targetSearch" type="text" autocomplete="off" placeholder="Sök person…" />
+      <div id="targetSuggest" class="suggest" hidden aria-label="Förslag målperson"></div>
+    </div>
 
-📦 Leveranskrav
+    <div class="row2 backupHidden" aria-hidden="true">
+      <div>
+        <label class="sr-only" for="personA">Person A</label>
+        <select id="personA" tabindex="-1"></select>
+      </div>
+      <div>
+        <label class="sr-only" for="personB">Person B</label>
+        <select id="personB" tabindex="-1"></select>
+      </div>
+    </div>
 
-Leverera hel fil app/create-relation.html
+    <div class="actions">
+      <!-- ARKIV-ID: CR-05 | Skapa / Spara (id bevaras vid edit) -->
+      <button id="createBtn" class="btn" type="button">Skapa relation</button>
+      <button id="clearBtn" class="btn secondary" type="button">Rensa</button>
+    </div>
+  </section>
 
-Lista kort vad som resetas efter sparning
+  <section class="card" aria-label="Översikt">
+    <h2>Familj</h2>
 
-Bekräfta: “Endast UI-state reset – ingen datalogik ändrad”
+    <div class="familyWrap" aria-label="Familjebild">
+      <pre id="family" class="family">—</pre>
+    </div>
+
+    <div class="actions" style="justify-content:center;">
+      <button id="toggleMoreBtn" class="btn secondary" type="button" hidden>Visa mer</button>
+    </div>
+
+    <h2 style="margin-top:14px;">Relationer</h2>
+
+    <ul id="list" class="list" aria-label="Lista med relationer"></ul>
+
+    <div class="actions">
+      <button id="refreshBtn" class="btn secondary" type="button">Uppdatera</button>
+      <a class="btn secondary" href="./slaktkort.html">Personer</a>
+      <a class="btn secondary" href="./map.html">Karta</a>
+    </div>
+  </section>
+</div>
+
+<script>
+  "use strict";
+
+  (function authGuard(){
+    try{
+      if(sessionStorage.getItem("demo_auth") !== "1"){
+        window.location.href = "../index.html";
+      }
+    }catch{}
+  })();
+
+  const KEY_TREES  = "slakttradet_trees";
+  const KEY_ACTIVE = "slakttradet_active_tree_id";
+  const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
+  const relKey   = (treeId) => "slakttradet_relationer_" + String(treeId);
+
+  const logoutBtn = document.getElementById("logoutBtn");
+
+  const pillTree = document.getElementById("pillTree");
+  const pillPeople = document.getElementById("pillPeople");
+  const pillRel = document.getElementById("pillRel");
+
+  const hintEl = document.getElementById("hint");
+  const okEl = document.getElementById("ok");
+  const errEl = document.getElementById("err");
+
+  const formTitleEl = document.getElementById("formTitle");
+
+  const relTypeEl = document.getElementById("relType");
+  const relVariantEl = document.getElementById("relVariant");
+
+  const focusSearchEl = document.getElementById("focusSearch");
+  const focusSuggestEl = document.getElementById("focusSuggest");
+
+  const targetSearchEl = document.getElementById("targetSearch");
+  const targetSuggestEl = document.getElementById("targetSuggest");
+
+  const personAEl = document.getElementById("personA");
+  const personBEl = document.getElementById("personB");
+
+  const createBtn = document.getElementById("createBtn");
+  const clearBtn = document.getElementById("clearBtn");
+
+  const refreshBtn = document.getElementById("refreshBtn");
+  const listEl = document.getElementById("list");
+
+  const familyEl = document.getElementById("family");
+  const toggleMoreBtn = document.getElementById("toggleMoreBtn");
+
+  function safeParse(raw, fallback){
+    try{ return JSON.parse(raw); }catch{ return fallback; }
+  }
+  function loadJson(key, fallback){
+    const raw = localStorage.getItem(key);
+    return raw ? safeParse(raw, fallback) : fallback;
+  }
+  function saveJson(key, value){
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+  function escapeHtml(s){
+    return String(s || "")
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+  function nowId(){
+    return "r_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,8);
+  }
+  function setBox(el, html){
+    el.hidden = false;
+    el.innerHTML = html;
+  }
+  function clearBoxes(){
+    hintEl.hidden = true; hintEl.innerHTML = "";
+    okEl.hidden = true; okEl.innerHTML = "";
+    errEl.hidden = true; errEl.innerHTML = "";
+  }
+
+  /* ARKIV-ID: CR-01 | Hämta aktivt träd */
+  function getTrees(){
+    const arr = loadJson(KEY_TREES, []);
+    return Array.isArray(arr) ? arr : [];
+  }
+  function activeTreeId(){
+    return localStorage.getItem(KEY_ACTIVE) || "";
+  }
+  function activeTreeLabel(){
+    const id = activeTreeId();
+    if(!id) return "—";
+    const t = getTrees().find(x => String(x.id) === String(id));
+    return t ? (t.name || t.id) : id;
+  }
+
+  /* ARKIV-ID: CR-02 | Läs personer */
+  function loadPeople(){
+    const t = activeTreeId();
+    if(!t) return [];
+    const arr = loadJson(cardsKey(t), []);
+    return Array.isArray(arr) ? arr : [];
+  }
+
+  /* ARKIV-ID: CR-05 | Läs/spara relationer (oförändrat format) */
+  function loadRelations(){
+    const t = activeTreeId();
+    if(!t) return [];
+    const arr = loadJson(relKey(t), []);
+    return Array.isArray(arr) ? arr : [];
+  }
+  function saveRelations(arr){
+    const t = activeTreeId();
+    if(!t) return;
+    saveJson(relKey(t), Array.isArray(arr) ? arr : []);
+  }
+
+  function personName(p){
+    const n = `${p.fornamn || ""} ${p.efternamn || ""}`.trim();
+    return n || "(namnlös)";
+  }
+  function yearsLine(p){
+    const a = (p && p.fodelsear != null && String(p.fodelsear).trim() !== "") ? String(p.fodelsear).trim() : "";
+    const b = (p && p.dodsar != null && String(p.dodsar).trim() !== "") ? String(p.dodsar).trim() : "";
+    if(!a && !b) return "";
+    if(a && b) return `${a}–${b}`;
+    return a ? `${a}–` : `–${b}`;
+  }
+
+  let cachedPeople = [];
+
+  function buildOptions(selectEl, people, selectedId, disallowId){
+    selectEl.innerHTML = "";
+
+    const opt0 = document.createElement("option");
+    opt0.value = "";
+    opt0.textContent = "Välj…";
+    selectEl.appendChild(opt0);
+
+    for(const p of people){
+      const pid = String(p.id);
+      if(disallowId && pid === String(disallowId)) continue;
+
+      const opt = document.createElement("option");
+      opt.value = pid;
+      opt.textContent = personName(p) + (yearsLine(p) ? (" · " + yearsLine(p)) : "");
+      if(selectedId && pid === String(selectedId)) opt.selected = true;
+      selectEl.appendChild(opt);
+    }
+  }
+
+  function syncDropdowns(keepA, keepB){
+    const a = keepA != null ? String(keepA) : String(personAEl.value || "");
+    const b = keepB != null ? String(keepB) : String(personBEl.value || "");
+
+    buildOptions(personAEl, cachedPeople, a, b || null);
+    buildOptions(personBEl, cachedPeople, b, a || null);
+
+    if(a && personAEl.value !== a) personAEl.value = "";
+    if(b && personBEl.value !== b) personBEl.value = "";
+  }
+
+  function normalizeForStore(rel){
+    const r = Object.assign({}, rel);
+    if(!r.id) r.id = nowId();
+    if(!r.createdAt) r.createdAt = Date.now();
+
+    r.typ = String(r.typ || "").toUpperCase();
+
+    if(r.typ === "FORALDER_BARN"){
+      r.franPersonId = String(r.franPersonId || "");
+      r.tillPersonId = String(r.tillPersonId || "");
+    }
+    if(r.typ === "PARTNER"){
+      r.personAId = String(r.personAId || r.personA || r.aId || r.a || "");
+      r.personBId = String(r.personBId || r.personB || r.bId || r.b || "");
+      r.variant = String(r.variant || "").toUpperCase();
+    }
+    return r;
+  }
+
+  function isDuplicate(existing, candidate){
+    if(!existing || !candidate) return false;
+
+    if(existing.typ === "FORALDER_BARN" && candidate.typ === "FORALDER_BARN"){
+      const a1 = String(existing.franPersonId || "");
+      const b1 = String(existing.tillPersonId || "");
+      const a2 = String(candidate.franPersonId || "");
+      const b2 = String(candidate.tillPersonId || "");
+      return a1 === a2 && b1 === b2;
+    }
+
+    if(existing.typ === "PARTNER" && candidate.typ === "PARTNER"){
+      const ea = String(existing.personAId || existing.personA || existing.aId || existing.a || "");
+      const eb = String(existing.personBId || existing.personB || existing.bId || existing.b || "");
+      const ca = String(candidate.personAId || candidate.personA || candidate.aId || candidate.a || "");
+      const cb = String(candidate.personBId || candidate.personB || candidate.bId || candidate.b || "");
+
+      const lowE = ea < eb ? ea : eb;
+      const highE = ea < eb ? eb : ea;
+      const lowC = ca < cb ? ca : cb;
+      const highC = ca < cb ? cb : ca;
+
+      return lowE === lowC && highE === highC;
+    }
+
+    return false;
+  }
+
+  /* ARKIV-ID: CR-04 | Variantlistor (UI-only) */
+  const VARIANTS_BY_TYPE = {
+    FORALDER_BARN: [
+      { v: "MAMMA", label: "Mamma" },
+      { v: "PAPPA", label: "Pappa" }
+    ],
+    PARTNER: [
+      { v: "GIFT", label: "Make/Maka" },
+      { v: "SAMBO", label: "Sambo" }
+    ]
+  };
+
+  function renderVariantOptions(){
+    const typ = String(relTypeEl.value || "").toUpperCase();
+    const variants = VARIANTS_BY_TYPE[typ] || [{ v: "OKAND", label: "—" }];
+
+    const current = String(relVariantEl.value || "");
+    relVariantEl.innerHTML = "";
+    for(const it of variants){
+      const opt = document.createElement("option");
+      opt.value = it.v;
+      opt.textContent = it.label;
+      relVariantEl.appendChild(opt);
+    }
+    if(current && Array.from(relVariantEl.options).some(o => o.value === current)){
+      relVariantEl.value = current;
+    }
+  }
+
+  /* ARKIV-ID: CR-03 | Sök + förslag */
+  let pickedAId = "";
+  let pickedBId = "";
+
+  function normalizeStr(s){ return String(s || "").trim().toLowerCase(); }
+
+  function searchPeople(query){
+    const q = normalizeStr(query);
+    if(q.length < 3) return [];
+    const res = [];
+    for(const p of cachedPeople){
+      const name = normalizeStr(personName(p));
+      if(name.includes(q)) res.push(p);
+    }
+    return res.slice(0, 12);
+  }
+
+  function closeSuggest(which){
+    if(which === "A"){
+      focusSuggestEl.hidden = true;
+      focusSuggestEl.innerHTML = "";
+    }else{
+      targetSuggestEl.hidden = true;
+      targetSuggestEl.innerHTML = "";
+    }
+  }
+
+  function renderSuggest(which, items){
+    const box = (which === "A") ? focusSuggestEl : targetSuggestEl;
+    box.innerHTML = "";
+    if(items.length === 0){
+      box.hidden = true;
+      return;
+    }
+
+    for(const p of items){
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "sItem";
+      btn.textContent = personName(p) + (yearsLine(p) ? (" · " + yearsLine(p)) : "");
+      btn.addEventListener("click", () => {
+        if(which === "A"){
+          pickFocus(String(p.id));
+          focusSearchEl.value = personName(p);
+          closeSuggest("A");
+          try{ relTypeEl.focus(); }catch{}
+        }else{
+          pickTarget(String(p.id));
+          targetSearchEl.value = personName(p);
+          closeSuggest("B");
+          try{ createBtn.focus(); }catch{}
+        }
+      });
+      box.appendChild(btn);
+    }
+
+    box.hidden = false;
+  }
+
+  function pickFocus(id){
+    clearBoxes();
+    pickedAId = String(id || "");
+    if(pickedAId && pickedAId === pickedBId){
+      pickedBId = "";
+      targetSearchEl.value = "";
+    }
+    syncDropdowns(pickedAId, pickedBId);
+    renderFamily();
+  }
+
+  function pickTarget(id){
+    clearBoxes();
+    const next = String(id || "");
+    if(next && next === pickedAId){
+      setBox(errEl, "<strong>Målperson får inte vara samma som den första.</strong>");
+      return;
+    }
+    pickedBId = next;
+    syncDropdowns(pickedAId, pickedBId);
+    renderFamily();
+  }
+
+  /* ARKIV-ID: CR-06 | Mänsklig etikett */
+  function relLabelHuman(r, peopleById){
+    if(!r || !r.typ) return "—";
+
+    if(r.typ === "FORALDER_BARN"){
+      const a = peopleById.get(String(r.franPersonId)) || null;
+      const b = peopleById.get(String(r.tillPersonId)) || null;
+      const an = a ? personName(a) : ("#" + String(r.franPersonId || "—"));
+      const bn = b ? personName(b) : ("#" + String(r.tillPersonId || "—"));
+      return "Förälder → Barn: " + an + " → " + bn;
+    }
+
+    if(r.typ === "PARTNER"){
+      const aId = String(r.personAId || "");
+      const bId = String(r.personBId || "");
+      const a = peopleById.get(aId) || null;
+      const b = peopleById.get(bId) || null;
+      const an = a ? personName(a) : ("#" + (aId || "—"));
+      const bn = b ? personName(b) : ("#" + (bId || "—"));
+      const v = (r.variant ? String(r.variant).toUpperCase() : "");
+      const suffix = (v === "SAMBO") ? " (Sambo)" : (v === "GIFT" ? " (Make/Maka)" : "");
+      return "Partner: " + an + " ↔ " + bn + suffix;
+    }
+
+    return String(r.typ);
+  }
+
+  /* ARKIV-ID: CR-07 | Redigering */
+  let editingId = "";
+  let editingType = "";
+
+  function enterEditMode(rel){
+    if(!rel || !rel.id) return;
+    clearBoxes();
+
+    editingId = String(rel.id);
+    editingType = String(rel.typ || "").toUpperCase();
+
+    formTitleEl.textContent = "Redigera relation";
+    createBtn.textContent = "Spara";
+
+    if(editingType === "FORALDER_BARN"){
+      relTypeEl.value = "FORALDER_BARN";
+      renderVariantOptions();
+      pickedAId = String(rel.franPersonId || "");
+      pickedBId = String(rel.tillPersonId || "");
+    }else if(editingType === "PARTNER"){
+      relTypeEl.value = "PARTNER";
+      renderVariantOptions();
+      const v = String(rel.variant || "").toUpperCase();
+      relVariantEl.value = (v === "SAMBO") ? "SAMBO" : "GIFT";
+      pickedAId = String(rel.personAId || "");
+      pickedBId = String(rel.personBId || "");
+    }else{
+      editingId = "";
+      editingType = "";
+      formTitleEl.textContent = "Skapa relation";
+      createBtn.textContent = "Skapa relation";
+      return;
+    }
+
+    syncDropdowns(pickedAId, pickedBId);
+
+    const pa = cachedPeople.find(p => String(p.id) === String(pickedAId)) || null;
+    const pb = cachedPeople.find(p => String(p.id) === String(pickedBId)) || null;
+    focusSearchEl.value = pa ? personName(pa) : "";
+    targetSearchEl.value = pb ? personName(pb) : "";
+
+    renderFamily();
+    try{ focusSearchEl.focus(); }catch{}
+  }
+
+  function exitEditMode(){
+    editingId = "";
+    editingType = "";
+    formTitleEl.textContent = "Skapa relation";
+    createBtn.textContent = "Skapa relation";
+  }
+
+  /* ARKIV-ID: CR-09 | Reset efter sparning (arbetsorder 6) */
+  function resetAfterSuccess(){
+    exitEditMode();
+
+    pickedAId = "";
+    pickedBId = "";
+
+    focusSearchEl.value = "";
+    targetSearchEl.value = "";
+
+    closeSuggest("A");
+    closeSuggest("B");
+
+    relTypeEl.value = "FORALDER_BARN";
+    renderVariantOptions();
+
+    syncDropdowns("", "");
+
+    try{ focusSearchEl.focus(); }catch{}
+    renderFamily();
+  }
+
+  /* ARKIV-ID: CR-08 | Familjebild + Visa mer */
+  let showMore = false;
+
+  function nameWithYear(id, peopleById){
+    const p = peopleById.get(String(id)) || null;
+    if(!p) return "#" + String(id || "—");
+    const y = yearsLine(p);
+    return y ? (personName(p) + " (" + y + ")") : personName(p);
+  }
+
+  function buildParentsIndex(rels){
+    const m = new Map();
+    for(const r of rels){
+      if(!r || r.typ !== "FORALDER_BARN") continue;
+      const parentId = String(r.franPersonId || "");
+      const childId  = String(r.tillPersonId || "");
+      if(!parentId || !childId) continue;
+      if(!m.has(childId)) m.set(childId, []);
+      m.get(childId).push(parentId);
+    }
+    return m;
+  }
+
+  function buildChildrenIndex(rels){
+    const m = new Map();
+    for(const r of rels){
+      if(!r || r.typ !== "FORALDER_BARN") continue;
+      const parentId = String(r.franPersonId || "");
+      const childId  = String(r.tillPersonId || "");
+      if(!parentId || !childId) continue;
+      if(!m.has(parentId)) m.set(parentId, []);
+      m.get(parentId).push(childId);
+    }
+    return m;
+  }
+
+  function findPartnerId(subjectId, rels){
+    const sid = String(subjectId || "");
+    if(!sid) return "";
+    for(const r of rels){
+      if(!r || r.typ !== "PARTNER") continue;
+      const a = String(r.personAId || "");
+      const b = String(r.personBId || "");
+      if(a === sid && b) return b;
+      if(b === sid && a) return a;
+    }
+    return "";
+  }
+
+  function uniq(arr){
+    const out = [];
+    const seen = new Set();
+    for(const x of arr){
+      const s = String(x);
+      if(!s || seen.has(s)) continue;
+      seen.add(s);
+      out.push(s);
+    }
+    return out;
+  }
+
+  function renderFamily(){
+    const trees = getTrees();
+    const act = activeTreeId();
+    const hasActive = !!act && trees.some(t => String(t.id) === String(act));
+    if(!hasActive){
+      familyEl.textContent = "—";
+      toggleMoreBtn.hidden = true;
+      return;
+    }
+
+    const rels = loadRelations();
+    const peopleById = new Map(cachedPeople.map(p => [String(p.id), p]));
+
+    let subjectId = String(pickedAId || "");
+    if(!subjectId){
+      const first = rels[0] || null;
+      if(first && first.typ === "FORALDER_BARN") subjectId = String(first.franPersonId || "");
+      else if(first && first.typ === "PARTNER") subjectId = String(first.personAId || "");
+    }
+
+    if(!subjectId){
+      familyEl.textContent = "—";
+      toggleMoreBtn.hidden = true;
+      return;
+    }
+
+    const partnerId = findPartnerId(subjectId, rels);
+    const childrenIdx = buildChildrenIndex(rels);
+
+    const children = uniq([
+      ...(childrenIdx.get(String(subjectId)) || []),
+      ...(partnerId ? (childrenIdx.get(String(partnerId)) || []) : [])
+    ]);
+
+    const parentsIdx = buildParentsIndex(rels);
+    const myParents = uniq(parentsIdx.get(String(subjectId)) || []);
+    let siblings = [];
+    if(myParents.length > 0){
+      for(const parentId of myParents){
+        siblings = siblings.concat(childrenIdx.get(String(parentId)) || []);
+      }
+      siblings = uniq(siblings).filter(x => String(x) !== String(subjectId));
+    }
+
+    toggleMoreBtn.hidden = !(siblings.length > 0);
+    toggleMoreBtn.textContent = showMore ? "Visa mindre" : "Visa mer";
+
+    const p1 = nameWithYear(subjectId, peopleById);
+    const p2 = partnerId ? nameWithYear(partnerId, peopleById) : "";
+    const top = partnerId ? (p1 + " ── " + p2) : p1;
+
+    let out = top;
+
+    if(children.length > 0){
+      const kids = children.map(id => nameWithYear(id, peopleById));
+      if(kids.length === 1){
+        out += "\n" + "│" + "\n" + kids[0];
+      }else{
+        out += "\n" + "│" + "\n";
+        const left = [];
+        const right = [];
+        for(let i=0;i<kids.length;i++){
+          (i % 2 === 0 ? left : right).push(kids[i]);
+        }
+        const rows = Math.max(left.length, right.length);
+        for(let i=0;i<rows;i++){
+          const a = left[i] || "";
+          const b = right[i] || "";
+          if(b){
+            out += a.padEnd(Math.max(12, a.length + 3), " ") + "   " + b + "\n";
+          }else{
+            out += a + "\n";
+          }
+        }
+        out = out.trimEnd();
+      }
+    }
+
+    if(showMore && siblings.length > 0){
+      const sibs = siblings.map(id => nameWithYear(id, peopleById));
+      out += "\n\n" + "Syskon:\n" + sibs.join("\n");
+    }
+
+    familyEl.textContent = out;
+  }
+
+  toggleMoreBtn.addEventListener("click", () => {
+    showMore = !showMore;
+    renderFamily();
+  });
+
+  function renderPills(){
+    const trees = getTrees();
+    const act = activeTreeId();
+    const hasTrees = trees.length > 0;
+    const hasActive = !!act && trees.some(t => String(t.id) === String(act));
+
+    pillTree.className = "pill " + (hasActive ? "ok" : (hasTrees ? "warn" : "err"));
+    pillTree.innerHTML = "Aktivt träd: <strong>" + escapeHtml(hasActive ? activeTreeLabel() : "—") + "</strong>";
+
+    const ppl = hasActive ? cachedPeople.length : 0;
+    const rels = hasActive ? loadRelations().length : 0;
+
+    pillPeople.innerHTML = "Personer: <strong>" + ppl + "</strong>";
+    pillRel.innerHTML = "Relationer: <strong>" + rels + "</strong>";
+  }
+
+  function renderHint(){
+    const trees = getTrees();
+    const act = activeTreeId();
+    const hasTrees = trees.length > 0;
+    const hasActive = !!act && trees.some(t => String(t.id) === String(act));
+
+    if(!hasTrees){
+      setBox(hintEl, "<strong>Skapa ett träd först.</strong> <a href='./trees.html'>Gå till Träd</a>.");
+      return false;
+    }
+    if(!hasActive){
+      setBox(hintEl, "<strong>Välj ett aktivt träd.</strong> <a href='./trees.html'>Gå till Träd</a>.");
+      return false;
+    }
+    if(cachedPeople.length < 2){
+      setBox(hintEl, "<strong>Lägg till minst två personer.</strong> <a href='./slaktkort.html'>Gå till Personer</a>.");
+      return false;
+    }
+    return true;
+  }
+
+  function renderList(){
+    listEl.innerHTML = "";
+
+    const trees = getTrees();
+    const act = activeTreeId();
+    const hasActive = !!act && trees.some(t => String(t.id) === String(act));
+
+    if(!hasActive){
+      const li = document.createElement("li");
+      li.className = "item";
+      li.style.cursor = "default";
+      li.innerHTML = "<div class='itemLeft'><p class='itemTitle'>—</p><p class='itemMeta'>Välj aktivt träd först.</p></div>";
+      listEl.appendChild(li);
+      return;
+    }
+
+    const rels = loadRelations();
+    if(rels.length === 0){
+      const li = document.createElement("li");
+      li.className = "item";
+      li.style.cursor = "default";
+      li.innerHTML = "<div class='itemLeft'><p class='itemTitle'>Inga relationer ännu</p><p class='itemMeta'>Skapa en relation.</p></div>";
+      listEl.appendChild(li);
+      return;
+    }
+
+    const peopleById = new Map(cachedPeople.map(p => [String(p.id), p]));
+
+    for(const r of rels){
+      const li = document.createElement("li");
+      li.className = "item";
+
+      const left = document.createElement("div");
+      left.className = "itemLeft";
+
+      const title = document.createElement("p");
+      title.className = "itemTitle";
+      title.textContent = relLabelHuman(r, peopleById);
+
+      left.appendChild(title);
+
+      const actions = document.createElement("div");
+      actions.className = "actions";
+      actions.style.marginTop = "0";
+
+      const editBtn = document.createElement("button");
+      editBtn.className = "btn secondary";
+      editBtn.type = "button";
+      editBtn.textContent = "Redigera";
+      editBtn.addEventListener("click", () => enterEditMode(r));
+
+      const delBtn = document.createElement("button");
+      delBtn.className = "btn danger";
+      delBtn.type = "button";
+      delBtn.textContent = "Ta bort";
+      delBtn.addEventListener("click", () => {
+        const ok = confirm("Är du säker?");
+        if(!ok) return;
+        const next = rels.filter(x => String(x.id) !== String(r.id));
+        saveRelations(next);
+
+        if(editingId && String(r.id) === String(editingId)){
+          resetAfterSuccess();
+        }
+
+        clearBoxes();
+        setBox(okEl, "<strong>Borttaget.</strong>");
+        refresh();
+      });
+
+      actions.appendChild(editBtn);
+      actions.appendChild(delBtn);
+
+      li.appendChild(left);
+      li.appendChild(actions);
+      listEl.appendChild(li);
+    }
+  }
+
+  /* ARKIV-ID: CR-05 | CREATE / UPDATE */
+  function createOrUpdateRelation(){
+    clearBoxes();
+
+    const trees = getTrees();
+    const act = activeTreeId();
+    const hasActive = !!act && trees.some(t => String(t.id) === String(act));
+    if(!hasActive){
+      setBox(errEl, "<strong>Välj aktivt träd först.</strong>");
+      return;
+    }
+
+    const aId = String(pickedAId || personAEl.value || "");
+    const bId = String(pickedBId || personBEl.value || "");
+
+    if(!aId || !bId){
+      setBox(errEl, "<strong>Välj två personer.</strong>");
+      return;
+    }
+    if(aId === bId){
+      setBox(errEl, "<strong>Du kan inte koppla en person till sig själv.</strong>");
+      return;
+    }
+
+    const uiType = String(relTypeEl.value || "").toUpperCase();
+    const uiVariant = String(relVariantEl.value || "").toUpperCase();
+
+    if(uiType !== "FORALDER_BARN" && uiType !== "PARTNER"){
+      setBox(errEl, "<strong>Den relationstypen kan inte sparas ännu.</strong>");
+      return;
+    }
+
+    const rels = loadRelations();
+    let candidate = null;
+
+    if(uiType === "FORALDER_BARN"){
+      candidate = normalizeForStore({
+        id: editingId ? editingId : nowId(),
+        typ: "FORALDER_BARN",
+        franPersonId: aId,
+        tillPersonId: bId
+      });
+    }else if(uiType === "PARTNER"){
+      const variant = (uiVariant === "SAMBO") ? "SAMBO" : "GIFT";
+      candidate = normalizeForStore({
+        id: editingId ? editingId : nowId(),
+        typ: "PARTNER",
+        personAId: aId,
+        personBId: bId,
+        variant
+      });
+    }
+
+    if(editingId){
+      const prev = rels.find(x => String(x.id) === String(editingId)) || null;
+      if(prev && prev.createdAt != null) candidate.createdAt = prev.createdAt;
+    }
+
+    if(rels.some(x => String(x.id) !== String(candidate.id) && isDuplicate(x, candidate))){
+      setBox(errEl, "<strong>Relationen finns redan.</strong>");
+      return;
+    }
+
+    const wasEditing = !!editingId;
+
+    if(editingId){
+      const idx = rels.findIndex(x => String(x.id) === String(editingId));
+      if(idx === -1){
+        rels.unshift(candidate);
+      }else{
+        rels[idx] = candidate;
+      }
+      saveRelations(rels);
+      setBox(okEl, "<strong>Sparat.</strong>");
+    }else{
+      rels.unshift(candidate);
+      saveRelations(rels);
+      setBox(okEl, "<strong>Sparat.</strong>");
+    }
+
+    refresh();
+
+    /* ARKIV-ID: CR-09 | Reset efter lyckad sparning */
+    resetAfterSuccess();
+
+    // behåll ett lugnt kvitto kort
+    clearTimeout(window.__okTimer);
+    window.__okTimer = setTimeout(() => { okEl.hidden = true; okEl.innerHTML = ""; }, 1200);
+  }
+
+  // EVENTS
+  relTypeEl.addEventListener("change", () => {
+    renderVariantOptions();
+  });
+
+  focusSearchEl.addEventListener("input", () => {
+    clearBoxes();
+    const q = focusSearchEl.value || "";
+    if(String(q).trim().length < 3){
+      closeSuggest("A");
+      return;
+    }
+    renderSuggest("A", searchPeople(q));
+  });
+
+  targetSearchEl.addEventListener("input", () => {
+    clearBoxes();
+    const q = targetSearchEl.value || "";
+    if(String(q).trim().length < 3){
+      closeSuggest("B");
+      return;
+    }
+    const items = searchPeople(q).filter(p => String(p.id) !== String(pickedAId || ""));
+    renderSuggest("B", items);
+  });
+
+  document.addEventListener("click", (e) => {
+    const t = e.target;
+    if(!t) return;
+    if(!focusSuggestEl.contains(t) && t !== focusSearchEl) closeSuggest("A");
+    if(!targetSuggestEl.contains(t) && t !== targetSearchEl) closeSuggest("B");
+  });
+
+  focusSearchEl.addEventListener("keydown", (e) => { if(e.key === "Escape") closeSuggest("A"); });
+  targetSearchEl.addEventListener("keydown", (e) => { if(e.key === "Escape") closeSuggest("B"); });
+
+  createBtn.addEventListener("click", createOrUpdateRelation);
+
+  clearBtn.addEventListener("click", () => {
+    clearBoxes();
+    showMore = false;
+    resetAfterSuccess();
+    refresh();
+  });
+
+  refreshBtn.addEventListener("click", () => {
+    clearBoxes();
+    refresh();
+  });
+
+  logoutBtn.addEventListener("click", () => {
+    try{ sessionStorage.removeItem("demo_auth"); }catch{}
+    window.location.href = "../index.html";
+  });
+
+  function refresh(){
+    cachedPeople = loadPeople();
+    renderPills();
+    renderVariantOptions();
+    const ok = renderHint();
+    createBtn.disabled = !ok;
+    syncDropdowns(pickedAId || personAEl.value || "", pickedBId || personBEl.value || "");
+    renderList();
+    renderFamily();
+  }
+
+  refresh();
+</script>
+</body>
+</html>
