@@ -127,7 +127,10 @@
       margin-top: 12px;
     }
 
+    /* MAP: gör kartan visuellt större (ingen rubrik ovanför) */
     .mapCard{
+      padding: 0;
+      overflow: hidden;
       display:flex;
       flex-direction:column;
       min-height: 560px;
@@ -137,8 +140,8 @@
       width:100%;
       flex: 1 1 auto;
       min-height: 520px;
-      border-radius:12px;
-      border: 1px solid #ddd;
+      border-radius: 12px;
+      border: 0;
       overflow:hidden;
       background:#f4f4f4;
     }
@@ -399,6 +402,13 @@
       font-weight: 950;
       margin-right: 6px;
     }
+
+    /* map-msg: lite luft men INTE ovanför kartan */
+    .mapMsg{
+      padding: 10px 12px;
+      border-top: 1px solid #eee;
+    }
+    .mapMsg p{ margin:0; }
   </style>
 </head>
 
@@ -417,16 +427,16 @@
     </nav>
   </div>
 
-  <div class="actions" style="justify-content:flex-end;">
+  <!-- ARBETORDER 11: Logga ut i header (höger) -->
+  <div class="actions" style="justify-content:flex-end; margin-top:0;">
     <button id="logoutBtn" class="btn secondary" type="button">Logga ut</button>
   </div>
 </header>
 
+<!-- ARBETORDER 11: ta bort 2 rutor (Med koordinater, Kopplingar ritade) -->
 <section class="pillRow" aria-label="Status">
   <span id="pillTree" class="pill warn">Aktivt träd: <strong>—</strong></span>
   <span id="pillPeople" class="pill">Personer: <strong>0</strong></span>
-  <span id="pillWithCoords" class="pill">Med koordinater: <strong>0</strong></span>
-  <span id="pillLinks" class="pill">Kopplingar ritade: <strong>0</strong></span>
 </section>
 
 <div class="grid">
@@ -481,7 +491,6 @@
       <span id="matchInfo" class="small" aria-live="polite"></span>
     </div>
 
-    <!-- ARBETORDER 10: EN dropdown, inga kryssrutor -->
     <label for="relMode">Visa relationer</label>
     <select id="relMode">
       <option value="PC">Visa Förälder→Barn</option>
@@ -501,12 +510,12 @@
     </div>
   </section>
 
-  <!-- HÖGERSPALT -->
+  <!-- HÖGERSPALT (kartan börjar direkt, ingen tom yta ovanför) -->
   <section class="card mapCard" aria-label="Karta">
-    <h2>Karta</h2>
-    <p class="small">OpenStreetMap via Leaflet.</p>
     <div id="map" role="application" aria-label="Karta med markörer och kopplingar"></div>
-    <p id="msg" class="muted" aria-live="polite" style="margin-top:10px;"></p>
+    <div class="mapMsg">
+      <p id="msg" class="muted" aria-live="polite"></p>
+    </div>
   </section>
 </div>
 
@@ -526,8 +535,8 @@
   const relKey   = (treeId) => "slakttradet_relationer_" + String(treeId);
 
   // FÄRGER (enkelt)
-  const COLOR_PC = "#1f6feb";      // Förälder→Barn = färg A
-  const COLOR_PARTNER = "#7c3aed"; // Partner = färg B
+  const COLOR_PC = "#1f6feb";
+  const COLOR_PARTNER = "#7c3aed";
 
   const logoutBtn = document.getElementById("logoutBtn");
   const msg = document.getElementById("msg");
@@ -535,8 +544,6 @@
 
   const pillTree = document.getElementById("pillTree");
   const pillPeople = document.getElementById("pillPeople");
-  const pillWithCoords = document.getElementById("pillWithCoords");
-  const pillLinks = document.getElementById("pillLinks");
 
   const searchEl = document.getElementById("search");
   const clearSearchBtn = document.getElementById("clearSearchBtn");
@@ -708,10 +715,10 @@
   const markerLayer = L.layerGroup().addTo(map);
   const linkLayer = L.layerGroup().addTo(map);
 
-  const markersById = new Map(); // personId -> marker (synliga)
-  const coordsById = new Map();  // personId -> coords (alla med coords)
+  const markersById = new Map();
+  const coordsById = new Map();
 
-  let focusedMarkerId = ""; // personId
+  let focusedMarkerId = "";
 
   function clearMarkersOnly(){
     markerLayer.clearLayers();
@@ -735,7 +742,6 @@
     map.fitBounds(L.latLngBounds(ll).pad(0.2));
   }
 
-  // MARKÖR-ICON (ingen popup)
   function markerIconHtml(){
     return "<div class='mkWrap'><span class='mkFlag'>🇸🇪</span></div>";
   }
@@ -752,19 +758,14 @@
     for(const [pid, marker] of markersById.entries()){
       const el = marker.getElement();
       if(!el) continue;
-
       const wrap = el.querySelector(".mkWrap");
       if(!wrap) continue;
 
       wrap.classList.remove("isActive", "isDim");
 
       if(!hasFocus) continue;
-
-      if(String(pid) === String(focusedMarkerId)){
-        wrap.classList.add("isActive");
-      }else{
-        wrap.classList.add("isDim");
-      }
+      if(String(pid) === String(focusedMarkerId)) wrap.classList.add("isActive");
+      else wrap.classList.add("isDim");
     }
   }
   function setFocusMarker(personId){
@@ -776,7 +777,6 @@
     applyMarkerFocusStyles();
   }
 
-  // FILTERING (sök påverkar listan + (PC/PARTNER) markörer)
   function currentFiltered(peopleWithCoords){
     const q = String(searchEl.value || "").trim().toLowerCase();
     if(!q) return peopleWithCoords;
@@ -799,7 +799,6 @@
     return [...m.values()];
   }
 
-  // LIST RENDER (sökträffar endast när man söker)
   function renderList(people){
     const q = String(searchEl.value || "").trim();
     if(!q){
@@ -854,7 +853,6 @@
     }
   }
 
-  // PARTNER-ID ADAPTER (accept both formats)
   function getPartnerPair(r){
     const a1 = r && (r.personAId ?? r.personA ?? r.aId ?? r.a);
     const b1 = r && (r.personBId ?? r.personB ?? r.bId ?? r.b);
@@ -871,7 +869,7 @@
     return null;
   }
 
-  // PRESTANDA: index i minnet per refresh
+  // index i minnet per refresh
   const famIndex = {
     personById: new Map(),
     childrenByParent: new Map(),
@@ -1021,19 +1019,16 @@
     return html;
   }
 
-  // ARBETORDER 10: läge (en i taget)
   function getRelationMode(){
     const v = String(relModeEl.value || "PC");
     return (v === "PARTNER" || v === "FOCUS") ? v : "PC";
   }
 
   function getFocusId(){
-    // Fokus = den som är vald i panel (om öppen), annars senaste marker-fokus
     if(!dockPanel.hidden && panelPersonId) return String(panelPersonId);
     return String(focusedMarkerId || "");
   }
 
-  // MARKER RENDER
   function renderMarkers(peopleVisible){
     clearMarkersOnly();
 
@@ -1074,14 +1069,9 @@
     applyMarkerFocusStyles();
   }
 
-  // LINK RENDER (PC/PARTNER) – endast mellan synliga markörer
   function renderLinksMode(relations, mode, visibleSet){
     clearLinks();
-
-    if(mode !== "PC" && mode !== "PARTNER"){
-      pillLinks.innerHTML = "Kopplingar ritade: <strong>0</strong>";
-      return { total: 0 };
-    }
+    if(mode !== "PC" && mode !== "PARTNER") return { total: 0 };
 
     let drawn = 0;
     const seen = new Set();
@@ -1093,7 +1083,6 @@
         const fromId = String(r.franPersonId || "");
         const toId   = String(r.tillPersonId || "");
         if(!fromId || !toId) continue;
-
         if(!visibleSet.has(fromId) || !visibleSet.has(toId)) continue;
 
         const key = "PC:" + fromId + "->" + toId;
@@ -1115,7 +1104,6 @@
         const aId = pair.aId;
         const bId = pair.bId;
         if(!aId || !bId) continue;
-
         if(!visibleSet.has(aId) || !visibleSet.has(bId)) continue;
 
         const low = aId < bId ? aId : bId;
@@ -1134,19 +1122,14 @@
       }
     }
 
-    pillLinks.innerHTML = "Kopplingar ritade: <strong>" + drawn + "</strong>";
     return { total: drawn };
   }
 
-  // FOCUS MODE: visa endast fokus + (föräldrar/barn/partner)
   function renderFocusNetwork(allPeopleWithCoords, focusId){
     clearLinks();
 
     const id = String(focusId || "");
-    if(!id){
-      pillLinks.innerHTML = "Kopplingar ritade: <strong>0</strong>";
-      return { people: [], links: 0 };
-    }
+    if(!id) return { people: [], links: 0 };
 
     const parents = getParentsFor(id).map(p => String(p.id));
     const children = getChildrenFor(id).map(p => String(p.id));
@@ -1160,7 +1143,6 @@
       if(keep.has(pid)) people.push(p);
     }
 
-    // Rita bara runt fokus (föräldrar->fokus, fokus->barn, fokus--partner)
     let drawn = 0;
 
     const focusC = coordsById.get(id);
@@ -1177,7 +1159,6 @@
         L.polyline([[focusC.lat, focusC.lon], [b.lat, b.lon]], { color: COLOR_PC, weight: 3, opacity: 0.75 }).addTo(linkLayer);
         drawn++;
       }
-      // partner: max 1 linje (enligt "en aktivt läge åt gången" + lugnt)
       if(partners.length > 0){
         const pid = partners[0];
         const b = coordsById.get(pid);
@@ -1188,11 +1169,9 @@
       }
     }
 
-    pillLinks.innerHTML = "Kopplingar ritade: <strong>" + drawn + "</strong>";
     return { people, links: drawn };
   }
 
-  // HINT RENDER
   function renderHint(hasTrees, hasActive, peopleWithCoords){
     if(!hasTrees){
       hint.hidden = false;
@@ -1217,7 +1196,7 @@
 
   // DOCKAD PANEL STATE
   let panelPersonId = "";
-  let expandedMode = "NONE"; // "NONE" | "BARN" | "PARTNER"
+  let expandedMode = "NONE";
 
   function closePanel(){
     dockPanel.hidden = true;
@@ -1269,7 +1248,7 @@
 
         const m = markersById.get(id);
         if(m) map.setView(m.getLatLng(), Math.max(map.getZoom(), 10), { animate: true });
-        refreshMapOnly(); // fokusläge ska reagera direkt
+        refreshMapOnly();
       });
     }
 
@@ -1380,7 +1359,6 @@
     slotFocus.innerHTML = "";
     slotChildren.innerHTML = "";
 
-    // Parents
     if(fam.parents.length > 0){
       for(const par of fam.parents.slice(0, 2)){
         slotParents.appendChild(makeChip(personName(par), "Förälder", par.id, ""));
@@ -1392,7 +1370,6 @@
       slotParents.appendChild(makeChip("—", "Föräldrar", null, "muted"));
     }
 
-    // Partner
     if(fam.partners.length > 0){
       const first = fam.partners[0];
       slotPartner.appendChild(makeChip(personName(first), "Partner", first.id, ""));
@@ -1425,10 +1402,8 @@
       slotPartner.appendChild(makeChip("—", "Partner", null, "muted"));
     }
 
-    // Focus
     slotFocus.appendChild(makeChip(name, "Fokus", focusId, "primary"));
 
-    // Children
     if(fam.children.length > 0){
       const visible = fam.children.slice(0, 4);
       for(const ch of visible){
@@ -1472,7 +1447,6 @@
     toggleTechBtn.textContent = showTech ? "Dölj tekniskt" : "Visa tekniskt";
   }
 
-  // PANEL EVENTS
   panelClose.addEventListener("click", () => {
     closePanel();
     clearFocusMarker();
@@ -1491,7 +1465,6 @@
     toggleTechBtn.textContent = showTech ? "Dölj tekniskt" : "Visa tekniskt";
   });
 
-  // REFRESH CORE
   let lastAllRelations = [];
   let lastAllPeopleWithCoords = [];
   let lastFiltered = [];
@@ -1500,7 +1473,6 @@
     pillTree.className = "pill " + (hasActive ? "ok" : (hasTrees ? "warn" : "err"));
     pillTree.innerHTML = "Aktivt träd: <strong>" + (hasActive ? escapeHtml(activeTreeLabel()) : "—") + "</strong>";
     pillPeople.innerHTML = "Personer: <strong>" + allPeople.length + "</strong>";
-    pillWithCoords.innerHTML = "Med koordinater: <strong>" + peopleWithCoordsAll.length + "</strong>";
 
     const q = String(searchEl.value || "").trim();
     if(!q){
@@ -1517,7 +1489,6 @@
     const mode = getRelationMode();
     const focusId = getFocusId();
 
-    // mode-hint
     if(mode === "FOCUS" && !focusId){
       relModeHint.textContent = "Välj en person.";
     }else{
@@ -1528,7 +1499,6 @@
       if(!focusId){
         clearMarkersOnly();
         clearLinks();
-        pillLinks.innerHTML = "Kopplingar ritade: <strong>0</strong>";
         msg.innerHTML = "<span class='muted'>Bara fokus: välj en person (klicka i lista eller på markör).</span>";
         try{ setTimeout(() => map.invalidateSize(), 0); }catch{}
         return;
@@ -1537,7 +1507,6 @@
       const net = renderFocusNetwork(lastAllPeopleWithCoords, focusId);
       renderMarkers(net.people);
 
-      // zooma mjukt till nät om vi kan
       const ll = [];
       for(const p of net.people){
         const c = coordsFromPerson(p);
@@ -1556,7 +1525,6 @@
       return;
     }
 
-    // PC/PARTNER: markörer styrs av sökfilter (som tidigare)
     renderMarkers(lastFiltered);
 
     const visibleSet = new Set(markersById.keys());
@@ -1600,7 +1568,6 @@
     renderHintAndCounts(hasTrees, hasActive, allPeople, peopleWithCoordsAll, filtered);
     renderList(filtered);
 
-    // panel consistency
     if(!dockPanel.hidden && panelPersonId){
       const exists = allPeople.some(p => String(p.id) === String(panelPersonId));
       if(!exists){
@@ -1611,7 +1578,6 @@
       }
     }
 
-    // focus validity
     if(focusedMarkerId && !allPeople.some(p => String(p.id) === String(focusedMarkerId))){
       clearFocusMarker();
       if(!dockPanel.hidden) closePanel();
@@ -1620,7 +1586,6 @@
     refreshMapOnly();
   }
 
-  // EVENTS
   refreshBtn.addEventListener("click", refresh);
 
   fitBtn.addEventListener("click", () => {
@@ -1655,7 +1620,6 @@
     window.location.href = "../index.html";
   });
 
-  // START
   refresh();
 </script>
 </body>
