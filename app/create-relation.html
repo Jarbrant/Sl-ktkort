@@ -52,6 +52,14 @@
     .btn.danger{ border-color:#b00020; color:#b00020; }
     .btn:disabled{ opacity:.5; cursor:not-allowed; }
 
+    /* ARKIV-ID: CR-08 | Aktiv färg/stil för aktiv nav-knapp (Relationer) */
+    .topbar .btn.active,
+    .topbar .btn[aria-current="page"]{
+      background:#111;
+      color:#fff;
+      border-color:#111;
+    }
+
     .pillRow{
       display:flex;
       flex-wrap:wrap;
@@ -218,7 +226,6 @@
       border-top: 1px solid #eee;
       padding-top: 12px;
       margin-top: 12px;
-      /* ARBETORDER 4: centrering endast för familjebilden */
       display:flex;
       justify-content:center;
     }
@@ -234,10 +241,10 @@
       background: #fafafa;
       overflow:auto;
       max-height: 520px;
-      display:inline-block;   /* behövs för att flex-centering ska fungera snyggt */
-      text-align:left;        /* behåll ASCII-justering inne i rutan */
+      display:inline-block;
+      text-align:left;
       width: 100%;
-      max-width: 720px;       /* lugn och balanserad */
+      max-width: 720px;
       box-sizing:border-box;
     }
   </style>
@@ -253,7 +260,7 @@
       <a class="btn secondary" href="../start.html">Start</a>
       <a class="btn secondary" href="./trees.html">Träd</a>
       <a class="btn secondary" href="./slaktkort.html">Personer</a>
-      <a class="btn" href="./create-relation.html">Relationer</a>
+      <a class="btn active" aria-current="page" href="./create-relation.html">Relationer</a>
       <a class="btn secondary" href="./map.html">Karta</a>
     </nav>
   </div>
@@ -362,9 +369,6 @@
 <script>
   "use strict";
 
-  // =====================================================
-  // DEMO AUTH GUARD (matchar dina andra sidor)
-  // =====================================================
   (function authGuard(){
     try{
       if(sessionStorage.getItem("demo_auth") !== "1"){
@@ -373,17 +377,11 @@
     }catch{}
   })();
 
-  // =====================================================
-  // STORAGE KEYS (LÅSTA)
-  // =====================================================
   const KEY_TREES  = "slakttradet_trees";
   const KEY_ACTIVE = "slakttradet_active_tree_id";
   const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
   const relKey   = (treeId) => "slakttradet_relationer_" + String(treeId);
 
-  // =====================================================
-  // DOM
-  // =====================================================
   const logoutBtn = document.getElementById("logoutBtn");
 
   const pillTree = document.getElementById("pillTree");
@@ -421,9 +419,6 @@
 
   const listEl = document.getElementById("list");
 
-  // =====================================================
-  // HELPERS
-  // =====================================================
   function safeParse(raw, fallback){
     try{ return JSON.parse(raw); }catch{ return fallback; }
   }
@@ -455,7 +450,6 @@
     errEl.hidden = true; errEl.innerHTML = "";
   }
 
-  <!-- ARKIV-ID: CR-01 | Hämta aktivt träd -->
   function getTrees(){
     const arr = loadJson(KEY_TREES, []);
     return Array.isArray(arr) ? arr : [];
@@ -470,7 +464,6 @@
     return t ? (t.name || t.id) : id;
   }
 
-  <!-- ARKIV-ID: CR-02 | Läs personer -->
   function loadPeople(){
     const t = activeTreeId();
     if(!t) return [];
@@ -478,7 +471,6 @@
     return Array.isArray(arr) ? arr : [];
   }
 
-  <!-- ARKIV-ID: CR-05 | Läs/spara relationer (oförändrat) -->
   function loadRelations(){
     const t = activeTreeId();
     if(!t) return [];
@@ -507,9 +499,6 @@
     return a || "";
   }
 
-  // =====================================================
-  // DROPDOWN (backup) – oförändrad logik
-  // =====================================================
   let cachedPeople = [];
 
   function buildOptions(selectEl, people, selectedId, disallowId){
@@ -543,9 +532,6 @@
     if(b && personBEl.value !== b) personBEl.value = "";
   }
 
-  // =====================================================
-  // RELATION NORMALIZATION + DUPLICATE CHECK (oförändrat)
-  // =====================================================
   function normalizeForStore(rel){
     const r = Object.assign({}, rel);
     if(!r.id) r.id = nowId();
@@ -593,9 +579,6 @@
     return false;
   }
 
-  // =====================================================
-  // ARKIV-ID: CR-04 | Variantlistor (UI-only)
-  // =====================================================
   const VARIANTS_BY_TYPE = {
     FORALDER_BARN: [
       { v: "MAMMA", label: "Mamma" },
@@ -656,9 +639,6 @@
     }
   }
 
-  // =====================================================
-  // ARKIV-ID: CR-03 | Sök + förslag
-  // =====================================================
   let pickedAId = "";
   let pickedBId = "";
 
@@ -762,9 +742,6 @@
     targetPickedEl.textContent = pickedBId ? (pb ? personName(pb) : ("#" + pickedBId)) : "—";
   }
 
-  // =====================================================
-  // UI
-  // =====================================================
   function renderPills(){
     const trees = getTrees();
     const act = activeTreeId();
@@ -804,9 +781,6 @@
 
   function renderTech(){ techEl.textContent = ""; }
 
-  // =====================================================
-  // ARKIV-ID: CR-06 | Mänsklig lista + redigering
-  // =====================================================
   function peopleById(){ return new Map(cachedPeople.map(p => [String(p.id), p])); }
 
   function relLabelHuman(r, byId){
@@ -965,9 +939,6 @@
     }
   }
 
-  // =====================================================
-  // ARKIV-ID: CR-07 | Familjebild (endast visning)
-  // =====================================================
   let showMore = false;
 
   function getPartnerIdFor(personId, rels){
@@ -1128,9 +1099,6 @@
     familyAsciiEl.textContent = lines.join("\n");
   }
 
-  // =====================================================
-  // ARKIV-ID: CR-05 | CREATE / UPDATE (lagring intakt)
-  // =====================================================
   function createOrUpdateRelation(){
     clearBoxes();
 
@@ -1214,9 +1182,6 @@
     refresh();
   }
 
-  // =====================================================
-  // EVENTS
-  // =====================================================
   relTypeEl.addEventListener("change", () => {
     renderVariantOptions();
   });
@@ -1324,9 +1289,6 @@
     window.location.href = "../index.html";
   });
 
-  // =====================================================
-  // REFRESH
-  // =====================================================
   function refresh(){
     clearBoxes();
 
@@ -1346,9 +1308,6 @@
     renderFamily();
   }
 
-  // =====================================================
-  // START
-  // =====================================================
   refresh();
 </script>
 </body>
