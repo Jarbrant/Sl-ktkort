@@ -207,7 +207,6 @@
   </header>
 
   <div class="grid">
-    <!-- Vänster: formulär -->
     <section class="card" aria-label="Personformulär">
       <h2 id="formTitle">Skapa person</h2>
       <p class="muted" id="formSub">Fyll i uppgifter. Plats väljs via kartan.</p>
@@ -277,7 +276,6 @@
       </div>
     </section>
 
-    <!-- Höger: lista -->
     <section class="card" aria-label="Personlista">
       <h2>Lista</h2>
       <p class="muted">Klicka Redigera för att ändra en person.</p>
@@ -307,10 +305,10 @@
     const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
 
     // =====================================================
-    // DRAFT + MAP PICK keys
+    // DRAFT + MAP PICK keys (ROBUST: localStorage)
     // =====================================================
-    const DRAFT_KEY = "slaktkort_person_draft_v1";
-    const PICK_RESULT_KEY = "slaktkort_map_pick_result";
+    const DRAFT_KEY = "slaktkort_person_draft_v2";
+    const PICK_RESULT_KEY = "slaktkort_map_pick_result"; // {lat, lon}
 
     // =====================================================
     // DOM
@@ -450,7 +448,7 @@
       coords.value = "";
       notes.value = "";
       hideMsg();
-      saveDraft(); // håll draft i sync även när man rensar
+      saveDraft();
     }
 
     function fillForm(p){
@@ -471,7 +469,7 @@
     }
 
     // =====================================================
-    // Draft (sessionStorage) – behåll formulär mellan sidor
+    // Draft (ROBUST: localStorage) – överlever flik/refresh
     // =====================================================
     function readForm(){
       return {
@@ -484,7 +482,8 @@
         dodsar: dodsar.value,
         plats: plats.value,
         coords: coords.value,
-        notes: notes.value
+        notes: notes.value,
+        activeTreeId: activeTreeId() // för extra säkerhet
       };
     }
     function writeForm(d){
@@ -510,17 +509,18 @@
     }
     function saveDraft(){
       try{
-        sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ ts: Date.now(), data: readForm() }));
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ ts: Date.now(), data: readForm() }));
       }catch{}
     }
     function loadDraft(){
       try{
-        const raw = sessionStorage.getItem(DRAFT_KEY);
+        const raw = localStorage.getItem(DRAFT_KEY);
         if(!raw) return null;
         const obj = JSON.parse(raw);
         if(!obj || typeof obj !== "object") return null;
-        if(obj.ts && (Date.now() - obj.ts) > 2*60*60*1000){
-          sessionStorage.removeItem(DRAFT_KEY);
+        // rensa om äldre än 6 timmar
+        if(obj.ts && (Date.now() - obj.ts) > 6*60*60*1000){
+          localStorage.removeItem(DRAFT_KEY);
           return null;
         }
         return obj.data || null;
@@ -529,14 +529,17 @@
       }
     }
     function clearDraft(){
-      try{ sessionStorage.removeItem(DRAFT_KEY); }catch{}
+      try{ localStorage.removeItem(DRAFT_KEY); }catch{}
     }
 
-    // autospara draft när man skriver
+    // autospara draft när man skriver + när sidan lämnas
     let draftTimer = null;
     form.addEventListener("input", () => {
       if(draftTimer) clearTimeout(draftTimer);
       draftTimer = setTimeout(saveDraft, 120);
+    });
+    window.addEventListener("beforeunload", () => {
+      try{ saveDraft(); }catch{}
     });
 
     // =====================================================
@@ -544,7 +547,7 @@
     // =====================================================
     function applyPickResultIfAny(){
       try{
-        const raw = sessionStorage.getItem(PICK_RESULT_KEY);
+        const raw = localStorage.getItem(PICK_RESULT_KEY);
         if(!raw) return;
         const res = JSON.parse(raw);
         if(!res || typeof res !== "object") return;
@@ -554,13 +557,12 @@
         if(!Number.isFinite(lat) || !Number.isFinite(lon)) return;
 
         coords.value = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
-        // valfritt: om plats är tom, skriv "Vald på karta"
         if(!String(plats.value || "").trim()){
           plats.value = "Vald på karta";
         }
 
         saveDraft();
-        sessionStorage.removeItem(PICK_RESULT_KEY);
+        localStorage.removeItem(PICK_RESULT_KEY);
       }catch{}
     }
 
@@ -673,7 +675,6 @@
     pickOnMapBtn.addEventListener("click", () => {
       // spara draft innan navigation så inget försvinner
       saveDraft();
-      // gå till map
       window.location.href = "./map.html";
     });
 
@@ -717,10 +718,6 @@
         notes: String(notes.value || "").trim()
       };
 
-      // normalisera tomma år
-      if(person.fodelsear === "") person.fodelsear = "";
-      if(person.dodsar === "") person.dodsar = "";
-
       const all = loadPeople();
       const idx = all.findIndex(x => String(x.id) === String(person.id));
       if(idx >= 0){
@@ -730,13 +727,10 @@
       }
       savePeople(all);
 
-      // rensa draft efter lyckad save så man inte “återställer gammalt”
+      // rensa draft efter lyckad save (men behåll formulärdata i edit-läge)
       clearDraft();
-
-      // håll kvar i edit-läge eller skapa ny?
       fillForm(person);
       showMsg("Sparad.");
-
       render();
     });
 
@@ -748,18 +742,18 @@
     // =====================================================
     // Boot
     // =====================================================
-    // 1) Återställ draft först (så allt kommer tillbaka)
+    // 1) Återställ draft först
     const d = loadDraft();
-    if(d) writeForm(d);
+    if(d){
+      // om draft hör till ett annat aktivt träd är det ändå OK — men vi låter det vara
+      writeForm(d);
+    }
 
-    // 2) Applicera ev. punkt från kartan (utan att tappa draft)
+    // 2) Applicera ev. punkt från kartan
     applyPickResultIfAny();
 
-    // 3) Om vi är i edit-läge enligt draft: sätt rubriker rätt
-    if(editingId){
-      formTitle.textContent = "Redigera person";
-      formSub.textContent = "Ändra uppgifter och spara.";
-    }
+    // 3) Spara direkt så allt “låses” direkt (viktigt på GitHub Pages)
+    saveDraft();
 
     render();
   </script>
