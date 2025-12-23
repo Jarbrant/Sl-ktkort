@@ -1,11 +1,10 @@
-
 <!doctype html>
 <html lang="sv">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Relationer – Släktkort</title>
-  <meta name="description" content="Skapa relationer i aktivt träd (localStorage-first). Fokusperson → relationstyp → variant → annan person." />
+  <meta name="description" content="Skapa relationer i aktivt träd (localStorage-first). Förälder–barn + Partner." />
 
   <style>
     :root { color-scheme: light; }
@@ -14,13 +13,20 @@
       line-height: 1.5;
       margin: 0;
       padding: 24px;
-      max-width: 980px;
+      max-width: 1180px;
       margin-inline: auto;
       background: #fff;
       color: #111;
     }
     a{ color: inherit; text-decoration:none; }
-    header{ margin-bottom: 14px; }
+
+    header{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:18px;
+    }
     h1{ margin:0 0 6px; font-size:1.6rem; }
     .muted{ color:#555; margin:0 0 12px; }
 
@@ -29,7 +35,7 @@
       flex-wrap:wrap;
       gap:10px;
       align-items:center;
-      margin: 10px 0 16px;
+      margin: 10px 0 0;
     }
     .btn, button{
       display:inline-block;
@@ -40,9 +46,11 @@
       font:inherit;
       cursor:pointer;
       text-decoration:none;
+      user-select:none;
     }
     .btn.secondary{ border-color:#bbb; }
     .btn.danger{ border-color:#b00020; color:#b00020; }
+    .btn:disabled{ opacity:.5; cursor:not-allowed; }
 
     .pillRow{
       display:flex;
@@ -61,19 +69,31 @@
       background:#fafafa;
       font-size:.95rem;
     }
-    .pill strong{ font-weight:950; }
+    .pill strong{ font-weight:900; }
+    .pill.ok{ border-color:#cfe8cf; background:#f5fff5; }
+    .pill.warn{ border-color:#ffe1a6; background:#fff9ee; }
+    .pill.err{ border-color:#ffb3b3; background:#fff2f2; }
+
+    .grid{
+      display:grid;
+      gap:14px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 1080px){
+      .grid{ grid-template-columns: 420px 1fr; }
+    }
 
     .card{
       border:1px solid #ddd;
       border-radius:12px;
       padding:16px;
-      margin: 14px 0;
       background:#fff;
+      position: relative;
     }
     .card h2{ margin:0 0 6px; font-size:1.15rem; }
     .small{ font-size:.95rem; color:#555; margin:0 0 10px; }
 
-    label{ display:block; margin:10px 0 6px; font-weight:900; }
+    label{ display:block; margin:10px 0 6px; font-weight:800; }
     select, input{
       width:100%;
       box-sizing:border-box;
@@ -82,14 +102,15 @@
       border:1px solid #bbb;
       font:inherit;
       background:#fff;
-      color:#111;
     }
 
-    .row{ display:grid; gap:12px; grid-template-columns: 1fr; }
-    @media (min-width: 740px){
-      .row.two{ grid-template-columns: 1fr 1fr; }
-      .row.three{ grid-template-columns: 1fr 1fr 1fr; }
-      .row.four{ grid-template-columns: 1fr 1fr 1fr 1fr; }
+    .row2{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:12px;
+    }
+    @media (min-width: 720px){
+      .row2{ grid-template-columns: 1fr 1fr; }
     }
 
     .actions{
@@ -100,10 +121,28 @@
       margin-top: 12px;
     }
 
-    .error{ color:#b00020; font-weight:950; }
-    .ok{ font-weight:950; }
+    .hintBox{
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid #ffe1a6;
+      background: #fff9ee;
+    }
+    .okBox{
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid #cfe8cf;
+      background: #f5fff5;
+    }
+    .errBox{
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid #ffb3b3;
+      background: #fff2f2;
+    }
 
-    /* Sökresultat */
     .list{
       margin: 10px 0 0;
       padding: 0;
@@ -111,10 +150,10 @@
       display:flex;
       flex-direction:column;
       gap:10px;
-      max-height: 320px;
+      max-height: 520px;
       overflow:auto;
-      border-top:1px solid #eee;
-      padding-top:10px;
+      border-top: 1px solid #eee;
+      padding-top: 10px;
     }
     .item{
       border:1px solid #eee;
@@ -125,116 +164,123 @@
       align-items:flex-start;
       justify-content:space-between;
       gap:10px;
-      cursor:pointer;
     }
-    .item:hover{ background:#fafafa; }
-    .item.active{ border-color:#333; background:#f7f7f7; }
-    .itemTitle{ font-weight:950; margin:0 0 2px; }
+    .itemTitle{ font-weight:900; margin:0 0 2px; }
     .itemMeta{ margin:0; color:#555; font-size:.95rem; }
+    .itemLeft{ min-width:0; }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 
     code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
+
+    .sr-only{
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
   </style>
 </head>
 
 <body>
 <header>
-  <h1>🔗 Relationer</h1>
-  <p class="muted">Fokusperson → Relationstyp → Variant (ibland) → Välj person.</p>
+  <div>
+    <h1>Relationer</h1>
+    <p class="muted">Skapa relationer i <strong>aktivt träd</strong>. Förälder–Barn och Partner.</p>
 
-  <nav class="topbar" aria-label="Navigation">
-    <a class="btn secondary" href="../start.html">Start</a>
-    <a class="btn secondary" href="./trees.html">Träd</a>
-    <a class="btn secondary" href="./slaktkort.html">Personer</a>
-    <a class="btn" href="./create-relation.html" aria-current="page">Relationer</a>
-    <a class="btn secondary" href="./map.html">Karta</a>
+    <nav class="topbar" aria-label="Navigation">
+      <a class="btn secondary" href="../start.html">Start</a>
+      <a class="btn secondary" href="./trees.html">Träd</a>
+      <a class="btn secondary" href="./slaktkort.html">Personer</a>
+      <a class="btn" href="./create-relation.html">Relationer</a>
+      <a class="btn secondary" href="./map.html">Karta</a>
+    </nav>
+  </div>
+
+  <div class="actions" style="justify-content:flex-end;">
     <button id="logoutBtn" class="btn secondary" type="button">Logga ut</button>
-  </nav>
-
-  <div class="pillRow" aria-label="Status">
-    <span class="pill">Aktivt träd: <strong id="pillTree">—</strong></span>
-    <span class="pill">Personer: <strong id="pillPeople">0</strong></span>
-    <span class="pill">Relationer: <strong id="pillRels">0</strong></span>
-    <span class="pill">Nästa steg: <strong>🗺️ Karta</strong></span>
   </div>
+</header>
 
-  <div class="row two">
-    <div>
-      <label for="focusSearch">Sök fokusperson *</label>
-      <input id="focusSearch" placeholder="minst 3 bokstäver…" autocomplete="off" />
-      <ul id="focusList" class="list" aria-label="Fokusperson-förslag"></ul>
-    </div>
-
-    <div>
-      <label>Vald fokusperson</label>
-      <p class="small" id="focusSummary">—</p>
-    </div>
-  </div>
-
-  <p id="msgTop" class="muted" aria-live="polite"></p>
+<section class="pillRow" aria-label="Status">
+  <span id="pillTree" class="pill warn">Aktivt träd: <strong>—</strong></span>
+  <span id="pillPeople" class="pill">Personer: <strong>0</strong></span>
+  <span id="pillRel" class="pill">Relationer: <strong>0</strong></span>
 </section>
 
-<section class="card">
-  <h2>2) Skapa relation</h2>
-  <p class="small">Variant-rutan visas bara när den gör nytta (t.ex. farmor/farfar/mormor/morfar).</p>
+<div class="grid">
+  <!-- VÄNSTER: FORM -->
+  <section class="card" aria-label="Skapa relation">
+    <h2>Skapa relation</h2>
+    <p class="small">Välj två personer. Systemet hindrar relation till sig själv.</p>
 
-  <form id="form">
-    <div class="row four">
+    <div id="hint" class="hintBox" hidden></div>
+    <div id="ok" class="okBox" hidden></div>
+    <div id="err" class="errBox" hidden></div>
+
+    <label for="relType">Relationstyp</label>
+    <select id="relType">
+      <option value="FORALDER_BARN">Förälder → Barn</option>
+      <option value="PARTNER">Partner</option>
+    </select>
+
+    <div id="partnerVariantWrap" hidden>
+      <label for="partnerVariant">Partner-variant</label>
+      <select id="partnerVariant">
+        <option value="GIFT">Gift</option>
+        <option value="SAMBO">Sambo</option>
+        <option value="SARBO">Särbo</option>
+        <option value="SKILDA">Skilda</option>
+      </select>
+      <p class="small" style="margin:8px 0 0;">Tips: Varianten påverkar bara metadata (inte logiken).</p>
+    </div>
+
+    <div class="row2">
       <div>
-        <label for="relationKey">Relationstyp *</label>
-        <select id="relationKey" required>
-          <option value="PARENT_OF" selected>Förälder till</option>
-          <option value="CHILD_OF">Barn till</option>
-
-          <option value="SIBLING_OF">Syskon med</option>
-
-          <option value="GRANDPARENT_OF">Far-/morförälder till</option>
-          <option value="GRANDCHILD_OF">Barnbarn till</option>
-
-          <option value="PARTNER_OF">Partner med</option>
-
-          <option value="AUNTUNCLE_MATERNAL">Moster/Morbror till</option>
-          <option value="AUNTUNCLE_PATERNAL">Faster/Farbror till</option>
-
-          <option value="COUSIN_OF">Kusin med</option>
-
-          <option value="STEP_PARENT_OF">Styvförälder till</option>
-          <option value="STEP_CHILD_OF">Styvbarn till</option>
-        </select>
+        <label for="personA">Person A</label>
+        <select id="personA"></select>
       </div>
-
-      <div id="variantWrap" hidden>
-        <label for="variantSelect" id="variantLabel">Variant (valfri)</label>
-        <select id="variantSelect">
-          <option value="">Ingen</option>
-        </select>
-        <p class="small" id="variantHelp">—</p>
-      </div>
-
       <div>
-        <label for="otherSelect" id="otherLabel">Person *</label>
-        <select id="otherSelect" required>
-          <option value="">Välj…</option>
-        </select>
-        <p class="small" id="otherHelp">—</p>
-      </div>
-
-      <div>
-        <label>Förhandsvisning</label>
-        <p class="small" id="previewLine">Välj fokusperson först.</p>
+        <label for="personB">Person B</label>
+        <select id="personB"></select>
       </div>
     </div>
 
     <div class="actions">
-      <button type="submit" class="btn">Spara relation</button>
-      <button type="button" id="resetBtn" class="btn secondary">Rensa val</button>
-      <a class="btn secondary" href="./map.html">Fortsätt → Karta</a>
+      <button id="createBtn" class="btn" type="button">Skapa relation</button>
+      <button id="swapBtn" class="btn secondary" type="button">Byt plats (A↔B)</button>
+      <button id="clearBtn" class="btn secondary" type="button">Rensa</button>
     </div>
 
-    <p id="msgSave" class="muted" aria-live="polite"></p>
-  </form>
-</section>
+    <div class="hintBox" style="margin-top:14px;">
+      <strong>Viktigt</strong>
+      <div class="small" style="margin-top:6px;">
+        Relationer sparas per träd i <code>slakttradet_relationer_&lt;treeId&gt;</code>.<br/>
+        Partner sparas även som <code>personAId</code>/<code>personBId</code> (kompatibelt med kartan).
+      </div>
+    </div>
+  </section>
+
+  <!-- HÖGER: LISTA -->
+  <section class="card" aria-label="Relationer i aktivt träd">
+    <h2>Relationer i aktivt träd</h2>
+    <p class="small">Du kan ta bort en relation här.</p>
+
+    <div class="actions">
+      <button id="refreshBtn" class="btn secondary" type="button">Uppdatera</button>
+      <a class="btn secondary" href="./slaktkort.html">Gå till Personer</a>
+      <a class="btn secondary" href="./map.html">Gå till Karta</a>
+    </div>
+
+    <ul id="list" class="list" aria-label="Lista med relationer"></ul>
+
+    <p class="small" id="tech" style="margin-top:10px;">—</p>
+  </section>
+</div>
 
 <script>
+  "use strict";
+
+  // =====================================================
+  // DEMO AUTH GUARD (matchar dina andra sidor)
+  // =====================================================
   (function authGuard(){
     try{
       if(sessionStorage.getItem("demo_auth") !== "1"){
@@ -243,46 +289,55 @@
     }catch{}
   })();
 
+  // =====================================================
+  // STORAGE KEYS (LÅSTA)
+  // =====================================================
   const KEY_TREES  = "slakttradet_trees";
   const KEY_ACTIVE = "slakttradet_active_tree_id";
   const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
   const relKey   = (treeId) => "slakttradet_relationer_" + String(treeId);
 
+  // =====================================================
+  // DOM
+  // =====================================================
   const logoutBtn = document.getElementById("logoutBtn");
 
   const pillTree = document.getElementById("pillTree");
   const pillPeople = document.getElementById("pillPeople");
-  const pillRels = document.getElementById("pillRels");
+  const pillRel = document.getElementById("pillRel");
 
-  const focusSearch = document.getElementById("focusSearch");
-  const focusList = document.getElementById("focusList");
-  const focusSummary = document.getElementById("focusSummary");
-  const msgTop = document.getElementById("msgTop");
+  const hintEl = document.getElementById("hint");
+  const okEl = document.getElementById("ok");
+  const errEl = document.getElementById("err");
 
-  const relationKeyEl = document.getElementById("relationKey");
+  const relTypeEl = document.getElementById("relType");
+  const partnerVariantWrap = document.getElementById("partnerVariantWrap");
+  const partnerVariantEl = document.getElementById("partnerVariant");
 
-  const variantWrap = document.getElementById("variantWrap");
-  const variantSelect = document.getElementById("variantSelect");
-  const variantLabel = document.getElementById("variantLabel");
-  const variantHelp = document.getElementById("variantHelp");
+  const personAEl = document.getElementById("personA");
+  const personBEl = document.getElementById("personB");
 
-  const otherSelect = document.getElementById("otherSelect");
-  const otherLabel = document.getElementById("otherLabel");
-  const otherHelp = document.getElementById("otherHelp");
+  const createBtn = document.getElementById("createBtn");
+  const swapBtn = document.getElementById("swapBtn");
+  const clearBtn = document.getElementById("clearBtn");
 
-  const previewLine = document.getElementById("previewLine");
-  const msgSave = document.getElementById("msgSave");
+  const refreshBtn = document.getElementById("refreshBtn");
+  const listEl = document.getElementById("list");
+  const techEl = document.getElementById("tech");
 
-  const resetBtn = document.getElementById("resetBtn");
-  const form = document.getElementById("form");
-
-  function safeParse(raw, fallback){ try{ return JSON.parse(raw); }catch{ return fallback; } }
+  // =====================================================
+  // HELPERS
+  // =====================================================
+  function safeParse(raw, fallback){
+    try{ return JSON.parse(raw); }catch{ return fallback; }
+  }
   function loadJson(key, fallback){
     const raw = localStorage.getItem(key);
     return raw ? safeParse(raw, fallback) : fallback;
   }
-  function saveJson(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
-
+  function saveJson(key, value){
+    localStorage.setItem(key, JSON.stringify(value));
+  }
   function escapeHtml(s){
     return String(s || "")
       .replaceAll("&","&amp;")
@@ -291,19 +346,27 @@
       .replaceAll('"',"&quot;")
       .replaceAll("'","&#039;");
   }
-  function setMsg(el, type, text){
-    el.innerHTML = type === "error"
-      ? "<span class='error'>" + escapeHtml(text) + "</span>"
-      : type === "ok"
-        ? "<span class='ok'>" + escapeHtml(text) + "</span>"
-        : escapeHtml(text || "");
+  function nowId(){
+    return "r_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,8);
+  }
+
+  function setBox(el, html){
+    el.hidden = false;
+    el.innerHTML = html;
+  }
+  function clearBoxes(){
+    hintEl.hidden = true; hintEl.innerHTML = "";
+    okEl.hidden = true; okEl.innerHTML = "";
+    errEl.hidden = true; errEl.innerHTML = "";
   }
 
   function getTrees(){
-    const trees = loadJson(KEY_TREES, []);
-    return Array.isArray(trees) ? trees : [];
+    const arr = loadJson(KEY_TREES, []);
+    return Array.isArray(arr) ? arr : [];
   }
-  function activeTreeId(){ return localStorage.getItem(KEY_ACTIVE) || ""; }
+  function activeTreeId(){
+    return localStorage.getItem(KEY_ACTIVE) || "";
+  }
   function activeTreeLabel(){
     const id = activeTreeId();
     if(!id) return "—";
@@ -317,361 +380,367 @@
     const arr = loadJson(cardsKey(t), []);
     return Array.isArray(arr) ? arr : [];
   }
-  function loadRels(){
+  function loadRelations(){
     const t = activeTreeId();
     if(!t) return [];
     const arr = loadJson(relKey(t), []);
     return Array.isArray(arr) ? arr : [];
   }
-  function saveRels(rels){
+  function saveRelations(arr){
     const t = activeTreeId();
     if(!t) return;
-    saveJson(relKey(t), rels);
+    saveJson(relKey(t), Array.isArray(arr) ? arr : []);
   }
 
   function personName(p){
     const n = `${p.fornamn || ""} ${p.efternamn || ""}`.trim();
     return n || "(namnlös)";
   }
-  function getPersonById(people, id){
-    return people.find(x => String(x.id) === String(id)) || null;
+  function yearsLine(p){
+    const a = (p && p.fodelsear != null && String(p.fodelsear).trim() !== "") ? String(p.fodelsear).trim() : "";
+    const b = (p && p.dodsar != null && String(p.dodsar).trim() !== "") ? String(p.dodsar).trim() : "";
+    if(!a && !b) return "";
+    if(a && b) return `${a}–${b}`;
+    return a ? `${a}–` : `–${b}`;
   }
 
-  const REL_META = {
-    PARENT_OF:          { label:"Förälder till",         otherLabel:"Barn *",            help:"Fokuspersonen är förälder. Den andra är barn.", symmetric:false, type:"PARENTCHILD" },
-    CHILD_OF:           { label:"Barn till",             otherLabel:"Förälder *",        help:"Fokuspersonen är barn. Den andra är förälder.", symmetric:false, type:"PARENTCHILD" },
+  // =====================================================
+  // DROPDOWN RENDER (utan självrelation + korsfilter)
+  // =====================================================
+  let cachedPeople = [];
 
-    SIBLING_OF:         { label:"Syskon med",            otherLabel:"Syskon *",          help:"Syskonrelation (symmetrisk).", symmetric:true,  type:"GENERIC" },
+  function buildOptions(selectEl, people, selectedId, disallowId){
+    selectEl.innerHTML = "";
 
-    GRANDPARENT_OF:     { label:"Far-/morförälder till", otherLabel:"Barnbarn *",        help:"Fokuspersonen är far-/morförälder. Den andra är barnbarn.", symmetric:false, type:"GENERIC" },
-    GRANDCHILD_OF:      { label:"Barnbarn till",         otherLabel:"Far-/morförälder *",help:"Fokuspersonen är barnbarn. Den andra är far-/morförälder.", symmetric:false, type:"GENERIC" },
+    const opt0 = document.createElement("option");
+    opt0.value = "";
+    opt0.textContent = "Välj…";
+    selectEl.appendChild(opt0);
 
-    PARTNER_OF:         { label:"Partner med",           otherLabel:"Partner *",         help:"Partnerrelation (symmetrisk).", symmetric:true,  type:"PARTNER" },
+    for(const p of people){
+      const pid = String(p.id);
+      if(disallowId && pid === String(disallowId)) continue;
 
-    AUNTUNCLE_MATERNAL: { label:"Moster/Morbror till",   otherLabel:"Syskonbarn *",      help:"Fokuspersonen är moster/morbror. Den andra är syskonbarn.", symmetric:false, type:"GENERIC" },
-    AUNTUNCLE_PATERNAL: { label:"Faster/Farbror till",   otherLabel:"Syskonbarn *",      help:"Fokuspersonen är faster/farbror. Den andra är syskonbarn.", symmetric:false, type:"GENERIC" },
-
-    COUSIN_OF:          { label:"Kusin med",             otherLabel:"Kusin *",           help:"Kusinrelation (symmetrisk).", symmetric:true,  type:"GENERIC" },
-
-    STEP_PARENT_OF:     { label:"Styvförälder till",     otherLabel:"Styvbarn *",        help:"Relation via omgifte/ny partner.", symmetric:false, type:"GENERIC" },
-    STEP_CHILD_OF:      { label:"Styvbarn till",         otherLabel:"Styvförälder *",    help:"Relation via omgifte/ny partner.", symmetric:false, type:"GENERIC" }
-  };
-
-  const VARIANTS = {
-    PARENT_OF:     { label:"Föräldervariant", help:"Valfritt: mamma eller pappa.", options:[
-      {v:"MAMMA", t:"Mamma"}, {v:"PAPPA", t:"Pappa"}
-    ]},
-    CHILD_OF:      { label:"Barnvariant", help:"Valfritt: son eller dotter.", options:[
-      {v:"SON", t:"Son"}, {v:"DOTTER", t:"Dotter"}
-    ]},
-    GRANDPARENT_OF:{ label:"Variant", help:"Valfritt: farmor/farfar/mormor/morfar.", options:[
-      {v:"FARMOR", t:"Farmor"}, {v:"FARFAR", t:"Farfar"}, {v:"MORMOR", t:"Mormor"}, {v:"MORFAR", t:"Morfar"}
-    ]},
-    GRANDCHILD_OF: { label:"Variant", help:"Valfritt: barnbarn (om du vill skriva ut).", options:[
-      {v:"BARNBARN", t:"Barnbarn"}
-    ]},
-    AUNTUNCLE_MATERNAL:{ label:"Variant", help:"Valfritt: moster eller morbror.", options:[
-      {v:"MOSTER", t:"Moster"}, {v:"MORBROR", t:"Morbror"}
-    ]},
-    AUNTUNCLE_PATERNAL:{ label:"Variant", help:"Valfritt: faster eller farbror.", options:[
-      {v:"FASTER", t:"Faster"}, {v:"FARBROR", t:"Farbror"}
-    ]},
-    PARTNER_OF: { label:"Partnerstatus", help:"Valfritt: typ av partnerrelation.", options:[
-      {v:"MAKE_MAKA", t:"Make/Maka"}, {v:"SAMBO", t:"Sambo"}, {v:"SARBO", t:"Särbo"}, {v:"SKILDA", t:"Skilda"}
-    ]},
-    STEP_PARENT_OF:{ label:"Variant", help:"Valfritt: styvförälder.", options:[
-      {v:"STYVFORALDER", t:"Styvförälder"}
-    ]},
-    STEP_CHILD_OF:{ label:"Variant", help:"Valfritt: styvbarn.", options:[
-      {v:"STYVBARN", t:"Styvbarn"}
-    ]}
-  };
-
-  function relLabel(key){
-    return (REL_META[key] && REL_META[key].label) ? REL_META[key].label : key;
+      const opt = document.createElement("option");
+      opt.value = pid;
+      opt.textContent = personName(p) + (yearsLine(p) ? (" · " + yearsLine(p)) : "");
+      if(selectedId && pid === String(selectedId)) opt.selected = true;
+      selectEl.appendChild(opt);
+    }
   }
 
-  function hasSameParentChild(rels, parentId, childId){
-    return rels.some(r =>
-      r && r.typ === "FORALDER_BARN" &&
-      String(r.franPersonId) === String(parentId) &&
-      String(r.tillPersonId) === String(childId)
-    );
-  }
-  function parentsOfChild(rels, childId){
-    return rels
-      .filter(r => r && r.typ === "FORALDER_BARN" && String(r.tillPersonId) === String(childId))
-      .map(r => String(r.franPersonId));
-  }
-  function hasSamePartner(rels, aId, bId){
-    const A = String(aId), B = String(bId);
-    return rels.some(r => {
-      if(!r || r.typ !== "PARTNER") return false;
-      const x = String(r.personAId), y = String(r.personBId);
-      return (x === A && y === B) || (x === B && y === A);
-    });
-  }
-  function hasSameGeneric(rels, relationKey, aId, bId, symmetric, variant){
-    const A = String(aId), B = String(bId);
-    const V = String(variant || "");
-    return rels.some(r => {
-      if(!r || r.typ !== "GENERIC") return false;
-      if(String(r.relationKey) !== String(relationKey)) return false;
-      if(String(r.variant || "") !== V) return false;
-      const x = String(r.personAId), y = String(r.personBId);
-      if(symmetric) return (x === A && y === B) || (x === B && y === A);
-      return (x === A && y === B);
-    });
+  function syncDropdowns(keepA, keepB){
+    const a = keepA != null ? String(keepA) : String(personAEl.value || "");
+    const b = keepB != null ? String(keepB) : String(personBEl.value || "");
+
+    // A får inte visa B, B får inte visa A
+    buildOptions(personAEl, cachedPeople, a, b || null);
+    buildOptions(personBEl, cachedPeople, b, a || null);
+
+    // om valet blev ogiltigt (försvann), rensa
+    if(a && personAEl.value !== a) personAEl.value = "";
+    if(b && personBEl.value !== b) personBEl.value = "";
   }
 
-  function renderStatus(){
-    const t = activeTreeId();
-    const people = loadPeople();
-    const rels = loadRels();
+  // =====================================================
+  // RELATION NORMALIZATION + DUPLICATE CHECK
+  // =====================================================
+  function normalizeForStore(rel){
+    // Säkerställ: id, typ, createdAt
+    const r = Object.assign({}, rel);
+    if(!r.id) r.id = nowId();
+    if(!r.createdAt) r.createdAt = Date.now();
 
-    pillTree.textContent = activeTreeLabel();
-    pillPeople.textContent = String(people.length);
-    pillRels.textContent = String(rels.length);
+    // Typ
+    r.typ = String(r.typ || "").toUpperCase();
 
-    if(!t){
-      setMsg(msgTop, "error", "Välj ett aktivt träd först (Träd).");
+    // Standardfält för karta/adapter
+    if(r.typ === "FORALDER_BARN"){
+      r.franPersonId = String(r.franPersonId || "");
+      r.tillPersonId = String(r.tillPersonId || "");
+    }
+    if(r.typ === "PARTNER"){
+      // kompatibelt format (kartan läser personAId/personBId)
+      r.personAId = String(r.personAId || r.personA || r.aId || r.a || "");
+      r.personBId = String(r.personBId || r.personB || r.bId || r.b || "");
+      r.variant = String(r.variant || "").toUpperCase();
+    }
+    return r;
+  }
+
+  function isDuplicate(existing, candidate){
+    if(!existing || !candidate) return false;
+
+    if(existing.typ === "FORALDER_BARN" && candidate.typ === "FORALDER_BARN"){
+      const a1 = String(existing.franPersonId || "");
+      const b1 = String(existing.tillPersonId || "");
+      const a2 = String(candidate.franPersonId || "");
+      const b2 = String(candidate.tillPersonId || "");
+      return a1 === a2 && b1 === b2;
+    }
+
+    if(existing.typ === "PARTNER" && candidate.typ === "PARTNER"){
+      const ea = String(existing.personAId || existing.personA || existing.aId || existing.a || "");
+      const eb = String(existing.personBId || existing.personB || existing.bId || existing.b || "");
+      const ca = String(candidate.personAId || candidate.personA || candidate.aId || candidate.a || "");
+      const cb = String(candidate.personBId || candidate.personB || candidate.bId || candidate.b || "");
+
+      // partner är symmetrisk (A-B == B-A)
+      const lowE = ea < eb ? ea : eb;
+      const highE = ea < eb ? eb : ea;
+      const lowC = ca < cb ? ca : cb;
+      const highC = ca < cb ? cb : ca;
+
+      // variant spelar inte roll för dublettskydd (du kan byta variant via delete+add)
+      return lowE === lowC && highE === highC;
+    }
+
+    return false;
+  }
+
+  // =====================================================
+  // UI RENDER
+  // =====================================================
+  function renderPills(){
+    const trees = getTrees();
+    const act = activeTreeId();
+    const hasTrees = trees.length > 0;
+    const hasActive = !!act && trees.some(t => String(t.id) === String(act));
+
+    pillTree.className = "pill " + (hasActive ? "ok" : (hasTrees ? "warn" : "err"));
+    pillTree.innerHTML = "Aktivt träd: <strong>" + escapeHtml(hasActive ? activeTreeLabel() : "—") + "</strong>";
+
+    const ppl = hasActive ? cachedPeople.length : 0;
+    const rels = hasActive ? loadRelations().length : 0;
+
+    pillPeople.innerHTML = "Personer: <strong>" + ppl + "</strong>";
+    pillRel.innerHTML = "Relationer: <strong>" + rels + "</strong>";
+  }
+
+  function renderHint(){
+    const trees = getTrees();
+    const act = activeTreeId();
+    const hasTrees = trees.length > 0;
+    const hasActive = !!act && trees.some(t => String(t.id) === String(act));
+
+    if(!hasTrees){
+      setBox(hintEl, "<strong>🚩 Inga träd:</strong> Gå till <a href='./trees.html'><code>Träd</code></a> och skapa ett träd.");
       return false;
     }
-    if(people.length === 0){
-      setMsg(msgTop, "error", "Inga personer än. Skapa personer först.");
+    if(!hasActive){
+      setBox(hintEl, "<strong>🚩 Inget aktivt träd:</strong> Välj aktivt träd i <a href='./trees.html'><code>Träd</code></a>.");
       return false;
     }
-    setMsg(msgTop, "", "");
+    if(cachedPeople.length < 2){
+      setBox(hintEl, "<strong>🚩 För få personer:</strong> Du behöver minst <code>2</code> personer i aktivt träd. Gå till <a href='./slaktkort.html'><code>Personer</code></a>.");
+      return false;
+    }
     return true;
   }
 
-  function fillSelect(select, people, includeEmpty=true, excludeId=""){
-    const ex = String(excludeId || "");
-    select.innerHTML = includeEmpty ? "<option value=''>Välj…</option>" : "";
-    for(const p of people){
-      if(!p || !p.id) continue;
-      if(ex && String(p.id) === ex) continue;
-      const opt = document.createElement("option");
-      opt.value = String(p.id);
-      opt.textContent = personName(p);
-      select.appendChild(opt);
-    }
-  }
+  function relLabel(r, peopleById){
+    if(!r || !r.typ) return "—";
 
-  let focusId = "";
-
-  function renderFocusSummary(){
-    const people = loadPeople();
-    const p = focusId ? getPersonById(people, focusId) : null;
-    focusSummary.textContent = p ? personName(p) : "—";
-    renderPreview();
-  }
-
-  function applyVariantUI(){
-    const key = String(relationKeyEl.value || "");
-    const v = VARIANTS[key];
-
-    if(!v){
-      variantWrap.hidden = true;
-      variantSelect.innerHTML = "<option value=''>Ingen</option>";
-      variantHelp.textContent = "—";
-      return;
+    if(r.typ === "FORALDER_BARN"){
+      const a = peopleById.get(String(r.franPersonId)) || null;
+      const b = peopleById.get(String(r.tillPersonId)) || null;
+      const an = a ? personName(a) : ("#" + String(r.franPersonId || "—"));
+      const bn = b ? personName(b) : ("#" + String(r.tillPersonId || "—"));
+      return "Förälder → Barn: " + an + " → " + bn;
     }
 
-    variantWrap.hidden = false;
-    variantLabel.textContent = (v.label || "Variant") + " (valfri)";
-    variantHelp.textContent = v.help || "—";
-
-    const prev = String(variantSelect.value || "");
-    variantSelect.innerHTML = "<option value=''>Ingen</option>";
-    for(const o of v.options || []){
-      const opt = document.createElement("option");
-      opt.value = o.v;
-      opt.textContent = o.t;
-      variantSelect.appendChild(opt);
-    }
-    if(prev) variantSelect.value = prev;
-  }
-
-  function applyRelationUI(){
-    const k = String(relationKeyEl.value || "");
-    const meta = REL_META[k] || { otherLabel:"Person *", help:"—" };
-
-    otherLabel.textContent = meta.otherLabel || "Person *";
-    otherHelp.textContent = meta.help || "—";
-
-    applyVariantUI();
-
-    const people = loadPeople();
-    const prevOther = String(otherSelect.value || "");
-    fillSelect(otherSelect, people, true, focusId);
-    if(prevOther && prevOther !== focusId) otherSelect.value = prevOther;
-    if(otherSelect.value === focusId) otherSelect.value = "";
-
-    renderPreview();
-  }
-
-  function renderPreview(){
-    const people = loadPeople();
-    const otherId = String(otherSelect.value || "");
-    const relK = String(relationKeyEl.value || "");
-    const variant = String(variantSelect.value || "");
-
-    const a = focusId ? getPersonById(people, focusId) : null;
-    const b = otherId ? getPersonById(people, otherId) : null;
-
-    if(!a){
-      previewLine.textContent = "Välj fokusperson först.";
-      return;
+    if(r.typ === "PARTNER"){
+      const aId = String(r.personAId || "");
+      const bId = String(r.personBId || "");
+      const a = peopleById.get(aId) || null;
+      const b = peopleById.get(bId) || null;
+      const an = a ? personName(a) : ("#" + (aId || "—"));
+      const bn = b ? personName(b) : ("#" + (bId || "—"));
+      const v = r.variant ? (" · " + r.variant) : "";
+      return "Partner: " + an + " ↔ " + bn + v;
     }
 
-    const mid = relLabel(relK) + (variant ? (" (" + variant + ")") : "");
-    previewLine.textContent = personName(a) + " — " + mid + " — " + (b ? personName(b) : "…");
+    return r.typ;
   }
 
-  function renderFocusResults(){
-    focusList.innerHTML = "";
-    const ok = renderStatus();
-    if(!ok) return;
+  function renderList(){
+    listEl.innerHTML = "";
 
-    const q = String(focusSearch.value || "").trim().toLowerCase();
-    if(q.length < 3) return; // AUTOPATCH: visa inget innan 3 tecken
+    const trees = getTrees();
+    const act = activeTreeId();
+    const hasActive = !!act && trees.some(t => String(t.id) === String(act));
 
-    const people = loadPeople();
-    const hits = people
-      .filter(p => personName(p).toLowerCase().includes(q))
-      .slice(0, 40);
-
-    if(hits.length === 0) return;
-
-    for(const p of hits){
+    if(!hasActive){
       const li = document.createElement("li");
-      li.className = "item" + (String(p.id) === String(focusId) ? " active" : "");
-      li.innerHTML =
-        "<div style='min-width:0;'>" +
-          "<p class='itemTitle'>" + escapeHtml(personName(p)) + "</p>" +
-          "<p class='itemMeta'>ID: " + escapeHtml(String(p.id)) + "</p>" +
-        "</div>";
+      li.className = "item";
+      li.style.cursor = "default";
+      li.innerHTML = "<div class='itemLeft'><p class='itemTitle'>—</p><p class='itemMeta'>Välj aktivt träd först.</p></div>";
+      listEl.appendChild(li);
+      return;
+    }
 
-      li.addEventListener("click", () => {
-        focusId = String(p.id);
-        setMsg(msgSave, "", "");
-        renderFocusSummary();
-        applyRelationUI();
-        renderFocusResults();
+    const people = cachedPeople;
+    const rels = loadRelations();
+
+    if(rels.length === 0){
+      const li = document.createElement("li");
+      li.className = "item";
+      li.style.cursor = "default";
+      li.innerHTML = "<div class='itemLeft'><p class='itemTitle'>Inga relationer ännu</p><p class='itemMeta'>Skapa en relation till vänster.</p></div>";
+      listEl.appendChild(li);
+      return;
+    }
+
+    const peopleById = new Map(people.map(p => [String(p.id), p]));
+
+    for(const r of rels){
+      const li = document.createElement("li");
+      li.className = "item";
+
+      const left = document.createElement("div");
+      left.className = "itemLeft";
+
+      const title = document.createElement("p");
+      title.className = "itemTitle";
+      title.textContent = relLabel(r, peopleById);
+
+      const meta = document.createElement("p");
+      meta.className = "itemMeta mono";
+      meta.textContent = "id: " + (r.id || "—") + " · typ: " + (r.typ || "—");
+
+      left.appendChild(title);
+      left.appendChild(meta);
+
+      const del = document.createElement("button");
+      del.className = "btn danger";
+      del.type = "button";
+      del.textContent = "Ta bort";
+      del.addEventListener("click", () => {
+        const ok = confirm("Ta bort relation?\n\n" + relLabel(r, peopleById));
+        if(!ok) return;
+        const next = rels.filter(x => String(x.id) !== String(r.id));
+        saveRelations(next);
+        clearBoxes();
+        setBox(okEl, "<strong>Borttaget.</strong>");
+        refresh();
       });
 
-      focusList.appendChild(li);
+      li.appendChild(left);
+      li.appendChild(del);
+      listEl.appendChild(li);
     }
   }
 
-  function refreshAll(){
-    setMsg(msgSave, "", "");
-    const ok = renderStatus();
-    if(!ok) return;
-
-    const people = loadPeople();
-    if(focusId && !getPersonById(people, focusId)) focusId = "";
-
-    renderFocusSummary();
-    applyRelationUI();
-    renderFocusResults();
-  }
-
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-
+  function renderTech(){
     const t = activeTreeId();
-    if(!t) return setMsg(msgSave, "error", "Välj ett aktivt träd först.");
+    techEl.textContent =
+      "Aktivt treeId: " + (t || "—") +
+      " · PeopleKey: " + (t ? cardsKey(t) : "—") +
+      " · RelationsKey: " + (t ? relKey(t) : "—");
+  }
 
-    const otherId = String(otherSelect.value || "").trim();
-    const key = String(relationKeyEl.value || "").trim();
-    const variant = String(variantSelect.value || "");
+  // =====================================================
+  // CORE ACTION: CREATE
+  // =====================================================
+  function createRelation(){
+    clearBoxes();
 
-    if(!focusId) return setMsg(msgSave, "error", "Välj fokusperson först.");
-    if(!key) return setMsg(msgSave, "error", "Välj relationstyp.");
-    if(!otherId) return setMsg(msgSave, "error", "Välj den andra personen.");
-    if(otherId === focusId) return setMsg(msgSave, "error", "Du kan inte välja samma person.");
+    const trees = getTrees();
+    const act = activeTreeId();
+    const hasActive = !!act && trees.some(t => String(t.id) === String(act));
+    if(!hasActive){
+      setBox(errEl, "<strong>Välj aktivt träd först.</strong> Gå till <a href='./trees.html'><code>Träd</code></a>.");
+      return;
+    }
 
-    const rels = loadRels();
-    const meta = REL_META[key] || { symmetric:false, type:"GENERIC" };
+    const typ = String(relTypeEl.value || "").toUpperCase();
+    const aId = String(personAEl.value || "");
+    const bId = String(personBEl.value || "");
 
-    if(meta.type === "PARENTCHILD"){
-      const parentId = (key === "PARENT_OF") ? focusId : otherId;
-      const childId  = (key === "PARENT_OF") ? otherId : focusId;
+    if(!aId || !bId){
+      setBox(errEl, "<strong>Välj två personer.</strong>");
+      return;
+    }
+    if(aId === bId){
+      setBox(errEl, "<strong>Du kan inte koppla en person till sig själv.</strong>");
+      return;
+    }
 
-      if(hasSameParentChild(rels, parentId, childId)) return setMsg(msgSave, "error", "Redan kopplad.");
-      const parents = new Set(parentsOfChild(rels, childId));
-      if(parents.size >= 2) return setMsg(msgSave, "error", "Barnet har redan 2 föräldrar.");
+    const rels = loadRelations();
 
-      rels.push({
-        id: "r" + Date.now(),
+    let candidate = null;
+
+    if(typ === "FORALDER_BARN"){
+      candidate = normalizeForStore({
+        id: nowId(),
         typ: "FORALDER_BARN",
-        franPersonId: parentId,
-        tillPersonId: childId,
-        variant: variant || "",
-        createdAt: new Date().toISOString()
+        franPersonId: aId,
+        tillPersonId: bId
       });
-
-      saveRels(rels);
-      pillRels.textContent = String(rels.length);
-      otherSelect.value = "";
-      setMsg(msgSave, "ok", "Sparat: Förälder ↔ Barn.");
-      renderPreview();
-      return;
-    }
-
-    if(meta.type === "PARTNER"){
-      if(hasSamePartner(rels, focusId, otherId)) return setMsg(msgSave, "error", "Partnerrelation finns redan.");
-
-      rels.push({
-        id: "r" + Date.now(),
+    }else if(typ === "PARTNER"){
+      const variant = String(partnerVariantEl.value || "GIFT").toUpperCase();
+      candidate = normalizeForStore({
+        id: nowId(),
         typ: "PARTNER",
-        personAId: focusId,
-        personBId: otherId,
-        variant: variant || "",
-        createdAt: new Date().toISOString()
+        personAId: aId,
+        personBId: bId,
+        variant
       });
-
-      saveRels(rels);
-      pillRels.textContent = String(rels.length);
-      otherSelect.value = "";
-      setMsg(msgSave, "ok", "Sparat: Partner.");
-      renderPreview();
+    }else{
+      setBox(errEl, "<strong>Okänd relationstyp.</strong>");
       return;
     }
 
-    if(hasSameGeneric(rels, key, focusId, otherId, !!meta.symmetric, variant)) {
-      return setMsg(msgSave, "error", "Relationen finns redan.");
+    // dublettskydd
+    if(rels.some(x => isDuplicate(x, candidate))){
+      setBox(errEl, "<strong>Relationen finns redan.</strong>");
+      return;
     }
 
-    rels.push({
-      id: "r" + Date.now(),
-      typ: "GENERIC",
-      relationKey: key,
-      personAId: focusId,
-      personBId: otherId,
-      symmetric: !!meta.symmetric,
-      variant: variant || "",
-      createdAt: new Date().toISOString()
-    });
+    rels.unshift(candidate);
+    saveRelations(rels);
 
-    saveRels(rels);
-    pillRels.textContent = String(rels.length);
-    otherSelect.value = "";
-    setMsg(msgSave, "ok", "Sparat: " + relLabel(key) + ".");
-    renderPreview();
+    setBox(okEl, "<strong>Sparat.</strong> Relation skapad i aktivt träd.");
+    refresh();
+  }
+
+  // =====================================================
+  // EVENTS
+  // =====================================================
+  relTypeEl.addEventListener("change", () => {
+    const typ = String(relTypeEl.value || "").toUpperCase();
+    partnerVariantWrap.hidden = (typ !== "PARTNER");
   });
 
-  relationKeyEl.addEventListener("change", () => applyRelationUI());
-  variantSelect.addEventListener("change", () => renderPreview());
-  otherSelect.addEventListener("change", () => renderPreview());
+  personAEl.addEventListener("change", () => {
+    // om A ändras, synka B
+    syncDropdowns(personAEl.value, personBEl.value);
+  });
+  personBEl.addEventListener("change", () => {
+    syncDropdowns(personAEl.value, personBEl.value);
+  });
 
-  resetBtn.addEventListener("click", () => {
-    otherSelect.value = "";
-    variantSelect.value = "";
-    setMsg(msgSave, "", "");
-    renderPreview();
+  createBtn.addEventListener("click", createRelation);
+
+  swapBtn.addEventListener("click", () => {
+    clearBoxes();
+    const a = String(personAEl.value || "");
+    const b = String(personBEl.value || "");
+    syncDropdowns(b, a);
+  });
+
+  clearBtn.addEventListener("click", () => {
+    clearBoxes();
+    relTypeEl.value = "FORALDER_BARN";
+    partnerVariantWrap.hidden = true;
+    partnerVariantEl.value = "GIFT";
+    syncDropdowns("", "");
+    try{ personAEl.focus(); }catch{}
+  });
+
+  refreshBtn.addEventListener("click", () => {
+    clearBoxes();
+    refresh();
   });
 
   logoutBtn.addEventListener("click", () => {
@@ -679,15 +748,34 @@
     window.location.href = "../index.html";
   });
 
-  let t1 = null;
-  focusSearch.addEventListener("input", () => {
-    if(t1) clearTimeout(t1);
-    t1 = setTimeout(renderFocusResults, 120);
-  });
+  // =====================================================
+  // REFRESH
+  // =====================================================
+  function refresh(){
+    clearBoxes();
 
-  window.addEventListener("focus", () => refreshAll());
+    cachedPeople = loadPeople();
+    renderPills();
+    renderTech();
 
-  refreshAll();
+    // hint + early exits
+    const ok = renderHint();
+    partnerVariantWrap.hidden = (String(relTypeEl.value || "").toUpperCase() !== "PARTNER");
+
+    // render dropdowns
+    syncDropdowns(personAEl.value, personBEl.value);
+
+    // disable create if not ok
+    createBtn.disabled = !ok;
+
+    // list
+    renderList();
+  }
+
+  // =====================================================
+  // START
+  // =====================================================
+  refresh();
 </script>
 </body>
 </html>
