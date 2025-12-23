@@ -37,6 +37,7 @@
       align-items:center;
       margin: 10px 0 0;
     }
+
     .btn, button{
       display:inline-block;
       padding:10px 12px;
@@ -49,8 +50,7 @@
       user-select:none;
     }
     .btn.secondary{ border-color:#bbb; }
-    .btn.danger{ border-color:#b00020; color:#b00020; }
-    .btn:disabled{ opacity:.5; cursor:not-allowed; }
+    .btn:disabled{ opacity:.55; cursor:not-allowed; }
 
     .pillRow{
       display:flex;
@@ -88,7 +88,6 @@
       border-radius:12px;
       padding:16px;
       background:#fff;
-      position: relative;
     }
     .card h2{ margin:0 0 6px; font-size:1.15rem; }
     .small{ font-size:.95rem; color:#555; margin:0 0 10px; }
@@ -132,11 +131,20 @@
       cursor:pointer;
     }
     .item:hover{ background:#fafafa; }
+
     .item.active{
       border-color:#7fcf9b;
       box-shadow: 0 0 0 4px rgba(183,228,199,.35);
     }
-    .itemTitle{ font-weight:900; margin:0 0 2px; display:flex; align-items:center; gap:8px; }
+
+    .itemTitle{
+      font-weight:900;
+      margin:0 0 2px;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+    }
     .badge{
       font-size:.85rem;
       border:1px solid #ddd;
@@ -144,8 +152,12 @@
       border-radius:999px;
       background:#fafafa;
     }
-    .itemMeta{ margin:0; color:#555; font-size:.95rem; }
+    .badge.ok{
+      border-color:#cfe8cf;
+      background:#f5fff5;
+    }
     .itemSub{ margin:4px 0 0; color:#333; font-size:.95rem; }
+    .itemMeta{ margin:4px 0 0; color:#555; font-size:.95rem; }
 
     .hintBox{
       margin-top: 10px;
@@ -161,6 +173,21 @@
       border: 1px solid #cfe8cf;
       background: #f5fff5;
     }
+
+    details.tech{
+      margin-top: 14px;
+      border-radius: 12px;
+      border: 1px solid #eee;
+      background: #fafafa;
+      padding: 10px 12px;
+    }
+    details.tech > summary{
+      cursor:pointer;
+      font-weight:900;
+      list-style:none;
+    }
+    details.tech > summary::-webkit-details-marker{ display:none; }
+
     code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
   </style>
 </head>
@@ -169,11 +196,11 @@
 <header>
   <div>
     <h1>Träd</h1>
-    <p class="muted">Skapa träd och välj vilket du arbetar i. Aktivt träd styr Personer, Relationer och Karta.</p>
+    <p class="muted">Här skapar och väljer du vilket släktträd du arbetar i.</p>
 
     <nav class="topbar" aria-label="Navigation">
       <a class="btn secondary" href="../start.html">Start</a>
-      <a class="btn" href="./trees.html">Träd</a>
+      <a class="btn" href="./trees.html" aria-current="page">Träd</a>
       <a class="btn secondary" href="./slaktkort.html">Personer</a>
       <a class="btn secondary" href="./create-relation.html">Relationer</a>
       <a class="btn secondary" href="./map.html">Karta</a>
@@ -193,47 +220,41 @@
 <div class="grid">
   <!-- VÄNSTER: LISTA -->
   <section class="card" aria-label="Trädlista">
-    <h2>Trädlista</h2>
-    <p class="small">Klicka ett träd för att markera. Använd knapparna till höger för att byta namn eller ta bort.</p>
-
-    <div class="actions">
-      <button id="reloadBtn" type="button" class="btn secondary">Ladda om</button>
-      <button id="newBtn" type="button" class="btn">Skapa nytt träd</button>
-    </div>
+    <h2>Mina träd</h2>
+    <p class="small">Klicka på ett träd för att välja det som aktivt.</p>
 
     <div id="leftHint" class="hintBox" hidden></div>
-
     <ul id="list" class="list" aria-label="Träd"></ul>
+
+    <div class="actions" style="margin-top:14px;">
+      <button id="reloadBtn" type="button" class="btn secondary">Uppdatera lista</button>
+    </div>
   </section>
 
-  <!-- HÖGER: EDIT -->
-  <section class="card" aria-label="Redigera träd">
-    <h2 id="panelTitle">Skapa nytt träd</h2>
-    <p class="small" id="panelSub">Ge trädet ett namn och spara.</p>
+  <!-- HÖGER: SKAPA -->
+  <section class="card" aria-label="Skapa träd">
+    <h2>Skapa träd</h2>
+    <p class="small">Skriv ett namn och skapa ett nytt släktträd.</p>
 
-    <label for="name">Trädnamn</label>
+    <label for="name">Namn</label>
     <input id="name" placeholder="t.ex. Släkten Nilsson" autocomplete="off" />
 
     <div class="actions">
-      <button id="saveBtn" type="button" class="btn">Spara</button>
-      <button id="setActiveBtn" type="button" class="btn secondary" disabled>Gör aktivt</button>
-      <button id="deleteBtn" type="button" class="btn danger" disabled>Ta bort</button>
-      <button id="resetBtn" type="button" class="btn secondary">Återställ</button>
+      <button id="createBtn" type="button" class="btn">Skapa träd</button>
+      <button id="clearBtn" type="button" class="btn secondary">Rensa</button>
     </div>
 
     <div id="statusBox" class="okBox" hidden></div>
 
-    <div class="hintBox" style="margin-top:14px;">
-      <strong>Nycklar (tekniskt)</strong>
-      <div class="small" style="margin-top:6px;">
-        Träd sparas i <code>slakttradet_trees</code><br/>
-        Aktivt träd: <code>slakttradet_active_tree_id</code><br/>
-        Personer per träd: <code>slakttradet_slaktkort_&lt;treeId&gt;</code><br/>
-        Relationer per träd: <code>slakttradet_relationer_&lt;treeId&gt;</code>
+    <!-- Debug/tekniskt (gömt som standard) -->
+    <details class="tech" id="techDetails">
+      <summary>Visa tekniskt</summary>
+      <div class="small" style="margin-top:8px;">
+        Träd: <code>slakttradet_trees</code><br/>
+        Aktivt träd: <code>slakttradet_active_tree_id</code>
       </div>
-    </div>
-
-    <p class="small" id="tech" style="margin-top:10px;">—</p>
+      <p class="small" id="tech" style="margin:10px 0 0;">—</p>
+    </details>
   </section>
 </div>
 
@@ -256,8 +277,6 @@
   // =====================================================
   const KEY_TREES  = "slakttradet_trees";
   const KEY_ACTIVE = "slakttradet_active_tree_id";
-  const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
-  const relKey   = (treeId) => "slakttradet_relationer_" + String(treeId);
 
   // =====================================================
   // DOM
@@ -268,19 +287,12 @@
   const pillTrees = document.getElementById("pillTrees");
 
   const reloadBtn = document.getElementById("reloadBtn");
-  const newBtn = document.getElementById("newBtn");
-
-  const leftHint = document.getElementById("leftHint");
   const listEl = document.getElementById("list");
+  const leftHint = document.getElementById("leftHint");
 
-  const panelTitle = document.getElementById("panelTitle");
-  const panelSub = document.getElementById("panelSub");
   const nameEl = document.getElementById("name");
-
-  const saveBtn = document.getElementById("saveBtn");
-  const setActiveBtn = document.getElementById("setActiveBtn");
-  const deleteBtn = document.getElementById("deleteBtn");
-  const resetBtn = document.getElementById("resetBtn");
+  const createBtn = document.getElementById("createBtn");
+  const clearBtn = document.getElementById("clearBtn");
 
   const statusBox = document.getElementById("statusBox");
   const techEl = document.getElementById("tech");
@@ -309,13 +321,6 @@
   function tid(){
     return "t_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,8);
   }
-  function activeTreeId(){
-    return localStorage.getItem(KEY_ACTIVE) || "";
-  }
-  function setActiveTreeId(id){
-    if(id) localStorage.setItem(KEY_ACTIVE, String(id));
-    else localStorage.removeItem(KEY_ACTIVE);
-  }
   function getTrees(){
     const arr = loadJson(KEY_TREES, []);
     return Array.isArray(arr) ? arr : [];
@@ -323,16 +328,15 @@
   function saveTrees(arr){
     saveJson(KEY_TREES, Array.isArray(arr) ? arr : []);
   }
+  function activeTreeId(){
+    return localStorage.getItem(KEY_ACTIVE) || "";
+  }
+  function setActiveTreeId(id){
+    if(id) localStorage.setItem(KEY_ACTIVE, String(id));
+    else localStorage.removeItem(KEY_ACTIVE);
+  }
   function treeLabel(t){
     return String(t && (t.name || t.namn || t.id) ? (t.name || t.namn || t.id) : "—");
-  }
-  function countPeople(treeId){
-    const arr = loadJson(cardsKey(treeId), []);
-    return Array.isArray(arr) ? arr.length : 0;
-  }
-  function countRelations(treeId){
-    const arr = loadJson(relKey(treeId), []);
-    return Array.isArray(arr) ? arr.length : 0;
   }
   function showStatus(html){
     statusBox.hidden = false;
@@ -344,7 +348,6 @@
   // STATE
   // =====================================================
   let trees = [];
-  let selectedId = ""; // "" = create mode
 
   // =====================================================
   // UI
@@ -366,11 +369,13 @@
 
     if(trees.length === 0){
       leftHint.hidden = false;
-      leftHint.innerHTML = "<strong>Inga träd ännu.</strong> Klicka <code>Skapa nytt träd</code>.";
+      leftHint.innerHTML = "<strong>Inga träd ännu.</strong> Skapa ett träd till höger för att börja.";
       const li = document.createElement("li");
       li.className = "item";
       li.style.cursor = "default";
-      li.innerHTML = "<p class='itemTitle'>—</p><p class='itemMeta'>Skapa ett träd för att börja.</p>";
+      li.innerHTML =
+        "<p class='itemTitle'>—</p>" +
+        "<p class='itemSub'>När du har ett träd kan du lägga in personer och relationer.</p>";
       listEl.appendChild(li);
       return;
     }
@@ -382,76 +387,43 @@
 
     for(const t of trees){
       const li = document.createElement("li");
-      const isSel = String(t.id) === String(selectedId);
       const isAct = act && String(t.id) === String(act);
 
-      li.className = "item" + (isSel ? " active" : "");
+      li.className = "item" + (isAct ? " active" : "");
       li.dataset.id = String(t.id);
-
-      const ppl = countPeople(t.id);
-      const rel = countRelations(t.id);
 
       li.innerHTML =
         "<p class='itemTitle'>" +
           escapeHtml(treeLabel(t)) +
-          (isAct ? " <span class='badge'>Aktivt</span>" : "") +
+          (isAct ? " <span class='badge ok'>Aktivt</span>" : "") +
         "</p>" +
-        "<p class='itemMeta'>ID: " + escapeHtml(String(t.id)) + "</p>" +
-        "<p class='itemSub'>Personer: " + ppl + " · Relationer: " + rel + "</p>";
+        "<p class='itemSub'>Klicka för att välja</p>";
 
-      li.addEventListener("click", () => selectTree(String(t.id)));
+      li.addEventListener("click", () => {
+        setActiveTreeId(String(t.id));
+        showStatus("<strong>Aktivt träd valt.</strong>");
+        refresh();
+      });
 
       listEl.appendChild(li);
     }
   }
 
-  function setPanelMode(){
-    if(selectedId){
-      const t = trees.find(x => String(x.id) === String(selectedId));
-      panelTitle.textContent = "Redigera träd";
-      panelSub.textContent = "Byt namn, gör aktivt eller ta bort.";
-      nameEl.value = t ? (t.name || "") : "";
-      setActiveBtn.disabled = false;
-      deleteBtn.disabled = false;
-    }else{
-      panelTitle.textContent = "Skapa nytt träd";
-      panelSub.textContent = "Ge trädet ett namn och spara.";
-      nameEl.value = "";
-      setActiveBtn.disabled = true;
-      deleteBtn.disabled = true;
-    }
-    renderTech();
-  }
-
   function renderTech(){
     const act = activeTreeId();
     techEl.textContent =
-      "Valt: " + (selectedId ? selectedId : "— (ny)") +
-      " · Aktivt: " + (act || "—") +
-      " · Träd-nyckel: " + KEY_TREES;
+      "Aktivt: " + (act || "—") +
+      " · Antal träd: " + String(trees.length) +
+      " · Nyckel: " + KEY_TREES;
   }
 
   // =====================================================
   // ACTIONS
   // =====================================================
-  function selectTree(id){
-    const t = trees.find(x => String(x.id) === String(id));
-    if(!t) return;
-    selectedId = String(t.id);
-    setPanelMode();
-    renderList();
-  }
-
-  function resetPanel(){
-    selectedId = "";
-    setPanelMode();
-    renderList();
-  }
-
   function createTree(){
     const name = String(nameEl.value || "").trim();
     if(!name){
-      showStatus("<strong>Skriv ett trädnamn.</strong>");
+      showStatus("<strong>Skriv ett namn.</strong>");
       return;
     }
 
@@ -465,89 +437,11 @@
     trees.unshift(t);
     saveTrees(trees);
 
-    // om inget aktivt finns: gör det nya aktivt
-    if(!activeTreeId()){
-      setActiveTreeId(t.id);
-    }
+    // Gör det nya trädet aktivt direkt (1 tydligt flöde)
+    setActiveTreeId(t.id);
 
-    selectedId = String(t.id);
-    showStatus("<strong>Skapat.</strong>");
-    refresh();
-  }
-
-  function renameTree(){
-    const t = trees.find(x => String(x.id) === String(selectedId));
-    if(!t){
-      showStatus("<strong>Välj ett träd.</strong>");
-      return;
-    }
-
-    const name = String(nameEl.value || "").trim();
-    if(!name){
-      showStatus("<strong>Skriv ett trädnamn.</strong>");
-      return;
-    }
-
-    t.name = name;
-    t.updatedAt = Date.now();
-    saveTrees(trees);
-
-    showStatus("<strong>Sparat.</strong>");
-    refresh();
-  }
-
-  function setActive(){
-    if(!selectedId){
-      showStatus("<strong>Välj ett träd.</strong>");
-      return;
-    }
-    const exists = trees.some(t => String(t.id) === String(selectedId));
-    if(!exists){
-      showStatus("<strong>Trädet finns inte.</strong>");
-      return;
-    }
-    setActiveTreeId(selectedId);
-    showStatus("<strong>Aktivt träd uppdaterat.</strong>");
-    refresh();
-  }
-
-  function deleteTree(){
-    const t = trees.find(x => String(x.id) === String(selectedId));
-    if(!t) return;
-
-    const ppl = countPeople(t.id);
-    const rel = countRelations(t.id);
-
-    const ok = confirm(
-      "Ta bort trädet:\n\n" +
-      (t.name || t.id) + "\n\n" +
-      "Detta tar även bort åtkomst till data som ligger under nycklarna:\n" +
-      cardsKey(t.id) + " (" + ppl + " personer)\n" +
-      relKey(t.id) + " (" + rel + " relationer)\n\n" +
-      "OBS: Data tas bort endast om du väljer 'OK'."
-    );
-    if(!ok) return;
-
-    // ta bort data för trädet
-    try{ localStorage.removeItem(cardsKey(t.id)); }catch{}
-    try{ localStorage.removeItem(relKey(t.id)); }catch{}
-
-    // ta bort trädet
-    trees = trees.filter(x => String(x.id) !== String(t.id));
-    saveTrees(trees);
-
-    // om aktivt träd var detta -> välj nytt aktivt eller rensa
-    const act = activeTreeId();
-    if(act && String(act) === String(t.id)){
-      if(trees.length){
-        setActiveTreeId(trees[0].id);
-      }else{
-        setActiveTreeId("");
-      }
-    }
-
-    showStatus("<strong>Borttaget.</strong>");
-    selectedId = "";
+    nameEl.value = "";
+    showStatus("<strong>Trädet är skapat och valt som aktivt.</strong>");
     refresh();
   }
 
@@ -556,7 +450,8 @@
   // =====================================================
   function refresh(){
     trees = getTrees();
-    // om aktivt pekar på icke-existerande: fixa
+
+    // Om aktivt pekar på icke-existerande: välj första eller rensa
     const act = activeTreeId();
     if(act && !trees.some(t => String(t.id) === String(act))){
       if(trees.length) setActiveTreeId(trees[0].id);
@@ -565,12 +460,7 @@
 
     renderPills();
     renderList();
-
-    // om selectedId inte finns längre
-    if(selectedId && !trees.some(t => String(t.id) === String(selectedId))){
-      selectedId = "";
-    }
-    setPanelMode();
+    renderTech();
   }
 
   // =====================================================
@@ -578,41 +468,20 @@
   // =====================================================
   reloadBtn.addEventListener("click", () => {
     refresh();
-    showStatus("<strong>Omladdat.</strong>");
+    showStatus("<strong>Uppdaterat.</strong>");
   });
 
-  newBtn.addEventListener("click", () => {
-    selectedId = "";
-    setPanelMode();
+  createBtn.addEventListener("click", createTree);
+
+  clearBtn.addEventListener("click", () => {
+    nameEl.value = "";
     try{ nameEl.focus(); }catch{}
-    showStatus("<strong>Nytt träd.</strong>");
   });
 
-  saveBtn.addEventListener("click", () => {
-    if(selectedId) renameTree();
-    else createTree();
-  });
-
-  setActiveBtn.addEventListener("click", setActive);
-  deleteBtn.addEventListener("click", deleteTree);
-
-  resetBtn.addEventListener("click", () => {
-    if(selectedId){
-      // återställ namn från storage
-      const t = trees.find(x => String(x.id) === String(selectedId));
-      nameEl.value = t ? (t.name || "") : "";
-      showStatus("<strong>Återställt.</strong>");
-    }else{
-      nameEl.value = "";
-      showStatus("<strong>Återställt.</strong>");
-    }
-  });
-
-  // Enter = spara
   nameEl.addEventListener("keydown", (e) => {
     if(e.key === "Enter"){
       e.preventDefault();
-      saveBtn.click();
+      createBtn.click();
     }
   });
 
