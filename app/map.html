@@ -457,9 +457,12 @@
         </div>
       </div>
 
+      <!-- NYTT: teknisk info göms bakom knapp -->
       <div class="panelSection">
-        <h3>Teknisk info</h3>
-        <p class="small" id="panelTech">Koordinater: —</p>
+        <button id="toggleTechBtn" class="btn secondary" type="button" style="padding:8px 10px;">Visa tekniskt</button>
+        <div id="panelTechWrap" hidden style="margin-top:10px;">
+          <p class="small" id="panelTech" style="margin:0;">Koordinater: —</p>
+        </div>
       </div>
     </section>
 
@@ -471,7 +474,7 @@
 
     <div class="actions" style="margin-top:10px;">
       <button id="clearSearchBtn" type="button" class="btn secondary">Rensa sök</button>
-      <span id="matchInfo" class="small" aria-live="polite">—</span>
+      <span id="matchInfo" class="small" aria-live="polite"></span>
     </div>
 
     <div class="toggleRow" role="group" aria-label="Visningsval">
@@ -491,7 +494,7 @@
 
     <div id="hint" class="hintBox" hidden></div>
 
-    <ul id="list" class="list" aria-label="Personer med koordinater"></ul>
+    <ul id="list" class="list" aria-label="Sökträffar" hidden></ul>
 
     <div class="actions" style="margin-top:14px;">
       <button id="refreshBtn" type="button" class="btn secondary">Uppdatera</button>
@@ -567,6 +570,11 @@
   const expandTitle = document.getElementById("expandTitle");
   const expandClose = document.getElementById("expandClose");
   const expandList = document.getElementById("expandList");
+
+  // NYTT: tech toggle
+  const toggleTechBtn = document.getElementById("toggleTechBtn");
+  const panelTechWrap = document.getElementById("panelTechWrap");
+  let showTech = false;
 
   // =====================================================
   // JSON HELPERS
@@ -674,6 +682,19 @@
     if(kmToFalun <= FALUN_RADIUS_KM) return { primary: "Falun", secondary: "Dalarna" };
     if(inBox(coords, DALARNA_BOX)) return { primary: "Dalarna", secondary: "" };
     return { primary: "Sverige", secondary: "" };
+  }
+
+  function humanPlaceLine(p){
+    const c = coordsFromPerson(p);
+    if(c){
+      const pl = placeFromCoords(c);
+      if(pl.primary){
+        return "Plats: " + pl.primary + (pl.secondary ? " (" + pl.secondary + ")" : "");
+      }
+    }
+    const saved = String(p && p.plats || "").trim();
+    if(saved) return "Plats: " + saved;
+    return ""; // INGET "—"
   }
 
   // =====================================================
@@ -789,46 +810,61 @@
 
     return peopleWithCoords.filter(p => {
       const n = personName(p).toLowerCase();
-      const coords = coordsFromPerson(p);
-      const place = coords ? placeFromCoords(coords) : { primary:"", secondary:"" };
-      const placeTxt = (place.primary + " " + place.secondary).toLowerCase();
-      const savedPlace = String(p.plats || "").toLowerCase();
-      return n.includes(q) || savedPlace.includes(q) || placeTxt.includes(q);
+      const placeLine = humanPlaceLine(p).toLowerCase();
+      return n.includes(q) || placeLine.includes(q);
     });
   }
 
+  // NYTT: dedupe på id (en person = en rad)
+  function dedupeById(arr){
+    const m = new Map();
+    for(const p of (Array.isArray(arr) ? arr : [])){
+      if(!p) continue;
+      const id = String(p.id || "");
+      if(!id) continue;
+      if(!m.has(id)) m.set(id, p);
+    }
+    return [...m.values()];
+  }
+
   // =====================================================
-  // LIST RENDER
+  // LIST RENDER (Sökträffar)
   // =====================================================
   function renderList(people){
+    const q = String(searchEl.value || "").trim();
+    if(!q){
+      listEl.hidden = true;
+      listEl.innerHTML = "";
+      return;
+    }
+
+    listEl.hidden = false;
     listEl.innerHTML = "";
 
-    if(people.length === 0){
+    const uniq = dedupeById(people);
+
+    if(uniq.length === 0){
       const li = document.createElement("li");
       li.className = "item";
       li.style.cursor = "default";
-      li.innerHTML = "<p class='itemTitle'>Inga personer att visa</p><p class='itemMeta'>Lägg koordinater i Personer.</p>";
+      li.innerHTML =
+        "<p class='itemTitle'>Inga träffar</p>" +
+        "<p class='itemMeta'>Prova ett annat namn eller en plats.</p>";
       listEl.appendChild(li);
       return;
     }
 
-    for(const p of people){
-      const c = coordsFromPerson(p);
-      const years = yearsLine(p);
-
-      const place = c ? placeFromCoords(c) : { primary:"", secondary:"" };
-      const placeLine = place.primary
-        ? ("Plats: " + place.primary + (place.secondary ? " (" + place.secondary + ")" : ""))
-        : (String(p.plats || "").trim() ? ("Plats: " + String(p.plats || "").trim()) : "Plats: —");
+    for(const p of uniq){
+      const placeLine = humanPlaceLine(p);
 
       const li = document.createElement("li");
       li.className = "item";
       li.dataset.id = String(p.id);
 
+      // EXAKT: Namn + (Plats om den finns). Inga “—”. Inga tekniska fält.
       li.innerHTML =
         "<p class='itemTitle'>" + escapeHtml(personName(p)) + "</p>" +
-        "<p class='itemMeta'>" + escapeHtml(years || "—") + "</p>" +
-        "<p class='itemSub'>" + escapeHtml(placeLine) + "</p>";
+        (placeLine ? ("<p class='itemSub'>" + escapeHtml(placeLine) + "</p>") : "");
 
       li.addEventListener("click", () => {
         const id = String(p.id);
@@ -1149,14 +1185,14 @@
     const name = personName(p);
     const years = yearsLine(p);
     const coords = coordsFromPerson(p);
-    const place = coords ? placeFromCoords(coords) : { primary:"", secondary:"" };
+    const placeLine = humanPlaceLine(p); // mänsklig
 
     panelName.textContent = name;
 
     let meta = "";
     if(years) meta += years;
-    if(place.primary){
-      meta += (meta ? " · " : "") + "Plats: " + place.primary + (place.secondary ? " (" + place.secondary + ")" : "");
+    if(placeLine){
+      meta += (meta ? " · " : "") + placeLine;
     }
     panelMeta.textContent = meta || "—";
 
@@ -1260,6 +1296,10 @@
       expandBox.hidden = true;
       expandList.innerHTML = "";
     }
+
+    // Tech visibility följer togglen
+    panelTechWrap.hidden = !showTech;
+    toggleTechBtn.textContent = showTech ? "Dölj tekniskt" : "Visa tekniskt";
   }
 
   // =====================================================
@@ -1274,6 +1314,12 @@
     expandedMode = "NONE";
     expandBox.hidden = true;
     expandList.innerHTML = "";
+  });
+
+  toggleTechBtn.addEventListener("click", () => {
+    showTech = !showTech;
+    panelTechWrap.hidden = !showTech;
+    toggleTechBtn.textContent = showTech ? "Dölj tekniskt" : "Visa tekniskt";
   });
 
   // =====================================================
@@ -1291,9 +1337,15 @@
     pillTree.innerHTML = "Aktivt träd: <strong>" + (hasActive ? escapeHtml(activeTreeLabel()) : "—") + "</strong>";
     pillPeople.innerHTML = "Personer: <strong>" + allPeople.length + "</strong>";
     pillWithCoords.innerHTML = "Med koordinater: <strong>" + peopleWithCoordsAll.length + "</strong>";
-    matchInfo.textContent =
-      filtered.length + " matchar filtret" +
-      (peopleWithCoordsAll.length ? (" (av " + peopleWithCoordsAll.length + ")") : "");
+
+    const q = String(searchEl.value || "").trim();
+    if(!q){
+      matchInfo.textContent = "";
+    }else{
+      const uniqCount = dedupeById(filtered).length;
+      matchInfo.textContent = uniqCount + " träff" + (uniqCount === 1 ? "" : "ar");
+    }
+
     renderHint(hasTrees, hasActive, peopleWithCoordsAll);
   }
 
@@ -1315,7 +1367,10 @@
 
     renderHintAndCounts(hasTrees, hasActive, allPeople, peopleWithCoordsAll, filtered);
 
+    // LISTA = bara sökträffar, bara när man söker
     renderList(filtered);
+
+    // MARKÖRER = som tidigare (filtrerade när man söker, annars alla med coords)
     renderMarkers(filtered);
 
     const focusId = (!dockPanel.hidden) ? panelPersonId : "";
