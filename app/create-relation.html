@@ -176,6 +176,36 @@
       position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
       overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
     }
+
+    /* ARKIV-ID: CR-03 | Sök (min 3 bokstäver) – UI-komponenter */
+    .searchWrap{ position: relative; }
+    .suggest{
+      position:absolute;
+      left:0; right:0;
+      top: calc(100% + 6px);
+      border:1px solid #ddd;
+      background:#fff;
+      border-radius:12px;
+      overflow:hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,.06);
+      max-height: 220px;
+      overflow:auto;
+      z-index: 10;
+    }
+    .sItem{
+      display:block;
+      width:100%;
+      text-align:left;
+      border:0;
+      border-bottom:1px solid #f1f1f1;
+      padding:10px 10px;
+      background:#fff;
+      cursor:pointer;
+      font:inherit;
+    }
+    .sItem:last-child{ border-bottom:0; }
+    .sItem:hover{ background:#fafafa; }
+    .stepTitle{ margin:12px 0 6px; font-weight:900; }
   </style>
 </head>
 
@@ -209,41 +239,68 @@
   <!-- VÄNSTER: FORM -->
   <section class="card" aria-label="Skapa relation">
     <h2>Skapa relation</h2>
-    <p class="small">Välj två personer. Systemet hindrar relation till sig själv.</p>
+    <p class="small">Följ stegen. Systemet hindrar relation till sig själv.</p>
 
     <div id="hint" class="hintBox" hidden></div>
     <div id="ok" class="okBox" hidden></div>
     <div id="err" class="errBox" hidden></div>
 
+    <!-- ARKIV-ID: CR-03 | Steg 1 – Sök + förslag (fokusperson) -->
+    <div class="stepTitle">Steg 1 – Välj fokusperson</div>
+    <div class="searchWrap">
+      <label for="focusSearch">Sök (min 3 bokstäver)</label>
+      <input id="focusSearch" type="text" autocomplete="off" placeholder="Skriv minst 3 bokstäver…" />
+      <div id="focusSuggest" class="suggest" hidden aria-label="Förslag fokusperson"></div>
+    </div>
+    <p class="small" id="focusPicked" style="margin:8px 0 0;">—</p>
+
+    <!-- ARKIV-ID: CR-04 | Steg 2 – Relationstyp -->
+    <div class="stepTitle">Steg 2 – Välj relationstyp</div>
     <label for="relType">Relationstyp</label>
     <select id="relType">
-      <option value="FORALDER_BARN">Förälder → Barn</option>
+      <option value="FORALDER_BARN">Förälder</option>
+      <option value="BARN">Barn</option>
+      <option value="SYSKON">Syskon</option>
+      <option value="MORFARFORALDER">Mor- och farföräldrar</option>
+      <option value="BARNBARN">Barnbarn</option>
       <option value="PARTNER">Partner</option>
+      <option value="MOSTER_MORBROR">Moster / Morbror</option>
+      <option value="FASTER_FARBROR">Faster / Farbror</option>
+      <option value="KUSIN">Kusin</option>
+      <option value="STYV">Styvrelationer</option>
     </select>
+    <p class="small" id="relTypeNote" style="margin:8px 0 0;">
+      Obs: För att inte ändra kopplingslogiken sparas just nu endast <strong>Förälder</strong> och <strong>Partner</strong>.
+    </p>
 
-    <div id="partnerVariantWrap" hidden>
-      <label for="partnerVariant">Partner-variant</label>
-      <select id="partnerVariant">
-        <option value="GIFT">Gift</option>
-        <option value="SAMBO">Sambo</option>
-        <option value="SARBO">Särbo</option>
-        <option value="SKILDA">Skilda</option>
-      </select>
-      <p class="small" style="margin:8px 0 0;">Tips: Varianten påverkar bara metadata (inte logiken).</p>
+    <!-- ARKIV-ID: CR-04 | Steg 3 – Variant -->
+    <div class="stepTitle">Steg 3 – Välj variant</div>
+    <label for="relVariant">Variant</label>
+    <select id="relVariant"></select>
+
+    <!-- ARKIV-ID: CR-03 | Steg 4 – Sök + förslag (målperson) -->
+    <div class="stepTitle">Steg 4 – Välj målperson (till vem)</div>
+    <div class="searchWrap">
+      <label for="targetSearch">Sök (min 3 bokstäver)</label>
+      <input id="targetSearch" type="text" autocomplete="off" placeholder="Skriv minst 3 bokstäver…" />
+      <div id="targetSuggest" class="suggest" hidden aria-label="Förslag målperson"></div>
     </div>
+    <p class="small" id="targetPicked" style="margin:8px 0 0;">—</p>
 
-    <div class="row2">
+    <!-- Backup (behålls) -->
+    <div class="row2" style="margin-top:12px;">
       <div>
-        <label for="personA">Person A</label>
+        <label for="personA">Person A (backup)</label>
         <select id="personA"></select>
       </div>
       <div>
-        <label for="personB">Person B</label>
+        <label for="personB">Person B (backup)</label>
         <select id="personB"></select>
       </div>
     </div>
 
     <div class="actions">
+      <!-- ARKIV-ID: CR-05 | Skapa relation (sparlogik oförändrad) -->
       <button id="createBtn" class="btn" type="button">Skapa relation</button>
       <button id="swapBtn" class="btn secondary" type="button">Byt plats (A↔B)</button>
       <button id="clearBtn" class="btn secondary" type="button">Rensa</button>
@@ -311,8 +368,16 @@
   const errEl = document.getElementById("err");
 
   const relTypeEl = document.getElementById("relType");
-  const partnerVariantWrap = document.getElementById("partnerVariantWrap");
-  const partnerVariantEl = document.getElementById("partnerVariant");
+  const relTypeNoteEl = document.getElementById("relTypeNote");
+  const relVariantEl = document.getElementById("relVariant");
+
+  const focusSearchEl = document.getElementById("focusSearch");
+  const focusSuggestEl = document.getElementById("focusSuggest");
+  const focusPickedEl = document.getElementById("focusPicked");
+
+  const targetSearchEl = document.getElementById("targetSearch");
+  const targetSuggestEl = document.getElementById("targetSuggest");
+  const targetPickedEl = document.getElementById("targetPicked");
 
   const personAEl = document.getElementById("personA");
   const personBEl = document.getElementById("personB");
@@ -349,7 +414,6 @@
   function nowId(){
     return "r_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,8);
   }
-
   function setBox(el, html){
     el.hidden = false;
     el.innerHTML = html;
@@ -360,6 +424,7 @@
     errEl.hidden = true; errEl.innerHTML = "";
   }
 
+  /* ARKIV-ID: CR-01 | Hämta aktivt träd */
   function getTrees(){
     const arr = loadJson(KEY_TREES, []);
     return Array.isArray(arr) ? arr : [];
@@ -374,12 +439,15 @@
     return t ? (t.name || t.id) : id;
   }
 
+  /* ARKIV-ID: CR-02 | Läs personer */
   function loadPeople(){
     const t = activeTreeId();
     if(!t) return [];
     const arr = loadJson(cardsKey(t), []);
     return Array.isArray(arr) ? arr : [];
   }
+
+  /* ARKIV-ID: CR-05 | Läs/spara relationer (oförändrat) */
   function loadRelations(){
     const t = activeTreeId();
     if(!t) return [];
@@ -405,7 +473,7 @@
   }
 
   // =====================================================
-  // DROPDOWN RENDER (utan självrelation + korsfilter)
+  // DROPDOWN (backup) – oförändrad logik
   // =====================================================
   let cachedPeople = [];
 
@@ -433,34 +501,28 @@
     const a = keepA != null ? String(keepA) : String(personAEl.value || "");
     const b = keepB != null ? String(keepB) : String(personBEl.value || "");
 
-    // A får inte visa B, B får inte visa A
     buildOptions(personAEl, cachedPeople, a, b || null);
     buildOptions(personBEl, cachedPeople, b, a || null);
 
-    // om valet blev ogiltigt (försvann), rensa
     if(a && personAEl.value !== a) personAEl.value = "";
     if(b && personBEl.value !== b) personBEl.value = "";
   }
 
   // =====================================================
-  // RELATION NORMALIZATION + DUPLICATE CHECK
+  // RELATION NORMALIZATION + DUPLICATE CHECK (oförändrat)
   // =====================================================
   function normalizeForStore(rel){
-    // Säkerställ: id, typ, createdAt
     const r = Object.assign({}, rel);
     if(!r.id) r.id = nowId();
     if(!r.createdAt) r.createdAt = Date.now();
 
-    // Typ
     r.typ = String(r.typ || "").toUpperCase();
 
-    // Standardfält för karta/adapter
     if(r.typ === "FORALDER_BARN"){
       r.franPersonId = String(r.franPersonId || "");
       r.tillPersonId = String(r.tillPersonId || "");
     }
     if(r.typ === "PARTNER"){
-      // kompatibelt format (kartan läser personAId/personBId)
       r.personAId = String(r.personAId || r.personA || r.aId || r.a || "");
       r.personBId = String(r.personBId || r.personB || r.bId || r.b || "");
       r.variant = String(r.variant || "").toUpperCase();
@@ -485,17 +547,185 @@
       const ca = String(candidate.personAId || candidate.personA || candidate.aId || candidate.a || "");
       const cb = String(candidate.personBId || candidate.personB || candidate.bId || candidate.b || "");
 
-      // partner är symmetrisk (A-B == B-A)
       const lowE = ea < eb ? ea : eb;
       const highE = ea < eb ? eb : ea;
       const lowC = ca < cb ? ca : cb;
       const highC = ca < cb ? cb : ca;
 
-      // variant spelar inte roll för dublettskydd (du kan byta variant via delete+add)
       return lowE === lowC && highE === highC;
     }
 
     return false;
+  }
+
+  // =====================================================
+  // ARKIV-ID: CR-04 | Variantlistor (UI-only)
+  // =====================================================
+  const VARIANTS_BY_TYPE = {
+    FORALDER_BARN: [
+      { v: "MAMMA", label: "Mamma" },
+      { v: "PAPPA", label: "Pappa" }
+    ],
+    BARN: [
+      { v: "SON", label: "Son" },
+      { v: "DOTTER", label: "Dotter" }
+    ],
+    SYSKON: [
+      { v: "BROR", label: "Bror" },
+      { v: "SYSTER", label: "Syster" }
+    ],
+    MORFARFORALDER: [
+      { v: "MORMOR", label: "Mormor" },
+      { v: "MORFAR", label: "Morfar" },
+      { v: "FARMOR", label: "Farmor" },
+      { v: "FARFAR", label: "Farfar" }
+    ],
+    BARNBARN: [
+      { v: "BARNBARN", label: "Barnbarn" }
+    ],
+    PARTNER: [
+      { v: "GIFT", label: "Make/Maka" },
+      { v: "SAMBO", label: "Sambo" }
+    ],
+    MOSTER_MORBROR: [
+      { v: "MOSTER", label: "Moster" },
+      { v: "MORBROR", label: "Morbror" }
+    ],
+    FASTER_FARBROR: [
+      { v: "FASTER", label: "Faster" },
+      { v: "FARBROR", label: "Farbror" }
+    ],
+    KUSIN: [
+      { v: "KUSIN", label: "Kusin" }
+    ],
+    STYV: [
+      { v: "STYVFORALDER", label: "Styvförälder" },
+      { v: "STYVBARN", label: "Styvbarn" }
+    ]
+  };
+
+  function renderVariantOptions(){
+    const typ = String(relTypeEl.value || "").toUpperCase();
+    const variants = VARIANTS_BY_TYPE[typ] || [{ v: "OKAND", label: "—" }];
+
+    relVariantEl.innerHTML = "";
+    for(const it of variants){
+      const opt = document.createElement("option");
+      opt.value = it.v;
+      opt.textContent = it.label;
+      relVariantEl.appendChild(opt);
+    }
+
+    // Stödinfo (utan designbyte, bara text)
+    const supported = (typ === "FORALDER_BARN" || typ === "PARTNER");
+    relTypeNoteEl.innerHTML =
+      "Obs: För att inte ändra kopplingslogiken sparas just nu endast <strong>Förälder</strong> och <strong>Partner</strong>."
+      + (supported ? "" : " (Vald typ finns som UI, men kan inte sparas ännu.)");
+  }
+
+  // =====================================================
+  // ARKIV-ID: CR-03 | Sök + förslag (ingen scanning/magi)
+  // =====================================================
+  let pickedAId = ""; // fokus
+  let pickedBId = ""; // mål
+
+  function normalizeStr(s){ return String(s || "").trim().toLowerCase(); }
+
+  function searchPeople(query){
+    const q = normalizeStr(query);
+    if(q.length < 3) return [];
+    const res = [];
+    for(const p of cachedPeople){
+      const name = normalizeStr(personName(p));
+      if(name.includes(q)) res.push(p);
+    }
+    return res.slice(0, 12);
+  }
+
+  function closeSuggest(which){
+    if(which === "A"){
+      focusSuggestEl.hidden = true;
+      focusSuggestEl.innerHTML = "";
+    }else{
+      targetSuggestEl.hidden = true;
+      targetSuggestEl.innerHTML = "";
+    }
+  }
+
+  function renderSuggest(which, items){
+    const box = (which === "A") ? focusSuggestEl : targetSuggestEl;
+    box.innerHTML = "";
+    if(items.length === 0){
+      box.hidden = true;
+      return;
+    }
+
+    for(const p of items){
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "sItem";
+      btn.textContent = personName(p) + (yearsLine(p) ? (" · " + yearsLine(p)) : "");
+      btn.addEventListener("click", () => {
+        if(which === "A"){
+          pickFocus(String(p.id));
+          focusSearchEl.value = personName(p);
+          closeSuggest("A");
+          try{ relTypeEl.focus(); }catch{}
+        }else{
+          pickTarget(String(p.id));
+          targetSearchEl.value = personName(p);
+          closeSuggest("B");
+          try{ createBtn.focus(); }catch{}
+        }
+      });
+      box.appendChild(btn);
+    }
+
+    box.hidden = false;
+  }
+
+  function pickFocus(id){
+    clearBoxes();
+    pickedAId = String(id || "");
+    if(pickedAId && pickedAId === pickedBId){
+      pickedBId = "";
+      targetPickedEl.textContent = "—";
+      targetSearchEl.value = "";
+    }
+    syncDropdowns(pickedAId, pickedBId);
+
+    const p = cachedPeople.find(x => String(x.id) === pickedAId) || null;
+    focusPickedEl.textContent = pickedAId ? ("Vald: " + (p ? personName(p) : ("#" + pickedAId))) : "—";
+  }
+
+  function pickTarget(id){
+    clearBoxes();
+    const next = String(id || "");
+    if(next && next === pickedAId){
+      setBox(errEl, "<strong>Målperson får inte vara samma som fokusperson.</strong>");
+      return;
+    }
+    pickedBId = next;
+    syncDropdowns(pickedAId, pickedBId);
+
+    const p = cachedPeople.find(x => String(x.id) === pickedBId) || null;
+    targetPickedEl.textContent = pickedBId ? ("Vald: " + (p ? personName(p) : ("#" + pickedBId))) : "—";
+  }
+
+  function applyPickedFromDropdowns(){
+    pickedAId = String(personAEl.value || "");
+    pickedBId = String(personBEl.value || "");
+
+    if(pickedAId && pickedAId === pickedBId){
+      pickedBId = "";
+      personBEl.value = "";
+    }
+
+    const pa = cachedPeople.find(p => String(p.id) === String(pickedAId)) || null;
+    const pb = cachedPeople.find(p => String(p.id) === String(pickedBId)) || null;
+
+    focusPickedEl.textContent = pickedAId ? ("Vald: " + (pa ? personName(pa) : ("#" + pickedAId))) : "—";
+    targetPickedEl.textContent = pickedBId ? ("Vald: " + (pb ? personName(pb) : ("#" + pickedBId))) : "—";
   }
 
   // =====================================================
@@ -640,7 +870,7 @@
   }
 
   // =====================================================
-  // CORE ACTION: CREATE
+  // ARKIV-ID: CR-05 | CREATE (sparlogik intakt)
   // =====================================================
   function createRelation(){
     clearBoxes();
@@ -653,12 +883,12 @@
       return;
     }
 
-    const typ = String(relTypeEl.value || "").toUpperCase();
-    const aId = String(personAEl.value || "");
-    const bId = String(personBEl.value || "");
+    // Primärt: sökval om finns, annars backup dropdowns
+    const aId = String(pickedAId || personAEl.value || "");
+    const bId = String(pickedBId || personBEl.value || "");
 
     if(!aId || !bId){
-      setBox(errEl, "<strong>Välj två personer.</strong>");
+      setBox(errEl, "<strong>Välj fokusperson och målperson.</strong>");
       return;
     }
     if(aId === bId){
@@ -666,19 +896,29 @@
       return;
     }
 
-    const rels = loadRelations();
+    const uiType = String(relTypeEl.value || "").toUpperCase();
+    const uiVariant = String(relVariantEl.value || "").toUpperCase();
 
+    // Förbud: ändra kopplingslogik -> vi sparar bara det som redan stöds
+    if(uiType !== "FORALDER_BARN" && uiType !== "PARTNER"){
+      setBox(errEl, "<strong>Den relationstypen kan inte sparas ännu.</strong> Välj <code>Förälder</code> eller <code>Partner</code>.");
+      return;
+    }
+
+    const rels = loadRelations();
     let candidate = null;
 
-    if(typ === "FORALDER_BARN"){
+    if(uiType === "FORALDER_BARN"){
+      // (Variant är UI-only och sparas inte, för att inte ändra format.)
       candidate = normalizeForStore({
         id: nowId(),
         typ: "FORALDER_BARN",
         franPersonId: aId,
         tillPersonId: bId
       });
-    }else if(typ === "PARTNER"){
-      const variant = String(partnerVariantEl.value || "GIFT").toUpperCase();
+    }else if(uiType === "PARTNER"){
+      // Mappa UI-variant till befintliga partner-varianter
+      const variant = (uiVariant === "SAMBO") ? "SAMBO" : "GIFT";
       candidate = normalizeForStore({
         id: nowId(),
         typ: "PARTNER",
@@ -686,12 +926,8 @@
         personBId: bId,
         variant
       });
-    }else{
-      setBox(errEl, "<strong>Okänd relationstyp.</strong>");
-      return;
     }
 
-    // dublettskydd
     if(rels.some(x => isDuplicate(x, candidate))){
       setBox(errEl, "<strong>Relationen finns redan.</strong>");
       return;
@@ -708,34 +944,89 @@
   // EVENTS
   // =====================================================
   relTypeEl.addEventListener("change", () => {
-    const typ = String(relTypeEl.value || "").toUpperCase();
-    partnerVariantWrap.hidden = (typ !== "PARTNER");
+    renderVariantOptions();
   });
 
+  /* ARKIV-ID: CR-03 | Sök-input events */
+  focusSearchEl.addEventListener("input", () => {
+    clearBoxes();
+    const q = focusSearchEl.value || "";
+    if(String(q).trim().length < 3){
+      closeSuggest("A");
+      return;
+    }
+    renderSuggest("A", searchPeople(q));
+  });
+
+  targetSearchEl.addEventListener("input", () => {
+    clearBoxes();
+    const q = targetSearchEl.value || "";
+    if(String(q).trim().length < 3){
+      closeSuggest("B");
+      return;
+    }
+    const items = searchPeople(q).filter(p => String(p.id) !== String(pickedAId || ""));
+    renderSuggest("B", items);
+  });
+
+  document.addEventListener("click", (e) => {
+    const t = e.target;
+    if(!t) return;
+    if(!focusSuggestEl.contains(t) && t !== focusSearchEl) closeSuggest("A");
+    if(!targetSuggestEl.contains(t) && t !== targetSearchEl) closeSuggest("B");
+  });
+
+  focusSearchEl.addEventListener("keydown", (e) => { if(e.key === "Escape") closeSuggest("A"); });
+  targetSearchEl.addEventListener("keydown", (e) => { if(e.key === "Escape") closeSuggest("B"); });
+
   personAEl.addEventListener("change", () => {
-    // om A ändras, synka B
     syncDropdowns(personAEl.value, personBEl.value);
+    applyPickedFromDropdowns();
   });
   personBEl.addEventListener("change", () => {
     syncDropdowns(personAEl.value, personBEl.value);
+    applyPickedFromDropdowns();
   });
 
   createBtn.addEventListener("click", createRelation);
 
   swapBtn.addEventListener("click", () => {
     clearBoxes();
-    const a = String(personAEl.value || "");
-    const b = String(personBEl.value || "");
-    syncDropdowns(b, a);
+    const a = String(pickedAId || personAEl.value || "");
+    const b = String(pickedBId || personBEl.value || "");
+
+    pickedAId = b;
+    pickedBId = a;
+
+    if(pickedAId && pickedAId === pickedBId) pickedBId = "";
+
+    syncDropdowns(pickedAId, pickedBId);
+
+    const pa = cachedPeople.find(p => String(p.id) === String(pickedAId)) || null;
+    const pb = cachedPeople.find(p => String(p.id) === String(pickedBId)) || null;
+    focusSearchEl.value = pa ? personName(pa) : "";
+    targetSearchEl.value = pb ? personName(pb) : "";
+    focusPickedEl.textContent = pickedAId ? ("Vald: " + (pa ? personName(pa) : ("#" + pickedAId))) : "—";
+    targetPickedEl.textContent = pickedBId ? ("Vald: " + (pb ? personName(pb) : ("#" + pickedBId))) : "—";
   });
 
   clearBtn.addEventListener("click", () => {
     clearBoxes();
+
+    pickedAId = "";
+    pickedBId = "";
+    focusSearchEl.value = "";
+    targetSearchEl.value = "";
+    focusPickedEl.textContent = "—";
+    targetPickedEl.textContent = "—";
+    closeSuggest("A");
+    closeSuggest("B");
+
     relTypeEl.value = "FORALDER_BARN";
-    partnerVariantWrap.hidden = true;
-    partnerVariantEl.value = "GIFT";
+    renderVariantOptions();
+
     syncDropdowns("", "");
-    try{ personAEl.focus(); }catch{}
+    try{ focusSearchEl.focus(); }catch{}
   });
 
   refreshBtn.addEventListener("click", () => {
@@ -758,17 +1049,14 @@
     renderPills();
     renderTech();
 
-    // hint + early exits
     const ok = renderHint();
-    partnerVariantWrap.hidden = (String(relTypeEl.value || "").toUpperCase() !== "PARTNER");
 
-    // render dropdowns
+    renderVariantOptions();
     syncDropdowns(personAEl.value, personBEl.value);
+    applyPickedFromDropdowns();
 
-    // disable create if not ok
     createBtn.disabled = !ok;
 
-    // list
     renderList();
   }
 
