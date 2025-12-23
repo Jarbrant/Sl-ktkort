@@ -981,9 +981,13 @@
     return idsToPeople(sibIds);
   }
 
+  // =====================================================
+  // ARBETORDER 19 (PATCH): Tooltip ska visa (född–död) för ALLA namn
+  // Endast tooltip-text – ingen logik ändrad
+  // =====================================================
   function fmtPersonRow(p){
     const nm = personName(p);
-    const y = (p && p.fodelsear != null && String(p.fodelsear).trim() !== "") ? String(p.fodelsear).trim() : "";
+    const y = yearsLine(p);
     return y ? (nm + " (" + y + ")") : nm;
   }
 
