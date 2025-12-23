@@ -240,13 +240,6 @@
       font-size: 1.02rem;
       font-weight: 950;
     }
-    .panelActions{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      align-items:center;
-      margin-top: 12px;
-    }
 
     /* Mini-tree (chips) */
     .miniTree{
@@ -267,17 +260,22 @@
     .slotFocus{ grid-column: 2; grid-row: 2; display:flex; justify-content:center; }
     .slotChildren{ grid-column: 1 / 4; grid-row: 3; display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
 
+    /* ✅ CHIP: två rader, centrerat */
     .chip{
       display:inline-flex;
+      flex-direction: column;
       align-items:center;
-      gap:8px;
-      padding:8px 10px;
+      justify-content:center;
+      gap: 2px;
+      padding:10px 12px;
       border:1px solid #ddd;
       border-radius:999px;
       background:#fafafa;
       font: inherit;
       cursor:pointer;
       max-width: 100%;
+      text-align:center;
+      line-height: 1.15;
     }
     .chip:hover{ background:#f5f5f5; }
     .chip.primary{
@@ -294,11 +292,14 @@
       overflow:hidden;
       text-overflow:ellipsis;
       white-space:nowrap;
-      max-width: 240px;
+      max-width: 260px;
+      font-weight: 900;
     }
     .chip small{
       color:#555;
-      font-weight:700;
+      font-weight:800;
+      font-size: .85rem;
+      display:block;
     }
 
     .expandBox{
@@ -332,7 +333,6 @@
 
     /* MARKÖRER */
     :root{
-      --accentGreen: #b7e4c7;
       --markerBorder: rgba(17,17,17,.18);
       --markerDim: .38;
     }
@@ -464,13 +464,6 @@
             <ul id="expandList" class="expandList" aria-label="Lista"></ul>
           </div>
         </div>
-
-        <p class="small" style="margin-top:10px;">Tips: klicka på en chip för att byta fokus.</p>
-
-        <div class="panelActions">
-          <a class="btn secondary" href="./slaktkort.html">Gå till Personer</a>
-          <a class="btn secondary" href="./create-relation.html">Gå till Relationer</a>
-        </div>
       </div>
 
       <div class="panelSection">
@@ -490,7 +483,6 @@
 </div>
 
 <script>
-  // AUTH-GUARD (DEMO)
   (function authGuard(){
     try{
       if(sessionStorage.getItem("demo_auth") !== "1"){
@@ -499,13 +491,11 @@
     }catch{}
   })();
 
-  // STORAGE KEYS
   const KEY_TREES  = "slakttradet_trees";
   const KEY_ACTIVE = "slakttradet_active_tree_id";
   const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
   const relKey   = (treeId) => "slakttradet_relationer_" + String(treeId);
 
-  // DOM
   const logoutBtn = document.getElementById("logoutBtn");
   const msg = document.getElementById("msg");
   const hint = document.getElementById("hint");
@@ -526,7 +516,6 @@
   const listWrap = document.getElementById("listWrap");
   const listEl = document.getElementById("list");
 
-  // Panel DOM
   const dockPanel = document.getElementById("dockPanel");
   const panelClose = document.getElementById("panelClose");
 
@@ -544,14 +533,12 @@
   const expandClose = document.getElementById("expandClose");
   const expandList = document.getElementById("expandList");
 
-  // JSON HELPERS
   function safeParse(raw, fallback){ try{ return JSON.parse(raw); } catch{ return fallback; } }
   function loadJson(key, fallback){
     const raw = localStorage.getItem(key);
     return raw ? safeParse(raw, fallback) : fallback;
   }
 
-  // ACTIVE TREE
   function activeTreeId(){ return localStorage.getItem(KEY_ACTIVE) || ""; }
   function getTrees(){
     const trees = loadJson(KEY_TREES, []);
@@ -564,7 +551,6 @@
     return t ? (t.name || t.id) : id;
   }
 
-  // FORMAT
   function personName(p){
     const n = `${p.fornamn || ""} ${p.efternamn || ""}`.trim();
     return n || "(namnlös)";
@@ -585,7 +571,6 @@
       .replaceAll("'","&#039;");
   }
 
-  // COORDS (robust)
   function inLatLonRange(lat, lon){
     return Number.isFinite(lat) && Number.isFinite(lon) &&
       lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
@@ -623,13 +608,11 @@
     return null;
   }
 
-  // UI
   function setPill(el, kind, html){
     el.className = "pill " + (kind || "");
     el.innerHTML = html;
   }
 
-  // OFFLINE place
   const FALUN = { lat: 60.6070, lon: 15.6355 };
   const FALUN_RADIUS_KM = 15;
   const DALARNA_BOX = { minLat: 59.8, maxLat: 61.4, minLon: 12.2, maxLon: 16.9 };
@@ -656,7 +639,6 @@
     return { primary: "Sverige", secondary: "" };
   }
 
-  // LOADERS
   function loadPeople(){
     const t = activeTreeId();
     if(!t) return [];
@@ -673,7 +655,6 @@
     return people.find(p => String(p.id) === String(id)) || null;
   }
 
-  // LEAFLET
   const map = L.map("map", { zoomControl: true });
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
@@ -709,7 +690,6 @@
     map.fitBounds(L.latLngBounds(ll).pad(0.2));
   }
 
-  // MARKER ICON
   function markerIconHtml(){
     return "<div class='mkWrap'><span class='mkFlag'>🇸🇪</span></div>";
   }
@@ -742,7 +722,6 @@
     applyMarkerFocusStyles();
   }
 
-  // FILTER
   function currentFiltered(peopleWithCoords){
     const q = String(searchEl.value || "").trim().toLowerCase();
     if(!q) return peopleWithCoords;
@@ -757,7 +736,6 @@
     });
   }
 
-  // LIST RENDER
   function renderList(people){
     listEl.innerHTML = "";
 
@@ -803,7 +781,6 @@
     }
   }
 
-  // MARKERS
   function renderMarkers(peopleVisible){
     clearMarkersOnly();
 
@@ -830,7 +807,6 @@
     applyMarkerFocusStyles();
   }
 
-  // RELATION helpers
   function getPartnerPair(r){
     const a1 = r && (r.personAId ?? r.personA ?? r.aId ?? r.a);
     const b1 = r && (r.personBId ?? r.personB ?? r.bId ?? r.b);
@@ -923,7 +899,6 @@
     return { parentChild: drawnPC, partner: drawnPartner, total };
   }
 
-  // HINT
   function renderHint(hasTrees, hasActive, peopleWithCoords){
     if(!hasTrees){
       hint.hidden = false;
@@ -944,7 +919,6 @@
     hint.innerHTML = "";
   }
 
-  // PANEL STATE
   let panelPersonId = "";
   let expandedMode = "NONE";
 
@@ -954,7 +928,6 @@
     panelPersonId = "";
     expandedMode = "NONE";
   }
-
   function showPanelMode(){
     listWrap.hidden = true;
     dockPanel.hidden = false;
@@ -999,6 +972,7 @@
     setTimeout(() => { try{ map.invalidateSize(); }catch{} }, 50);
   }
 
+  /* ✅ CHIP med två rader: namn + roll/typ under */
   function makeChip(label, sub, personId, kind){
     const btn = document.createElement("button");
     btn.type = "button";
@@ -1015,11 +989,9 @@
     span.textContent = label || "—";
     btn.appendChild(span);
 
-    if(sub){
-      const sm = document.createElement("small");
-      sm.textContent = sub;
-      btn.appendChild(sm);
-    }
+    const sm = document.createElement("small");
+    sm.textContent = sub || "";
+    btn.appendChild(sm);
 
     if(personId){
       btn.addEventListener("click", () => {
@@ -1146,7 +1118,8 @@
         const more = document.createElement("button");
         more.type = "button";
         more.className = "chip";
-        more.innerHTML = "<span class='chipLabel'>+" + (fam.partners.length - 1) + "</span><small>fler</small>";
+        more.appendChild(Object.assign(document.createElement("span"), { className:"chipLabel", textContent:"+" + (fam.partners.length - 1) }));
+        more.appendChild(Object.assign(document.createElement("small"), { textContent:"fler" }));
         more.addEventListener("click", () => {
           expandedMode = "PARTNER";
           expandBox.hidden = false;
@@ -1171,7 +1144,8 @@
         const more = document.createElement("button");
         more.type = "button";
         more.className = "chip";
-        more.innerHTML = "<span class='chipLabel'>+" + moreN + "</span><small>Visa fler</small>";
+        more.appendChild(Object.assign(document.createElement("span"), { className:"chipLabel", textContent:"+" + moreN }));
+        more.appendChild(Object.assign(document.createElement("small"), { textContent:"Visa fler" }));
         more.addEventListener("click", () => {
           expandedMode = "BARN";
           expandBox.hidden = false;
@@ -1190,7 +1164,6 @@
     }
   }
 
-  // PANEL EVENTS
   panelClose.addEventListener("click", () => {
     closePanel();
     clearFocusMarker();
@@ -1203,9 +1176,7 @@
     scrollLeftTop();
   });
 
-  // REFRESH CORE
   let lastAllRelations = [];
-
   function refreshLinksOnly(){
     const focusId = (!dockPanel.hidden) ? panelPersonId : "";
     renderLinks(lastAllRelations, focusId);
@@ -1257,7 +1228,6 @@
         "<span class='error'>Inga markörer.</span> Inga personer i aktivt träd har koordinater (eller matchar filtret).";
     }
 
-    // om panelen är öppen: säkerställ att personen finns
     if(!dockPanel.hidden && panelPersonId){
       const exists = allPeople.some(p => String(p.id) === String(panelPersonId));
       if(!exists){
@@ -1268,15 +1238,11 @@
       }
     }
 
-    // Leaflet fix
     setTimeout(() => { try{ map.invalidateSize(); }catch{} }, 50);
   }
 
-  // EVENTS
   let searchTimer = null;
-
   function onSearchChange(){
-    // När man söker vill man tillbaka till listan (A-läge)
     if(!dockPanel.hidden){
       closePanel();
       clearFocusMarker();
@@ -1312,7 +1278,6 @@
     try{ map.invalidateSize(); }catch{}
   });
 
-  // START
   showListMode();
   refresh();
 
