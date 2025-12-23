@@ -7,21 +7,78 @@
   <meta name="description" content="Skapa och redigera personer i aktivt träd. Plats väljs från kartan." />
 
   <style>
-    :root { color-scheme: light; }
+    /* ARKIV-ID: UI-GLOBAL-01 | Global designstandard
+       Syfte: Gemensam baseline för alla Släktkort-sidor (GitHub Pages, local HTML).
+       Placering: Klistra in HÖGST UPP i varje sidas <style>-tagg.
+       Obs: Endast CSS. Ingen JS/keys/logik påverkas.
+    */
+    :root{
+      color-scheme: light;
+    }
     body{
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       line-height: 1.5;
       margin: 0;
       padding: 24px;
-      max-width: 1100px;
+      max-width: 1180px;
       margin-inline: auto;
       background: #fff;
       color: #111;
     }
-    a{ color: inherit; text-decoration:none; }
-    header{ margin-bottom: 14px; }
+    a{
+      color: inherit;
+      text-decoration: none;
+    }
+    header{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:18px;
+    }
+    .topbar{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin: 10px 0 0;
+    }
+    .btn, button{
+      display:inline-block;
+      padding:10px 12px;
+      border:1px solid #333;
+      border-radius:10px;
+      background:#fff;
+      font:inherit;
+      cursor:pointer;
+      text-decoration:none;
+      user-select:none;
+    }
+    .btn.secondary{
+      border-color:#bbb;
+    }
+    .btn:disabled,
+    button:disabled{
+      opacity:.55;
+      cursor:not-allowed;
+    }
+    .btn.navActive{
+      background:#f5fff5;
+      border-color:#cfe8cf;
+      color:#111;
+    }
+    .liftBoxGreen{
+      border: 1px solid #cfe8cf;
+      background: #f5fff5;
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+
+    /* --- Sida: Personer (behåll funktionellt oförändrat, men utan krockar) --- */
     h1{ margin:0 0 6px; font-size: 28px; }
     .muted{ color:#555; margin:0; }
+
+    /* Nav: håll layout, men knappar styrs av .btn (global) */
     nav{
       display:flex;
       flex-wrap:wrap;
@@ -29,25 +86,9 @@
       align-items:center;
       margin: 12px 0 18px;
     }
-    nav a{
-      padding: 8px 10px;
-      border-radius: 12px;
-      background: #f2f3f5;
-      border: 1px solid #e6e8eb;
-    }
-    nav a[aria-current="page"]{
-      background: #e9f7ef;
-      border-color: #bfe7cf;
-    }
     .spacer{ flex:1 1 auto; }
-    .btn{
-      padding: 8px 10px;
-      border-radius: 12px;
-      background: #fff;
-      border: 1px solid #e6e8eb;
-      cursor: pointer;
-      font: inherit;
-    }
+
+    /* Knappar: behåll varianter (matchar sidan) */
     .btn.primary{
       background:#111;
       color:#fff;
@@ -55,6 +96,7 @@
     }
     .btn.secondary{ background:#fafafa; }
     .btn.danger{ border-color:#ffb3b3; background:#fff2f2; }
+
     .pillRow{
       display:flex;
       flex-wrap:wrap;
@@ -147,15 +189,13 @@
     .item:hover{ background:#fafafa; }
     .itemTitle{ font-weight:900; margin:0 0 2px; }
     .itemMeta{ margin:0; color:#555; font-size: 13px; }
-    .hint{
-      margin-top: 10px;
-      padding: 10px 12px;
-      border-radius: 14px;
-      border: 1px solid #ffe1a6;
-      background: #fff9ee;
+
+    /* Text-stöd för liftBoxGreen när vi använder den som info-ruta */
+    .infoBoxText{
       font-size: 13px;
       color:#333;
     }
+
     .error{ color:#b00020; font-weight:900; }
     .ok{ font-weight:900; }
     code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
@@ -163,18 +203,18 @@
 </head>
 
 <body>
-  <header>
+  <header style="display:block;">
     <h1>Personer</h1>
     <p class="muted">Skapa och redigera personer i aktivt träd. Plats väljs från kartan.</p>
 
-    <nav aria-label="Huvudmeny">
-      <a href="../start.html">Start</a>
-      <a href="./trees.html">Träd</a>
-      <a href="./slaktkort.html" aria-current="page">Personer</a>
-      <a href="./create-relation.html">Relationer</a>
-      <a href="./map.html">Karta</a>
+    <nav class="topbar" aria-label="Huvudmeny">
+      <a class="btn secondary" href="../start.html">Start</a>
+      <a class="btn secondary" href="./trees.html">Träd</a>
+      <a class="btn navActive" href="./slaktkort.html" aria-current="page">Personer</a>
+      <a class="btn secondary" href="./create-relation.html">Relationer</a>
+      <a class="btn secondary" href="./map.html">Karta</a>
       <span class="spacer"></span>
-      <button class="btn" id="logoutBtn" type="button">Logga ut</button>
+      <button class="btn secondary" id="logoutBtn" type="button">Logga ut</button>
     </nav>
   </header>
 
@@ -210,7 +250,8 @@
       <h2 id="formTitle">Skapa person</h2>
       <p class="small" id="formSub">Fyll i uppgifter och spara.</p>
 
-      <div id="topMsg" class="hint" hidden></div>
+      <!-- Status/info (design-only): använder liftBoxGreen -->
+      <div id="topMsg" class="liftBoxGreen infoBoxText" hidden></div>
 
       <label for="fornamn">Förnamn</label>
       <input id="fornamn" autocomplete="given-name" />
@@ -264,7 +305,8 @@
         <button class="btn secondary" id="resetBtn" type="button">Återställ</button>
       </div>
 
-      <div class="hint">
+      <!-- Info-ruta (design-only): använder liftBoxGreen -->
+      <div class="liftBoxGreen infoBoxText" style="margin-top:10px;">
         <strong>Platsflöde</strong><br />
         När du klickar <code>Välj plats</code> sparas ett utkast automatiskt.<br />
         Kartan/Place-picker kan sedan skriva tillbaka koordinater via <code>slakttradet_place_pick_result</code>.
@@ -500,7 +542,6 @@
         const parts = norm.split(",").map(x => x.trim());
         d.coords = { lat: Number(parts[0]), lon: Number(parts[1]) };
       }else{
-        // om coords-fältet är tomt => null
         d.coords = null;
       }
 
@@ -544,7 +585,6 @@
       }
     }
 
-    // Autospara utkast vid input (debounce)
     let autosaveTimer = null;
     function scheduleAutosave(){
       if(autosaveTimer) clearTimeout(autosaveTimer);
@@ -562,10 +602,8 @@
 
       if(!ctx || !res) return false;
 
-      // ctx: { treeId, editId, ts }
       const t = activeTreeId();
       if(!t || String(ctx.treeId || "") !== String(t)){
-        // fel träd => rensa för att inte störa
         localStorage.removeItem(PLACE_CTX_KEY);
         localStorage.removeItem(PLACE_RES_KEY);
         return false;
@@ -579,25 +617,21 @@
         return false;
       }
 
-      // säkerställ att vi inte tappar övriga fält:
       const d = loadDraft() || {};
       const editId = String(ctx.editId || "");
       if(editId) d.id = editId;
 
       d.coords = { lat, lon };
 
-      // valfritt label/namn
       if(res.label && String(res.label).trim()){
         d.plats = String(res.label).trim();
       }else if(!d.plats){
-        // om plats-text är tom, lägg en enkel default
         d.plats = "";
       }
 
       saveDraft(d);
       applyDraftToForm(d);
 
-      // clean up bridge
       localStorage.removeItem(PLACE_CTX_KEY);
       localStorage.removeItem(PLACE_RES_KEY);
 
@@ -631,7 +665,6 @@
           return n.includes(q) || place.includes(q);
         });
       }else if(q && q.length > 0 && q.length < 3){
-        // show none until 3 chars
         arr = [];
       }
 
@@ -672,7 +705,6 @@
           const id = String(p.id);
           setEditId(id);
 
-          // skapa draft från person och applicera
           const d = makeDraftFromPerson(p);
           saveDraft(d);
           applyDraftToForm(d);
@@ -722,21 +754,17 @@
         return;
       }
 
-      // 1) om vi kommer tillbaka från kartan/place-picker: konsumera resultat först
       consumePlaceResult();
 
-      // 2) om draft finns: använd den (tappar aldrig fält)
       const d = loadDraft();
       const editId = getEditId();
 
       if(d){
         applyDraftToForm(d);
         if(d.id){
-          // försöka hitta personen för title
           const p = loadPeople().find(x => String(x.id) === String(d.id));
           setFormMode("EDIT", p || d);
         }else if(editId){
-          // om editId finns men draft saknar id
           d.id = editId;
           saveDraft(d);
           const p = loadPeople().find(x => String(x.id) === String(editId));
@@ -745,7 +773,6 @@
           setFormMode("NEW", null);
         }
       }else{
-        // 3) ingen draft => om editId finns, ladda person, annars tom
         if(editId){
           const p = loadPeople().find(x => String(x.id) === String(editId));
           if(p){
@@ -793,7 +820,6 @@
       const editingId = d.id || getEditId();
 
       if(editingId){
-        // update existing if found, else treat as new with same id
         const idx = people.findIndex(p => String(p.id) === String(editingId));
         const id = String(editingId);
 
@@ -818,7 +844,6 @@
         saveDraft(makeDraftFromPerson(updated));
         showTopMsg("ok", "✅ Sparat.");
       }else{
-        // new
         const id = newId();
         const created = {
           id,
@@ -880,7 +905,6 @@
 
       const editId = getEditId();
       if(!editId){
-        // new => bara clear draft/form
         clearDraft();
         applyDraftToForm(null);
         setFormMode("NEW", null);
@@ -915,18 +939,13 @@
         return;
       }
 
-      // 1) Spara draft så vi inte tappar data (VIKTIGT)
       const d = readFormToDraft();
 
-      // 2) Sätt editId (om vi redan redigerar)
       if(d.id) setEditId(d.id);
 
-      // 3) Skriv ctx så kartan vet vad som väntar
       const ctx = { treeId: String(t), editId: String(d.id || getEditId() || ""), ts: Date.now() };
       saveJson(PLACE_CTX_KEY, ctx);
 
-      // 4) Gå till place-picker (eller din karta)
-      //    - Om du hellre vill att den går till map.html direkt: byt till "./map.html"
       window.location.href = "./place-picker.html";
     }
 
@@ -969,11 +988,9 @@
     pickPlaceBtn.addEventListener("click", startPlacePick);
     clearPlaceBtn.addEventListener("click", clearPlace);
 
-    // Autosave on input
     [fornamnEl, efternamnEl, konEl, yrkeEl, fodelsearEl, dodsarEl, platsEl, coordsEl, anteckningEl]
       .forEach(el => el.addEventListener("input", scheduleAutosave));
 
-    // Search / list
     let searchTimer = null;
     searchEl.addEventListener("input", () => {
       if(searchTimer) clearTimeout(searchTimer);
