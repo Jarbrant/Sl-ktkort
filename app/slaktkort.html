@@ -78,7 +78,6 @@
     h1{ margin:0 0 6px; font-size: 28px; }
     .muted{ color:#555; margin:0; }
 
-    /* Nav: håll layout, men knappar styrs av .btn (global) */
     nav{
       display:flex;
       flex-wrap:wrap;
@@ -88,7 +87,6 @@
     }
     .spacer{ flex:1 1 auto; }
 
-    /* Knappar: behåll varianter (matchar sidan) */
     .btn.primary{
       background:#111;
       color:#fff;
@@ -190,7 +188,6 @@
     .itemTitle{ font-weight:900; margin:0 0 2px; }
     .itemMeta{ margin:0; color:#555; font-size: 13px; }
 
-    /* Text-stöd för liftBoxGreen när vi använder den som info-ruta */
     .infoBoxText{
       font-size: 13px;
       color:#333;
@@ -213,6 +210,7 @@
       <a class="btn navActive" href="./slaktkort.html" aria-current="page">Personer</a>
       <a class="btn secondary" href="./create-relation.html">Relationer</a>
       <a class="btn secondary" href="./map.html">Karta</a>
+      <a class="btn secondary" href="./person-search.html">Sök historisk person</a>
       <span class="spacer"></span>
       <button class="btn secondary" id="logoutBtn" type="button">Logga ut</button>
     </nav>
@@ -241,7 +239,6 @@
       <div class="actions" style="margin-top:10px;">
         <button class="btn" id="newBtn" type="button">Skapa ny person</button>
         <button class="btn secondary" id="reloadBtn" type="button">Ladda om</button>
-        <!-- NY KNAPP (UI-only) -->
         <button class="btn secondary" id="findHistoricalBtn" type="button">Sök historisk person</button>
       </div>
 
@@ -252,7 +249,6 @@
       <h2 id="formTitle">Skapa person</h2>
       <p class="small" id="formSub">Fyll i uppgifter och spara.</p>
 
-      <!-- Status/info (design-only): använder liftBoxGreen -->
       <div id="topMsg" class="liftBoxGreen infoBoxText" hidden></div>
 
       <label for="fornamn">Förnamn</label>
@@ -307,7 +303,6 @@
         <button class="btn secondary" id="resetBtn" type="button">Återställ</button>
       </div>
 
-      <!-- Info-ruta (design-only): använder liftBoxGreen -->
       <div class="liftBoxGreen infoBoxText" style="margin-top:10px;">
         <strong>Platsflöde</strong><br />
         När du klickar <code>Välj plats</code> sparas ett utkast automatiskt.<br />
@@ -319,9 +314,6 @@
   <script>
     "use strict";
 
-    // =====================================================
-    // AUTH-GUARD (DEMO)
-    // =====================================================
     (function authGuard(){
       try{
         if(sessionStorage.getItem("demo_auth") !== "1"){
@@ -330,26 +322,18 @@
       }catch{}
     })();
 
-    // =====================================================
-    // STORAGE KEYS (MÅSTE MATCHA ÖVRIGA SIDOR)
-    // =====================================================
     const KEY_TREES  = "slakttradet_trees";
     const KEY_ACTIVE = "slakttradet_active_tree_id";
 
     const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
     const relKey   = (treeId) => "slakttradet_relationer_" + String(treeId);
 
-    // Draft + edit state per tree
     const draftKey = (treeId) => "slakttradet_person_draft_" + String(treeId);
     const editIdKey = (treeId) => "slakttradet_edit_person_id_" + String(treeId);
 
-    // Place-pick bridge
     const PLACE_CTX_KEY = "slakttradet_place_pick_ctx";
     const PLACE_RES_KEY = "slakttradet_place_pick_result";
 
-    // =====================================================
-    // DOM
-    // =====================================================
     const logoutBtn = document.getElementById("logoutBtn");
 
     const pillTree = document.getElementById("pillTree");
@@ -364,8 +348,6 @@
 
     const newBtn = document.getElementById("newBtn");
     const reloadBtn = document.getElementById("reloadBtn");
-
-    // NY KNAPP (UI-only)
     const findHistoricalBtn = document.getElementById("findHistoricalBtn");
 
     const formTitle = document.getElementById("formTitle");
@@ -389,9 +371,6 @@
     const deleteBtn = document.getElementById("deleteBtn");
     const resetBtn = document.getElementById("resetBtn");
 
-    // =====================================================
-    // JSON HELPERS
-    // =====================================================
     function safeParse(raw, fallback){
       try{ return JSON.parse(raw); }catch{ return fallback; }
     }
@@ -412,9 +391,6 @@
         .replaceAll("'","&#039;");
     }
 
-    // =====================================================
-    // TREE + DATA
-    // =====================================================
     function activeTreeId(){
       return localStorage.getItem(KEY_ACTIVE) || "";
     }
@@ -441,9 +417,6 @@
       saveJson(cardsKey(t), people);
     }
 
-    // =====================================================
-    // PERSON MODEL
-    // =====================================================
     function personName(p){
       const n = `${p.fornamn || ""} ${p.efternamn || ""}`.trim();
       return n || "(namnlös)";
@@ -477,9 +450,6 @@
       return "p_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,7);
     }
 
-    // =====================================================
-    // EDIT STATE + DRAFT
-    // =====================================================
     function getEditId(){
       const t = activeTreeId();
       if(!t) return "";
@@ -598,13 +568,9 @@
       }, 180);
     }
 
-    // =====================================================
-    // PLACE PICK RESULT HANDLING (VIKTIG DEL)
-    // =====================================================
     function consumePlaceResult(){
       const ctx = loadJson(PLACE_CTX_KEY, null);
       const res = loadJson(PLACE_RES_KEY, null);
-
       if(!ctx || !res) return false;
 
       const t = activeTreeId();
@@ -647,7 +613,7 @@
     function showTopMsg(kind, text){
       topMsg.hidden = false;
       topMsg.style.borderColor = (kind === "ok") ? "#cfe8cf" : (kind === "err" ? "#ffb3b3" : "#ffe1a6");
-      topMsg.style.background = (kind === "ok") ? "#f5fff5" : (kind === "err" ? "#fff2f2" : "#fff9ee");
+      topMsg.style.background  = (kind === "ok") ? "#f5fff5" : (kind === "err" ? "#fff2f2" : "#fff9ee");
       topMsg.innerHTML = escapeHtml(text);
     }
     function clearTopMsg(){
@@ -655,9 +621,6 @@
       topMsg.innerHTML = "";
     }
 
-    // =====================================================
-    // LIST RENDER
-    // =====================================================
     function renderList(){
       const people = loadPeople();
       const q = String(searchEl.value || "").trim().toLowerCase();
@@ -720,9 +683,6 @@
       }
     }
 
-    // =====================================================
-    // BOOTSTRAP FORM
-    // =====================================================
     function refreshHeaderPills(){
       const t = activeTreeId();
       const trees = getTrees();
@@ -797,9 +757,6 @@
       }
     }
 
-    // =====================================================
-    // ACTIONS
-    // =====================================================
     function validateDraft(d){
       if(!d.fornamn || !d.efternamn){
         return "Förnamn och efternamn krävs.";
@@ -945,7 +902,6 @@
       }
 
       const d = readFormToDraft();
-
       if(d.id) setEditId(d.id);
 
       const ctx = { treeId: String(t), editId: String(d.id || getEditId() || ""), ts: Date.now() };
@@ -964,8 +920,57 @@
     }
 
     // =====================================================
-    // EVENTS
+    // PATCH: AUTO-OPEN FROM HASH (#open=<personId>)
     // =====================================================
+    function getOpenIdFromHash(){
+      const h = String(window.location.hash || "");
+      if(!h.startsWith("#open=")) return "";
+      try{
+        return decodeURIComponent(h.slice("#open=".length)).trim();
+      }catch{
+        return "";
+      }
+    }
+
+    function clearHash(){
+      try{
+        history.replaceState(null, "", window.location.pathname + window.location.search);
+      }catch{
+        // fallback
+        window.location.hash = "";
+      }
+    }
+
+    function tryOpenFromHash(){
+      const openId = getOpenIdFromHash();
+      if(!openId) return false;
+
+      const t = activeTreeId();
+      if(!t){
+        showTopMsg("warn", "⚠️ Kan inte öppna importerad person: inget aktivt träd valt.");
+        clearHash();
+        return true;
+      }
+
+      const people = loadPeople();
+      const p = people.find(x => String(x.id) === String(openId));
+      if(!p){
+        showTopMsg("warn", "⚠️ Kunde inte hitta importerad person (id saknas i listan).");
+        clearHash();
+        return true;
+      }
+
+      setEditId(String(p.id));
+      const d = makeDraftFromPerson(p);
+      saveDraft(d);
+      applyDraftToForm(d);
+      setFormMode("EDIT", p);
+      showTopMsg("ok", "✅ Import klar. Personen är öppnad för redigering.");
+      clearHash();
+      return true;
+    }
+
+    // EVENTS
     logoutBtn.addEventListener("click", () => {
       try{ sessionStorage.removeItem("demo_auth"); }catch{}
       window.location.href = "../index.html";
@@ -984,11 +989,13 @@
     reloadBtn.addEventListener("click", () => {
       initForm();
       renderList();
+      // efter reload: om hash finns, försök igen
+      tryOpenFromHash();
     });
 
-    // NY KNAPP (UI-only): visar att knappen fungerar
+    // FIX: knappen ska faktiskt gå till sidan
     findHistoricalBtn.addEventListener("click", () => {
-      showTopMsg("warn", "🔎 Sök historisk person: knappen är på plats. Nästa steg är att koppla detta till ett riktigt öppet API/flöde.");
+      window.location.href = "./person-search.html";
     });
 
     saveBtn.addEventListener("click", saveCurrent);
@@ -1016,11 +1023,11 @@
       try{ searchEl.focus(); }catch{}
     });
 
-    // =====================================================
     // START
-    // =====================================================
     initForm();
     renderList();
+    // efter init: försök öppna om vi kom hit från import
+    tryOpenFromHash();
   </script>
 </body>
 </html>
