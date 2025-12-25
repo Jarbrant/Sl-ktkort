@@ -173,7 +173,7 @@
   <section class="pillRow" aria-label="Status">
     <span id="pillTree" class="pill warn">Aktivt träd: <strong>—</strong></span>
     <span id="pillResults" class="pill">Träffar: <strong>0</strong></span>
-    <span id="pillMode" class="pill">Källa: <strong>—</strong></span>
+    <span id="pillMode" class="pill warn">Källa: <strong>—</strong></span>
   </section>
 
   <div class="grid">
@@ -207,6 +207,13 @@
       <h2>Förhandsvisning</h2>
       <p class="small">Klicka en träff för preview. Nästa steg: öppna i Puzzle och ringa in rätt person.</p>
 
+      <!-- Diagnostik (ny) -->
+      <div id="diagBox" class="liftBox" style="margin: 8px 0 10px;">
+        <strong>Status:</strong> <span class="mono" id="diagStatus">—</span><br/>
+        <strong>Orsak:</strong> <span class="mono" id="diagReason">—</span><br/>
+        <strong>Senaste URL:</strong> <span class="mono" id="diagUrl">—</span>
+      </div>
+
       <div id="previewBox" class="liftBox" aria-live="polite">
         Välj en träff för att se detaljer här.
       </div>
@@ -214,6 +221,7 @@
       <div class="actions">
         <button class="btn primary" id="puzzleBtn" type="button" disabled>Öppna i Puzzle</button>
         <button class="btn secondary" id="copyBtn" type="button" disabled>Kopiera som text</button>
+        <button class="btn secondary" id="diagBtn" type="button">Kör diagnos</button>
       </div>
 
       <div class="liftBox" style="margin-top:10px;">
@@ -234,7 +242,7 @@
     // - "searchapi" => tvinga searchapi (men fallback i UI om fel)
     // ==========================================================
     const FEATURE_PROVIDER = "auto";
-    const FEATURE_ALLOW_NETWORK = true; // sätt false om du vill tvinga offline
+    const FEATURE_ALLOW_NETWORK = true;
 
     // Session keys (inte core localStorage-keys/datamodell)
     const SS_CANDIDATES = "ra_session_candidates_v1";
@@ -269,6 +277,12 @@
     const puzzleBtn = document.getElementById("puzzleBtn");
     const copyBtn = document.getElementById("copyBtn");
 
+    // Diagnostik-UI (ny)
+    const diagStatusEl = document.getElementById("diagStatus");
+    const diagReasonEl = document.getElementById("diagReason");
+    const diagUrlEl = document.getElementById("diagUrl");
+    const diagBtn = document.getElementById("diagBtn");
+
     function safeParse(raw, fallback){
       try{ return JSON.parse(raw); }catch{ return fallback; }
     }
@@ -300,7 +314,42 @@
       return t ? (t.name || t.id) : id;
     }
 
-    function refreshPills(resultCount, providerLabel){
+    // ----------------------------------------------------------
+    // Diagnostik state (ny)
+    // ----------------------------------------------------------
+    const diag = {
+      mode: "—",      // LIVE | DEMO | —
+      provider: "—",
+      reason: "—",    // OK | CORS | TIMEOUT | HTTP_XXX | ZERO_HITS | PROVIDER_MISSING | UNKNOWN
+      lastUrl: "—"
+    };
+
+    function setDiag(partial){
+      Object.assign(diag, partial || {});
+      diagStatusEl.textContent = (diag.mode || "—") + " / " + (diag.provider || "—");
+      diagReasonEl.textContent = diag.reason || "—";
+      diagUrlEl.textContent = shortenUrl(diag.lastUrl || "—");
+      refreshModePill();
+    }
+
+    function shortenUrl(u){
+      const s = String(u || "");
+      if(!s || s === "—") return "—";
+      if(s.length <= 90) return s;
+      return s.slice(0, 50) + " … " + s.slice(-30);
+    }
+
+    function refreshModePill(){
+      // PILL: visa LIVE/DEMO tydligt och färgkoda
+      const mode = String(diag.mode || "—").toUpperCase();
+      const isLive = mode === "LIVE";
+      const isDemo = mode === "DEMO";
+
+      pillMode.className = "pill " + (isLive ? "ok" : (isDemo ? "warn" : "err"));
+      pillMode.innerHTML = "Källa: <strong>" + escapeHtml(mode === "—" ? "—" : (mode + " · " + (diag.provider || "—"))) + "</strong>";
+    }
+
+    function refreshPills(resultCount){
       const t = activeTreeId();
       const trees = getTrees();
       const hasTrees = trees.length > 0;
@@ -310,7 +359,7 @@
       pillTree.innerHTML = "Aktivt träd: <strong>" + escapeHtml(hasActive ? activeTreeLabel() : "—") + "</strong>";
 
       pillResults.innerHTML = "Träffar: <strong>" + String(resultCount || 0) + "</strong>";
-      pillMode.innerHTML = "Källa: <strong>" + escapeHtml(providerLabel || "—") + "</strong>";
+      refreshModePill();
     }
 
     function showTopMsg(kind, text){
@@ -348,8 +397,6 @@
 
     let selected = null;
     let lastCandidates = [];
-    let lastProviderId = primaryProvider ? primaryProvider.id : "demo";
-    let lastProviderLabel = primaryProvider ? primaryProvider.label : "Demo";
 
     function setPreview(c){
       selected = c || null;
@@ -408,82 +455,145 @@
       setPreview(null);
     }
 
+    // ----------------------------------------------------------
+    // URL-spårning: vi vet inte alltid exakt URL inifrån provider,
+    // men vi kan ge en "indikativ" URL för diagnos.
+    // ----------------------------------------------------------
+    function estimateSearchApiUrl(q){
+      // OBS: Detta är en uppskattad URL (för att hjälpa felsökning).
+      // Provider kan ändra params internt; men detta hjälper användaren.
+      try{
+        const u = new URL("https://data.riksarkivet.se/api/records");
+        u.searchParams.set("name", String(q || "").trim());
+        u.searchParams.set("limit", "50");
+        u.searchParams.set("offset", "0");
+        u.searchParams.set("sort", "relevance");
+        u.searchParams.set("facet", "ObjectType:Agent;Type:Person");
+        return u.toString();
+      }catch{
+        return "—";
+      }
+    }
+
+    function classifyErrorMessage(msg){
+      const s = String(msg || "").toLowerCase();
+      if(s.includes("cors_or_network") || s.includes("failed to fetch") || s.includes("cors")) return "CORS";
+      if(s.includes("timeout") || s.includes("aborted") || s.includes("abort")) return "TIMEOUT";
+      if(s.startsWith("http_")) return msg.toUpperCase();
+      return "UNKNOWN";
+    }
+
     async function doSearch(){
       clearTopMsg();
 
       const t = activeTreeId();
       if(!t){
+        setDiag({ mode: "—", provider: "—", reason: "NO_ACTIVE_TREE", lastUrl: "—" });
         showTopMsg("err", "⛔ Inget aktivt träd. Gå till Träd och välj ett aktivt träd innan du kan importera.");
         renderResults([]);
-        refreshPills(0, lastProviderLabel);
+        refreshPills(0);
         return;
       }
 
       const q = String(qEl.value || "").trim();
       if(!q || q.length < 2){
+        setDiag({ reason: "QUERY_TOO_SHORT" });
         showTopMsg("warn", "⚠️ Skriv minst 2 tecken för att söka.");
         renderResults([]);
-        refreshPills(0, lastProviderLabel);
+        refreshPills(0);
         return;
       }
 
       if(!primaryProvider){
+        setDiag({ mode: "—", provider: "—", reason: "PROVIDER_MISSING", lastUrl: "—" });
         showTopMsg("err", "⛔ Provider-lagret saknas (RAProviders). Kontrollera att ./assets/js/ra-providers.js laddas.");
         renderResults([]);
-        refreshPills(0, "—");
+        refreshPills(0);
         return;
       }
 
       searchBtn.disabled = true;
 
+      // för diagnos: indikativ URL om vi försöker searchapi
+      if(primaryProvider.id === "searchapi"){
+        setDiag({ lastUrl: estimateSearchApiUrl(q) });
+      }else{
+        setDiag({ lastUrl: "—" });
+      }
+
       try{
         // 1) Försök primär provider
-        lastProviderId = primaryProvider.id;
-        lastProviderLabel = primaryProvider.label;
+        setDiag({
+          mode: (primaryProvider.id === "searchapi" ? "LIVE" : "DEMO"),
+          provider: primaryProvider.label,
+          reason: "OK"
+        });
 
         let candidates = await primaryProvider.search(q);
 
-        // 2) Om 0 träffar => demo fallback (för att aldrig bli tomt)
+        // 2) Om 0 träffar => demo fallback (för att aldrig bli "tomt utan förklaring")
         if((!candidates || candidates.length === 0) && demoProvider){
-          candidates = await demoProvider.search(q);
-          lastProviderId = demoProvider.id;
-          lastProviderLabel = demoProvider.label + " (fallback: 0 träffar i primär)";
+          const demoHits = await demoProvider.search(q);
+          lastCandidates = Array.isArray(demoHits) ? demoHits : [];
+
+          setDiag({
+            mode: "DEMO",
+            provider: demoProvider.label,
+            reason: "ZERO_HITS_IN_PRIMARY"
+          });
+
+          renderResults(lastCandidates);
+          refreshPills(lastCandidates.length);
+
+          showTopMsg("warn", "⚠️ 0 träffar i primär källa → demo-fallback. (Inte ett fel i UI)");
+          return;
         }
 
         lastCandidates = Array.isArray(candidates) ? candidates : [];
         renderResults(lastCandidates);
-        refreshPills(lastCandidates.length, lastProviderLabel);
+        refreshPills(lastCandidates.length);
 
-        if(lastCandidates.length === 0){
-          showTopMsg("warn", "⚠️ Inga träffar. Prova ett annat namn.");
+        // Om primär var searchapi och vi fick träffar: skarpt läge bekräftat
+        if(primaryProvider.id === "searchapi"){
+          setDiag({ mode: "LIVE", provider: primaryProvider.label, reason: "OK" });
+          showTopMsg("ok", "✅ LIVE: Hämtat från Riksarkivet (Sök-API). Välj kandidat och öppna i Puzzle.");
         }else{
-          showTopMsg("ok", "✅ Klar. Nästa steg: välj en kandidat och öppna i Puzzle.");
+          setDiag({ mode: "DEMO", provider: primaryProvider.label, reason: "OK" });
+          showTopMsg("ok", "✅ DEMO: Hämtat från demo-provider. Välj kandidat och öppna i Puzzle.");
         }
 
       }catch(e){
-        // 3) Vid fel (CORS/timeout): fail-closed → demo fallback
+        // 3) Vid fel: fail-closed → demo fallback (om finns)
         const msg = String(e && e.message ? e.message : e);
+        const reason = classifyErrorMessage(msg);
 
         if(demoProvider){
           try{
-            const candidates = await demoProvider.search(q);
-            lastCandidates = Array.isArray(candidates) ? candidates : [];
-            lastProviderId = demoProvider.id;
-            lastProviderLabel = demoProvider.label + " (fallback: " + (msg || "fel") + ")";
-            renderResults(lastCandidates);
-            refreshPills(lastCandidates.length, lastProviderLabel);
+            const demoHits = await demoProvider.search(q);
+            lastCandidates = Array.isArray(demoHits) ? demoHits : [];
 
-            showTopMsg("warn", "⚠️ Kunde inte nå Riksarkivet (CORS/timeout). Kör demo-fallback.");
+            setDiag({
+              mode: "DEMO",
+              provider: demoProvider.label,
+              reason: "FALLBACK_AFTER_" + reason
+            });
+
+            renderResults(lastCandidates);
+            refreshPills(lastCandidates.length);
+
+            showTopMsg("warn", "⚠️ Riksarkivet blockerades (" + reason + ") → demo-fallback. (Inte ett UI-fel)");
           }catch{
             lastCandidates = [];
             renderResults([]);
-            refreshPills(0, "—");
+            setDiag({ mode: "—", provider: "—", reason: "FAIL_CLOSED", lastUrl: diag.lastUrl });
+            refreshPills(0);
             showTopMsg("err", "⛔ Sök misslyckades och fallback misslyckades. (fail-closed)");
           }
         }else{
           lastCandidates = [];
           renderResults([]);
-          refreshPills(0, "—");
+          setDiag({ mode: "—", provider: "—", reason: "FAIL_CLOSED", lastUrl: diag.lastUrl });
+          refreshPills(0);
           showTopMsg("err", "⛔ Sök misslyckades. (fail-closed)");
         }
       }finally{
@@ -497,8 +607,8 @@
         sessionStorage.setItem(SS_CANDIDATES, JSON.stringify(lastCandidates || []));
         sessionStorage.setItem(SS_CONTEXT, JSON.stringify({
           q: String(qEl.value || "").trim(),
-          providerId: lastProviderId,
-          providerLabel: lastProviderLabel,
+          providerId: (diag.mode === "LIVE" ? "searchapi" : "demo"),
+          providerLabel: diag.provider,
           selectedId: selected ? String(selected.id) : ""
         }));
       }catch{
@@ -547,6 +657,56 @@
 
     function goBack(){ window.location.href = "./slaktkort.html"; }
 
+    // ----------------------------------------------------------
+    // Diagnos-knapp: kör ett litet "sanity test"
+    // ----------------------------------------------------------
+    async function runDiag(){
+      clearTopMsg();
+
+      // 1) RAProviders finns?
+      if(!(window.RAProviders && typeof window.RAProviders.listProviders === "function")){
+        setDiag({ mode: "—", provider: "—", reason: "PROVIDER_MISSING", lastUrl: "—" });
+        showTopMsg("err", "⛔ RAProviders saknas. Kontrollera att ra-providers.js laddas (path).");
+        return;
+      }
+
+      // 2) Har vi searchapi provider?
+      const p = window.RAProviders.getProvider ? window.RAProviders.getProvider("searchapi") : null;
+      if(!p){
+        setDiag({ mode: "—", provider: "—", reason: "SEARCHAPI_PROVIDER_MISSING", lastUrl: "—" });
+        showTopMsg("err", "⛔ searchapi-provider saknas i ra-providers.js.");
+        return;
+      }
+
+      // 3) Prova en minimal sökning med en säker term (om fältet är tomt)
+      const probe = String(qEl.value || "").trim() || "Karl";
+      setDiag({ lastUrl: estimateSearchApiUrl(probe) });
+
+      try{
+        const r = await p.search(probe);
+        const n = Array.isArray(r) ? r.length : 0;
+
+        setDiag({
+          mode: "LIVE",
+          provider: p.label,
+          reason: "DIAG_OK_" + String(n) + "_HITS"
+        });
+
+        showTopMsg("ok", "✅ Diagnos: SearchAPI svarade (" + n + " träffar för '" + probe + "').");
+      }catch(e){
+        const msg = String(e && e.message ? e.message : e);
+        const reason = classifyErrorMessage(msg);
+
+        setDiag({
+          mode: "DEMO",
+          provider: (demoProvider ? demoProvider.label : "—"),
+          reason: "DIAG_FAIL_" + reason
+        });
+
+        showTopMsg("warn", "⚠️ Diagnos: SearchAPI blockeras (" + reason + "). Då blir det demo-fallback i GitHub Pages.");
+      }
+    }
+
     // Events
     logoutBtn.addEventListener("click", () => {
       try{ sessionStorage.removeItem("demo_auth"); }catch{}
@@ -559,13 +719,15 @@
       resultsEl.innerHTML = "";
       setPreview(null);
       clearTopMsg();
-      refreshPills(0, lastProviderLabel);
+      setDiag({ reason: "CLEARED", lastUrl: "—" });
+      refreshPills(0);
       try{ qEl.focus(); }catch{}
     });
     backBtn.addEventListener("click", goBack);
 
     puzzleBtn.addEventListener("click", openPuzzle);
     copyBtn.addEventListener("click", copySelected);
+    diagBtn.addEventListener("click", runDiag);
 
     qEl.addEventListener("keydown", (e) => {
       if(e.key === "Enter"){
@@ -575,9 +737,15 @@
     });
 
     // Init
-    refreshPills(0, primaryProvider ? primaryProvider.label : "—");
+    setDiag({
+      mode: (primaryProvider ? (primaryProvider.id === "searchapi" ? "LIVE" : "DEMO") : "—"),
+      provider: (primaryProvider ? primaryProvider.label : "—"),
+      reason: (primaryProvider ? "READY" : "PROVIDER_MISSING"),
+      lastUrl: "—"
+    });
     renderResults([]);
-    showTopMsg("warn", "ℹ️ Skriv ett namn och sök. Om Riksarkivet blockeras i webbläsaren faller sidan tillbaka till demo.");
+    refreshPills(0);
+    showTopMsg("warn", "ℹ️ Tips: Klicka 'Kör diagnos' om du undrar om LIVE blockeras av CORS/timeout.");
     try{ qEl.focus(); }catch{}
   </script>
 </body>
