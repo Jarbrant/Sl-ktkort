@@ -1,1 +1,821 @@
+<!-- =====================================================
+FILE: app/person-search.html
+SYFTE: Sök historisk person (demo nu, API senare) + import till aktivt träd
+PATCH: Förbättringar:
+  - Import -> auto-öppna i slaktkort.html via hash (#open=<personId>)
+  - Mjuk dupe-hantering (varning + "Importera ändå")
+  - Disable Import-knapp under import (anti-dubbelklick)
+  - Bättre feltexter (inga träd / inget aktivt träd / korrupt storage)
+  - Bättre year-validering (UI-feedback)
+  - Meta visar "Demo" tydligare
+  - Fail-closed på storage-korruption
+  - Kommentarblock för enklare vidareutveckling
+OBS: För att auto-fyll i slaktkort.html ska fungera behövs även PATCH i slaktkort.html (se längst ner).
+===================================================== -->
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sök historisk person – Släktkort</title>
+  <meta name="description" content="Sök förslag på historiska personer (externa källor) och importera som ny person i aktivt träd." />
+
+  <style>
+    :root{ color-scheme: light; }
+    body{
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      line-height: 1.5;
+      margin: 0;
+      padding: 24px;
+      max-width: 1180px;
+      margin-inline: auto;
+      background: #fff;
+      color: #111;
+    }
+    a{ color: inherit; text-decoration: none; }
+
+    header{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:18px;
+    }
+    h1{ margin:0 0 6px; font-size:1.6rem; }
+    .muted{ color:#555; margin:0 0 12px; }
+
+    .topbar{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin: 10px 0 0;
+    }
+    .btn, button{
+      display:inline-block;
+      padding:10px 12px;
+      border:1px solid #333;
+      border-radius:10px;
+      background:#fff;
+      font:inherit;
+      cursor:pointer;
+      text-decoration:none;
+      user-select:none;
+    }
+    .btn.secondary{ border-color:#bbb; background:#fafafa; }
+    .btn.primary{ background:#111; color:#fff; border-color:#111; }
+    .btn:disabled{ opacity:.55; cursor:not-allowed; }
+
+    .pillRow{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin: 10px 0 18px;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 10px;
+      border:1px solid #ddd;
+      border-radius:999px;
+      background:#fafafa;
+      font-size:.95rem;
+    }
+    .pill strong{ font-weight:900; }
+    .pill.ok{ border-color:#cfe8cf; background:#f5fff5; }
+    .pill.warn{ border-color:#ffe1a6; background:#fff9ee; }
+    .pill.err{ border-color:#ffb3b3; background:#fff2f2; }
+
+    .grid{
+      display:grid;
+      gap:14px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 980px){
+      .grid{ grid-template-columns: 420px 1fr; }
+    }
+
+    .card{
+      border:1px solid #e6e8eb;
+      border-radius:16px;
+      padding:14px;
+      background:#fff;
+      box-shadow: 0 1px 0 rgba(0,0,0,.03);
+    }
+    .card h2{ margin:0 0 6px; font-size:18px; }
+    .small{ margin:0 0 10px; color:#555; font-size:13px; }
+
+    label{ display:block; font-weight:800; margin:10px 0 6px; }
+    input, select{
+      width:100%;
+      box-sizing:border-box;
+      padding:10px;
+      border-radius:12px;
+      border:1px solid #bbb;
+      font:inherit;
+      background:#fff;
+    }
+
+    .row2{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:10px;
+    }
+    @media (min-width: 720px){
+      .row2{ grid-template-columns: 1fr 1fr; }
+    }
+
+    .actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin-top:12px;
+    }
+
+    .hintBox{
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid #ffe1a6;
+      background: #fff9ee;
+    }
+    .okBox{
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid #cfe8cf;
+      background: #f5fff5;
+    }
+    .errBox{
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid #ffb3b3;
+      background: #fff2f2;
+    }
+
+    .list{
+      margin: 10px 0 0;
+      padding: 0;
+      list-style:none;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      max-height: 560px;
+      overflow:auto;
+      border-top: 1px solid #eee;
+      padding-top: 10px;
+    }
+    .item{
+      border:1px solid #eee;
+      border-radius:14px;
+      padding:10px;
+      background:#fff;
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .itemLeft{ min-width: 0; }
+    .itemTitle{ font-weight:900; margin:0 0 2px; }
+    .itemMeta{ margin:0; color:#555; font-size:13px; }
+    code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
+  </style>
+</head>
+
+<body>
+<header>
+  <div>
+    <h1>Sök historisk person</h1>
+    <p class="muted">Sök förslag och importera som ny person i <strong>aktivt träd</strong>. (Demo-källa nu, API senare.)</p>
+
+    <nav class="topbar" aria-label="Navigation">
+      <a class="btn secondary" href="../start.html">Start</a>
+      <a class="btn secondary" href="./trees.html">Träd</a>
+      <a class="btn secondary" href="./slaktkort.html">Personer</a>
+      <a class="btn secondary" href="./create-relation.html">Relationer</a>
+      <a class="btn secondary" href="./map.html">Karta</a>
+      <a class="btn" href="./person-search.html" aria-current="page">Sök historisk person</a>
+    </nav>
+  </div>
+
+  <div class="actions" style="justify-content:flex-end;">
+    <button id="logoutBtn" class="btn secondary" type="button">Logga ut</button>
+  </div>
+</header>
+
+<section class="pillRow" aria-label="Status">
+  <span id="pillTree" class="pill warn">Aktivt träd: <strong>—</strong></span>
+  <span id="pillPeople" class="pill">Personer: <strong>0</strong></span>
+  <span id="pillSource" class="pill warn">Källa: <strong>Demo</strong></span>
+</section>
+
+<div class="grid">
+  <!-- ===========================
+       VÄNSTER: SÖK
+  ============================ -->
+  <section class="card" aria-label="Sök">
+    <h2>Sök</h2>
+    <p class="small">Skriv minst 3 bokstäver. Välj en träff till höger och importera.</p>
+
+    <div id="hint" class="hintBox" hidden></div>
+    <div id="ok" class="okBox" hidden></div>
+    <div id="err" class="errBox" hidden></div>
+
+    <label for="q">Namn</label>
+    <input id="q" autocomplete="off" placeholder="t.ex. Karl, Anna, Anders…" />
+
+    <div class="row2">
+      <div>
+        <label for="y1">Födelseår (valfritt)</label>
+        <input id="y1" inputmode="numeric" placeholder="t.ex. 1890" />
+      </div>
+      <div>
+        <label for="y2">Dödsår (valfritt)</label>
+        <input id="y2" inputmode="numeric" placeholder="t.ex. 1950" />
+      </div>
+    </div>
+
+    <label for="place">Plats (valfritt)</label>
+    <input id="place" autocomplete="off" placeholder="t.ex. Falun, Uppsala…" />
+
+    <div class="actions">
+      <button id="searchBtn" class="btn primary" type="button">Sök</button>
+      <button id="clearBtn" class="btn secondary" type="button">Rensa</button>
+      <a class="btn secondary" href="./slaktkort.html">← Tillbaka</a>
+    </div>
+
+    <div class="hintBox" style="margin-top:12px;">
+      <strong>Obs</strong><br />
+      Den här sidan använder en <em>demo-datakälla</em> just nu (för UI/flow).<br />
+      När du senare kopplar riktig källa (t.ex. Riksarkivet/API) byter du bara funktionen <code>fetchCandidates()</code>.
+    </div>
+  </section>
+
+  <!-- ===========================
+       HÖGER: RESULTAT
+  ============================ -->
+  <section class="card" aria-label="Resultat">
+    <h2>Resultat</h2>
+    <div class="actions" style="margin-top:0;">
+      <span class="small" id="meta">—</span>
+    </div>
+    <ul id="list" class="list" aria-label="Sökresultat"></ul>
+  </section>
+</div>
+
+<script>
+  "use strict";
+
+  // =====================================================
+  // SECTION: AUTH-GUARD (DEMO)
+  // =====================================================
+  (function authGuard(){
+    try{
+      if(sessionStorage.getItem("demo_auth") !== "1"){
+        window.location.href = "../index.html";
+      }
+    }catch{}
+  })();
+
+  // =====================================================
+  // SECTION: STORAGE KEYS (MÅSTE MATCHA ÖVRIGA SIDOR)
+  // =====================================================
+  const KEY_TREES  = "slakttradet_trees";
+  const KEY_ACTIVE = "slakttradet_active_tree_id";
+  const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
+
+  // =====================================================
+  // SECTION: DOM
+  // =====================================================
+  const logoutBtn  = document.getElementById("logoutBtn");
+  const pillTree   = document.getElementById("pillTree");
+  const pillPeople = document.getElementById("pillPeople");
+  const pillSource = document.getElementById("pillSource");
+
+  const hintEl = document.getElementById("hint");
+  const okEl   = document.getElementById("ok");
+  const errEl  = document.getElementById("err");
+
+  const qEl     = document.getElementById("q");
+  const y1El    = document.getElementById("y1");
+  const y2El    = document.getElementById("y2");
+  const placeEl = document.getElementById("place");
+
+  const searchBtn = document.getElementById("searchBtn");
+  const clearBtn  = document.getElementById("clearBtn");
+
+  const metaEl = document.getElementById("meta");
+  const listEl = document.getElementById("list");
+
+  // =====================================================
+  // SECTION: UI STATE (anti-dubbelklick, fail-closed)
+  // =====================================================
+  let isSearching = false;
+  let isImporting = false;
+  let storageOk   = true;
+
+  // =====================================================
+  // SECTION: HELPERS (JSON/storage/escape)
+  // =====================================================
+  function safeParse(raw, fallback){
+    try{ return JSON.parse(raw); }catch{ return fallback; }
+  }
+
+  // Fail-closed: om vi upptäcker korrupt data i nycklar vi behöver
+  function loadJson(key, fallback){
+    const raw = localStorage.getItem(key);
+    if(raw == null) return fallback;
+    const parsed = safeParse(raw, "__PARSE_FAIL__");
+    if(parsed === "__PARSE_FAIL__"){
+      storageOk = false;
+      return fallback;
+    }
+    return parsed;
+  }
+
+  function saveJson(key, value){
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  function escapeHtml(s){
+    return String(s || "")
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+
+  function clearBoxes(){
+    hintEl.hidden = true; hintEl.innerHTML = "";
+    okEl.hidden = true; okEl.innerHTML = "";
+    errEl.hidden = true; errEl.innerHTML = "";
+  }
+
+  function setBox(el, html){
+    el.hidden = false;
+    el.innerHTML = html;
+  }
+
+  // =====================================================
+  // SECTION: ACTIVE TREE + PEOPLE
+  // =====================================================
+  function activeTreeId(){
+    return localStorage.getItem(KEY_ACTIVE) || "";
+  }
+
+  function getTrees(){
+    const arr = loadJson(KEY_TREES, []);
+    return Array.isArray(arr) ? arr : [];
+  }
+
+  function activeTreeLabel(){
+    const id = activeTreeId();
+    if(!id) return "—";
+    const t = getTrees().find(x => String(x.id) === String(id));
+    return t ? (t.name || t.id) : id;
+  }
+
+  function loadPeople(){
+    const t = activeTreeId();
+    if(!t) return [];
+    const arr = loadJson(cardsKey(t), []);
+    return Array.isArray(arr) ? arr : [];
+  }
+
+  function savePeople(people){
+    const t = activeTreeId();
+    if(!t) return;
+    saveJson(cardsKey(t), Array.isArray(people) ? people : []);
+  }
+
+  // =====================================================
+  // SECTION: INPUT VALIDATION
+  // =====================================================
+  function parseYear(v){
+    // Fail-closed: bara heltal 0..3000, annars tomt
+    const s = String(v || "").trim();
+    if(!s) return "";
+    if(!/^\d{1,4}$/.test(s)) return ""; // strikt: endast siffror
+    const n = Number(s);
+    if(!Number.isFinite(n)) return "";
+    const i = Math.trunc(n);
+    if(i < 0 || i > 3000) return "";
+    return String(i);
+  }
+
+  function validateYearsUI(){
+    // Visar en mjuk varning i hintBox om år fälten innehåller “icke-parsebara” värden
+    // (ingen hård block här, men sök/import använder parseYear och ignorerar skräp)
+    const raw1 = String(y1El.value || "").trim();
+    const raw2 = String(y2El.value || "").trim();
+    const ok1 = !raw1 || !!parseYear(raw1);
+    const ok2 = !raw2 || !!parseYear(raw2);
+
+    // Om allt ok: gör inget. Om inte: visa hint.
+    if(ok1 && ok2) return;
+
+    // Visa bara om vi inte redan visar “inget träd” etc.
+    if(hintEl.hidden){
+      setBox(hintEl, "<strong>År-fält:</strong> använd bara siffror (t.ex. 1890). Andra tecken ignoreras vid sök.");
+    }
+  }
+
+  function newId(){
+    return "p_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,7);
+  }
+
+  // =====================================================
+  // SECTION: UI HEADER (pills + preconditions)
+  // =====================================================
+  function renderPills(){
+    const trees = getTrees();
+    const act = activeTreeId();
+    const hasTrees = trees.length > 0;
+    const hasActive = !!act && trees.some(t => String(t.id) === String(act));
+
+    pillTree.className = "pill " + (hasActive ? "ok" : (hasTrees ? "warn" : "err"));
+    pillTree.innerHTML = "Aktivt träd: <strong>" + escapeHtml(hasActive ? activeTreeLabel() : "—") + "</strong>";
+
+    const ppl = hasActive ? loadPeople().length : 0;
+    pillPeople.innerHTML = "Personer: <strong>" + ppl + "</strong>";
+
+    pillSource.className = "pill warn";
+    pillSource.innerHTML = "Källa: <strong>Demo</strong>";
+  }
+
+  function renderHint(){
+    const trees = getTrees();
+    const act = activeTreeId();
+    const hasTrees = trees.length > 0;
+    const hasActive = !!act && trees.some(t => String(t.id) === String(act));
+
+    if(!storageOk){
+      setBox(errEl, "<strong>Datafel i webbläsarens lagring.</strong> (Korrupt JSON i localStorage.)<br/>" +
+        "För säkerhets skull stoppar vi import/sök här. Prova att exportera / rensa data och ladda om sidan.");
+      searchBtn.disabled = true;
+      return false;
+    }
+
+    if(!hasTrees){
+      setBox(hintEl, "<strong>Skapa ett träd först.</strong> <a href='./trees.html'>Gå till Träd</a>.");
+      searchBtn.disabled = true;
+      return false;
+    }
+    if(!hasActive){
+      setBox(hintEl, "<strong>Välj ett aktivt träd.</strong> <a href='./trees.html'>Gå till Träd</a>.");
+      searchBtn.disabled = true;
+      return false;
+    }
+    searchBtn.disabled = false;
+    return true;
+  }
+
+  // =====================================================
+  // SECTION: DEMO SOURCE (byt senare mot riktig API-connector)
+  // =====================================================
+  const DEMO = [
+    { given:"Karl",   family:"Johansson",  birth:"1879", death:"1953", place:"Falun",     sex:"man" },
+    { given:"Anna",   family:"Persdotter", birth:"1862", death:"1921", place:"Uppsala",   sex:"kvinna" },
+    { given:"Anders", family:"Larsson",    birth:"1901", death:"1978", place:"Gävle",     sex:"man" },
+    { given:"Brita",  family:"Nilsdotter", birth:"1844", death:"1910", place:"Västerås",  sex:"kvinna" },
+    { given:"Olof",   family:"Svensson",   birth:"1888", death:"1966", place:"Luleå",     sex:"man" },
+    { given:"Maria",  family:"Eriksdotter",birth:"1895", death:"1972", place:"Visby",     sex:"kvinna" }
+  ];
+
+  function norm(s){ return String(s || "").trim().toLowerCase(); }
+
+  async function fetchCandidates(query){
+    // Demo: filtrera lokalt (ersätt med fetch(...) mot API senare)
+    const q = norm(query.name);
+    const place = norm(query.place);
+    const y1 = String(query.birth || "");
+    const y2 = String(query.death || "");
+
+    let arr = DEMO.filter(x => {
+      const full = norm(x.given + " " + x.family);
+      const okName = !q || full.includes(q);
+      const okPlace = !place || norm(x.place).includes(place);
+      const okY1 = !y1 || String(x.birth) === y1;
+      const okY2 = !y2 || String(x.death) === y2;
+      return okName && okPlace && okY1 && okY2;
+    });
+
+    // Simulera nätverk
+    await new Promise(r => setTimeout(r, 120));
+
+    return arr.slice(0, 25).map(x => ({
+      given: x.given,
+      family: x.family,
+      birth: x.birth,
+      death: x.death,
+      place: x.place,
+      sex: x.sex,
+      source: "Demo"
+    }));
+  }
+
+  // =====================================================
+  // SECTION: RENDER RESULTS
+  // =====================================================
+  function renderEmpty(){
+    listEl.innerHTML = "";
+    const li = document.createElement("li");
+    li.className = "item";
+    li.style.cursor = "default";
+    li.innerHTML = "<div class='itemLeft'><p class='itemTitle'>Inga resultat</p><p class='itemMeta'>Prova ett annat namn eller ta bort filter.</p></div>";
+    listEl.appendChild(li);
+  }
+
+  function setImportingState(on){
+    isImporting = !!on;
+    // Knapp-låsning görs per item också, men detta är en extra guard
+  }
+
+  function renderResults(items){
+    listEl.innerHTML = "";
+
+    if(!items || items.length === 0){
+      metaEl.textContent = "0 resultat (Demo)";
+      renderEmpty();
+      return;
+    }
+
+    metaEl.textContent = items.length + " resultat (Demo)";
+
+    for(const it of items){
+      const li = document.createElement("li");
+      li.className = "item";
+
+      const left = document.createElement("div");
+      left.className = "itemLeft";
+
+      const title = document.createElement("p");
+      title.className = "itemTitle";
+      title.textContent = (it.given + " " + it.family).trim();
+
+      const meta = document.createElement("p");
+      meta.className = "itemMeta";
+      meta.textContent =
+        (it.birth || it.death ? ("År: " + (it.birth || "—") + "–" + (it.death || "—") + " · ") : "") +
+        (it.place ? ("Plats: " + it.place + " · ") : "") +
+        ("Källa: " + (it.source || "—"));
+
+      left.appendChild(title);
+      left.appendChild(meta);
+
+      const importBtn = document.createElement("button");
+      importBtn.className = "btn primary";
+      importBtn.type = "button";
+      importBtn.textContent = "Importera";
+
+      importBtn.addEventListener("click", async () => {
+        if(isImporting) return; // anti-dubbelklick
+        importBtn.disabled = true;
+        setImportingState(true);
+        try{
+          await importPerson(it);
+        }finally{
+          setImportingState(false);
+          importBtn.disabled = false;
+        }
+      });
+
+      li.appendChild(left);
+      li.appendChild(importBtn);
+      listEl.appendChild(li);
+    }
+  }
+
+  // =====================================================
+  // SECTION: IMPORT LOGIC (skapa person + redirect)
+  // =====================================================
+  function makePersonFromCandidate(it){
+    return {
+      id: newId(),
+      fornamn: String(it.given || "").trim(),
+      efternamn: String(it.family || "").trim(),
+      kon: (it.sex === "man" || it.sex === "kvinna") ? it.sex : "",
+      yrke: "",
+      fodelsear: String(it.birth || "").trim(),
+      dodsar: String(it.death || "").trim(),
+      plats: String(it.place || "").trim(),
+      coords: null,
+      anteckning: "Importerad från: " + String(it.source || "Källa")
+    };
+  }
+
+  function isDupe(people, p){
+    // Dupe-regel:
+    // - om fodelsear finns: matcha på (fornamn+efternamn+fodelsear)
+    // - om fodelsear saknas: matcha på (fornamn+efternamn) men bara som varning (tillåt import)
+    const fn = String(p.fornamn || "").trim().toLowerCase();
+    const en = String(p.efternamn || "").trim().toLowerCase();
+    const y  = String(p.fodelsear || "").trim();
+
+    if(!fn || !en) return { hit:false, mode:"none" };
+
+    if(y){
+      const hit = people.some(x =>
+        String(x.fornamn || "").trim().toLowerCase() === fn &&
+        String(x.efternamn || "").trim().toLowerCase() === en &&
+        String(x.fodelsear || "").trim() === y
+      );
+      return { hit, mode: hit ? "hard" : "none" };
+    }
+
+    const hitSoft = people.some(x =>
+      String(x.fornamn || "").trim().toLowerCase() === fn &&
+      String(x.efternamn || "").trim().toLowerCase() === en
+    );
+    return { hit: hitSoft, mode: hitSoft ? "soft" : "none" };
+  }
+
+  function redirectToPerson(pId){
+    // Flödesnyckel (ingen ny localStorage key): vi skickar id i hash
+    // Kräver PATCH i slaktkort.html som läser #open=<id> och öppnar personen i formuläret.
+    const url = "./slaktkort.html#open=" + encodeURIComponent(String(pId || ""));
+    window.location.href = url;
+  }
+
+  async function importPerson(it){
+    clearBoxes();
+
+    if(!storageOk){
+      setBox(errEl, "<strong>Datafel i webbläsarens lagring.</strong> Import stoppas (fail-closed).");
+      return;
+    }
+
+    const act = activeTreeId();
+    const trees = getTrees();
+    const hasTrees = trees.length > 0;
+    const hasActive = !!act && trees.some(t => String(t.id) === String(act));
+
+    if(!hasTrees){
+      setBox(errEl, "<strong>Inga träd finns.</strong> Skapa ett träd först. <a href='./trees.html'>Gå till Träd</a>.");
+      return;
+    }
+    if(!hasActive){
+      setBox(errEl, "<strong>Inget aktivt träd valt.</strong> Välj aktivt träd. <a href='./trees.html'>Gå till Träd</a>.");
+      return;
+    }
+
+    const people = loadPeople();
+    const p = makePersonFromCandidate(it);
+
+    if(!p.fornamn || !p.efternamn){
+      setBox(errEl, "<strong>Kunde inte importera.</strong> Namn saknas.");
+      return;
+    }
+
+    const d = isDupe(people, p);
+
+    if(d.mode === "hard"){
+      // Hård dupe: ge val att importera ändå
+      const ok = window.confirm("Det finns redan en person med samma namn + födelseår.\n\nVill du importera ändå?");
+      if(!ok){
+        setBox(errEl, "<strong>Avbruten.</strong> Personen importerades inte.");
+        return;
+      }
+    }
+
+    if(d.mode === "soft"){
+      // Mjuk dupe: varna men tillåt
+      const ok = window.confirm("Det finns redan en person med samma namn.\n(Födelseår saknas eller är tomt.)\n\nVill du importera ändå?");
+      if(!ok){
+        setBox(errEl, "<strong>Avbruten.</strong> Personen importerades inte.");
+        return;
+      }
+    }
+
+    // Spara
+    people.push(p);
+    savePeople(people);
+
+    // UI uppdatering (snabbt)
+    renderPills();
+
+    // Nytt flöde: auto-öppna personen i Personer och fyll formulär (via slaktkort-patch)
+    setBox(okEl, "<strong>Importerad.</strong> Öppnar personen i Personer…");
+    redirectToPerson(p.id);
+  }
+
+  // =====================================================
+  // SECTION: SEARCH ACTION
+  // =====================================================
+  async function doSearch(){
+    clearBoxes();
+    validateYearsUI();
+
+    if(!renderHint()){
+      metaEl.textContent = "—";
+      renderEmpty();
+      return;
+    }
+
+    const name = String(qEl.value || "").trim();
+    if(name.length < 3){
+      setBox(errEl, "<strong>Skriv minst 3 bokstäver.</strong>");
+      metaEl.textContent = "—";
+      renderEmpty();
+      return;
+    }
+
+    if(isSearching) return;
+    isSearching = true;
+    searchBtn.disabled = true;
+
+    const query = {
+      name,
+      birth: parseYear(y1El.value),
+      death: parseYear(y2El.value),
+      place: String(placeEl.value || "").trim()
+    };
+
+    metaEl.textContent = "Söker…";
+
+    try{
+      const items = await fetchCandidates(query);
+      renderResults(items);
+    }catch(e){
+      setBox(errEl, "<strong>Fel vid sökning.</strong>");
+      metaEl.textContent = "—";
+      renderEmpty();
+    }finally{
+      isSearching = false;
+      searchBtn.disabled = false;
+    }
+  }
+
+  // =====================================================
+  // SECTION: CLEAR FORM
+  // =====================================================
+  function clearForm(){
+    clearBoxes();
+    qEl.value = "";
+    y1El.value = "";
+    y2El.value = "";
+    placeEl.value = "";
+    metaEl.textContent = "—";
+    renderEmpty();
+    try{ qEl.focus(); }catch{}
+  }
+
+  // =====================================================
+  // SECTION: EVENTS
+  // =====================================================
+  logoutBtn.addEventListener("click", () => {
+    try{ sessionStorage.removeItem("demo_auth"); }catch{}
+    window.location.href = "../index.html";
+  });
+
+  searchBtn.addEventListener("click", doSearch);
+  clearBtn.addEventListener("click", clearForm);
+
+  qEl.addEventListener("keydown", (e) => {
+    if(e.key === "Enter"){ e.preventDefault(); doSearch(); }
+  });
+
+  // År-fälten: visa mjuk validering
+  y1El.addEventListener("input", () => { clearBoxes(); validateYearsUI(); });
+  y2El.addEventListener("input", () => { clearBoxes(); validateYearsUI(); });
+
+  // =====================================================
+  // SECTION: STARTUP
+  // =====================================================
+  function start(){
+    // init: render och fail-closed check
+    renderPills();
+    renderHint();
+    metaEl.textContent = "—";
+    renderEmpty();
+    try{ qEl.focus(); }catch{}
+  }
+  start();
+</script>
+</body>
+</html>
+
+<!-- =====================================================
+PATCH-NOTIS (KRÄVS): app/slaktkort.html
+För att "Importera -> auto-fyll formulär" ska fungera måste slaktkort.html läsa hash:
+  #open=<personId>
+och öppna den personen i formuläret.
+
+KListra in logiken NÄRA din befintliga init/start-kod i slaktkort.html.
+Jag kan inte ge "hel fil" för slaktkort.html utan att du klistrar in den här i chatten.
+
+MINIMAL PATCH (princip):
+  1) Läs personId från location.hash
+  2) Ladda people för aktivt träd (samma keys)
+  3) Hitta matchande person
+  4) Kör samma funktion som när man klickar en person i listan (select/edit)
+  5) Rensa hash så det inte triggas igen
+
+Om du klistrar in din slaktkort.html här så patchar jag hela filen åt dig också.
+===================================================== -->
 
