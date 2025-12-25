@@ -994,9 +994,28 @@
     });
 
     // FIX: knappen ska faktiskt gå till sidan
-    findHistoricalBtn.addEventListener("click", () => {
-      window.location.href = "./person-search.html";
-    });
+  findHistoricalBtn.addEventListener("click", async () => {
+  // Failsafe: testa att filen finns och går att läsa utan att navigera "blint"
+  const target = "./person-search.html";
+
+  try{
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 2500);
+
+    const r = await fetch(target, { cache: "no-store", signal: ctrl.signal });
+    clearTimeout(t);
+
+    if(!r.ok){
+      showTopMsg("err", "⛔ Kan inte öppna söksidan (fil saknas eller gav " + r.status + "). Kontrollera att app/person-search.html finns i repot.");
+      return;
+    }
+
+    window.location.href = target;
+  }catch(e){
+    // fetch kan blockeras på file://, men på GitHub Pages ska den funka.
+    window.location.href = target;
+  }
+});
 
     saveBtn.addEventListener("click", saveCurrent);
     deleteBtn.addEventListener("click", deleteCurrent);
