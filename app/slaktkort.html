@@ -213,10 +213,6 @@
       <a class="btn navActive" href="./slaktkort.html" aria-current="page">Personer</a>
       <a class="btn secondary" href="./create-relation.html">Relationer</a>
       <a class="btn secondary" href="./map.html">Karta</a>
-
-      <!-- AO-02: navigation till RA-suggest (diskret, ingen redesign) -->
-      <a class="btn secondary" href="./ra-suggest.html?return=slaktkort">Hitta historisk person</a>
-
       <span class="spacer"></span>
       <button class="btn secondary" id="logoutBtn" type="button">Logga ut</button>
     </nav>
@@ -245,6 +241,8 @@
       <div class="actions" style="margin-top:10px;">
         <button class="btn" id="newBtn" type="button">Skapa ny person</button>
         <button class="btn secondary" id="reloadBtn" type="button">Ladda om</button>
+        <!-- NY KNAPP (UI-only) -->
+        <button class="btn secondary" id="findHistoricalBtn" type="button">Sök historisk person</button>
       </div>
 
       <ul id="list" class="list" aria-label="Personer"></ul>
@@ -333,11 +331,6 @@
     })();
 
     // =====================================================
-    // AO-02 (LÅST): session handshake key
-    // =====================================================
-    const RA_SESSION_KEY = "slaktkort_ra_candidate_v1";
-
-    // =====================================================
     // STORAGE KEYS (MÅSTE MATCHA ÖVRIGA SIDOR)
     // =====================================================
     const KEY_TREES  = "slakttradet_trees";
@@ -371,6 +364,9 @@
 
     const newBtn = document.getElementById("newBtn");
     const reloadBtn = document.getElementById("reloadBtn");
+
+    // NY KNAPP (UI-only)
+    const findHistoricalBtn = document.getElementById("findHistoricalBtn");
 
     const formTitle = document.getElementById("formTitle");
     const formSub = document.getElementById("formSub");
@@ -603,52 +599,6 @@
     }
 
     // =====================================================
-    // AO-02: CONSUME RA CANDIDATE (session-only, fail-closed)
-    // - Fyller DOM-fält, men sparar INTE till localStorage automatiskt.
-    // =====================================================
-    function splitName(full){
-      const s = String(full || "").trim().replace(/\s+/g, " ");
-      if(!s) return { fornamn:"", efternamn:"" };
-      const parts = s.split(" ");
-      if(parts.length === 1) return { fornamn: parts[0], efternamn: "" };
-      return { fornamn: parts[0], efternamn: parts.slice(1).join(" ") };
-    }
-
-    function consumeRaCandidateAutofill(){
-      let raw = null;
-      try{ raw = sessionStorage.getItem(RA_SESSION_KEY); }catch{}
-      if(!raw) return false;
-
-      let payload = null;
-      try{ payload = JSON.parse(raw); }catch{ payload = null; }
-
-      // Fail-closed: rensa alltid nyckeln när vi sett den
-      try{ sessionStorage.removeItem(RA_SESSION_KEY); }catch{}
-
-      if(!payload || typeof payload !== "object") return false;
-
-      const name = String(payload.name || "").trim();
-      const birthYear = (payload.birthYear != null && String(payload.birthYear).trim() !== "") ? parseYear(payload.birthYear) : "";
-      const deathYear = (payload.deathYear != null && String(payload.deathYear).trim() !== "") ? parseYear(payload.deathYear) : "";
-      const place = String(payload.place || "").trim();
-
-      if(name){
-        const parts = splitName(name);
-        fornamnEl.value = parts.fornamn;
-        efternamnEl.value = parts.efternamn;
-      }
-      if(birthYear) fodelsearEl.value = birthYear;
-      if(deathYear) dodsarEl.value = deathYear;
-      if(place) platsEl.value = place;
-
-      // Neutral info-rad (AO-02)
-      showTopMsg("ok", "Kandidat infylld. Spara om du vill behålla.");
-
-      // Viktigt: ingen auto-save här (ingen localStorage-persist utan användarens handling)
-      return true;
-    }
-
-    // =====================================================
     // PLACE PICK RESULT HANDLING (VIKTIG DEL)
     // =====================================================
     function consumePlaceResult(){
@@ -809,7 +759,6 @@
         return;
       }
 
-      // 1) Place-result kan skriva in coords + ev label (som tidigare)
       consumePlaceResult();
 
       const d = loadDraft();
@@ -846,9 +795,6 @@
           applyDraftToForm(null);
         }
       }
-
-      // 2) AO-02: sedan autofyll från sessionStorage (utan att spara i localStorage)
-      consumeRaCandidateAutofill();
     }
 
     // =====================================================
@@ -1038,6 +984,11 @@
     reloadBtn.addEventListener("click", () => {
       initForm();
       renderList();
+    });
+
+    // NY KNAPP (UI-only): visar att knappen fungerar
+    findHistoricalBtn.addEventListener("click", () => {
+      showTopMsg("warn", "🔎 Sök historisk person: knappen är på plats. Nästa steg är att koppla detta till ett riktigt öppet API/flöde.");
     });
 
     saveBtn.addEventListener("click", saveCurrent);
