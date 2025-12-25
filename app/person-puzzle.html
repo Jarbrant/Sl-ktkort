@@ -138,7 +138,14 @@
     }
     .item:hover{ background:#fafafa; }
     .item.sel{ outline:2px solid #111; }
-    .itemTitle{ font-weight:900; margin:0 0 2px; display:flex; align-items:center; gap:10px; }
+    .itemTitle{
+      font-weight:900;
+      margin:0 0 2px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+    }
     .badge{
       display:inline-flex;
       align-items:center;
@@ -150,6 +157,8 @@
       font-weight:900;
       white-space:nowrap;
     }
+    .badge.good{ border-color:#cfe8cf; background:#f5fff5; }
+    .badge.bad{ border-color:#ffb3b3; background:#fff2f2; }
     .itemMeta{ margin:0; color:#555; font-size: 13px; }
 
     code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
@@ -157,13 +166,13 @@
   </style>
 
   <!-- Providerlager -->
-  <script src="./assets/js/ra-providers.js?v=20251225b"></script>
+  <script src="./assets/js/ra-providers.js?v=20251225c"></script>
 </head>
 
 <body>
   <header>
     <h1>Person puzzle</h1>
-    <p class="muted">Ring in rätt person med pusselbitar och poäng. Du importerar först när du själv klickar Importera.</p>
+    <p class="muted">Ring in rätt person med pusselbitar och poäng. Import sker bara när du klickar Importera.</p>
 
     <nav class="topbar" aria-label="Huvudmeny">
       <a class="btn secondary" href="../start.html">Start</a>
@@ -180,18 +189,19 @@
     <span id="pillTree" class="pill warn">Aktivt träd: <strong>—</strong></span>
     <span id="pillCand" class="pill">Kandidater: <strong>0</strong></span>
     <span id="pillSource" class="pill warn">Källa: <strong>—</strong></span>
+    <span id="pillVisible" class="pill">Visas: <strong>0</strong></span>
   </section>
 
   <div class="grid">
     <section class="card" aria-label="Frågor och poäng">
       <h2>Frågor</h2>
       <p class="small">
-        Du kan poängsätta lokalt (snabbt) och vid behov fråga källan igen (ny sökning på basnamn).
+        Målet är att <strong>minska</strong> listan. Du kan dölja kandidater under en tröskel och fråga källan igen (ny sökning).
       </p>
 
       <div id="topMsg" class="liftBox warn" hidden></div>
 
-      <label for="place">Plats (extra pusselbit)</label>
+      <label for="place">Plats (pusselbit)</label>
       <input id="place" placeholder="t.ex. Leksand, Falun, socken, län…" autocomplete="off"/>
 
       <div class="row2">
@@ -216,8 +226,11 @@
         </div>
       </div>
 
-      <label for="clues">Pusselbitar (fri text / nyckelord)</label>
-      <textarea id="clues" placeholder="t.ex. 'smed', 'soldat', 'tidningsnotis', 'gifte sig', 'gårdsnamn'…"></textarea>
+      <label for="clues">Pusselbitar (nyckelord – fri text)</label>
+      <textarea id="clues" placeholder="t.ex. 'smed', 'soldat', 'tidningsnotis', gårdsnamn…"></textarea>
+
+      <label for="minScore">Min score för att visas (döljer resten)</label>
+      <input id="minScore" inputmode="numeric" placeholder="t.ex. 5" />
 
       <div class="actions">
         <button class="btn primary" id="applyBtn" type="button">Poängsätt & sortera</button>
@@ -250,6 +263,7 @@
       <div class="liftBox" style="margin-top:10px;">
         <strong>Teknik</strong><br/>
         Bas-sökterm: <code id="ctxQ">—</code><br/>
+        API-query: <code id="ctxApiQ">—</code><br/>
         Start-hints: <code id="ctxHints">—</code>
       </div>
     </section>
@@ -291,6 +305,7 @@
     const pillTree = document.getElementById("pillTree");
     const pillCand = document.getElementById("pillCand");
     const pillSource = document.getElementById("pillSource");
+    const pillVisible = document.getElementById("pillVisible");
 
     const topMsg = document.getElementById("topMsg");
 
@@ -300,6 +315,7 @@
     const deathMinEl = document.getElementById("deathMin");
     const deathMaxEl = document.getElementById("deathMax");
     const cluesEl = document.getElementById("clues");
+    const minScoreEl = document.getElementById("minScore");
 
     const applyBtn = document.getElementById("applyBtn");
     const resetBtn = document.getElementById("resetBtn");
@@ -313,6 +329,7 @@
     const dropBtn = document.getElementById("dropBtn");
 
     const ctxQ = document.getElementById("ctxQ");
+    const ctxApiQ = document.getElementById("ctxApiQ");
     const ctxHints = document.getElementById("ctxHints");
 
     /* ============================================================
@@ -384,7 +401,7 @@
       return t ? (t.name || t.id) : id;
     }
 
-    function refreshPills(){
+    function refreshPills(visibleCount){
       const t = activeTreeId();
       const trees = getTrees();
       const hasTrees = trees.length > 0;
@@ -398,6 +415,8 @@
       const src = (context && context.providerLabel) ? String(context.providerLabel) : "—";
       pillSource.className = "pill " + (src === "—" ? "warn" : "ok");
       pillSource.innerHTML = "Källa: <strong>" + escapeHtml(src) + "</strong>";
+
+      pillVisible.innerHTML = "Visas: <strong>" + String(visibleCount || 0) + "</strong>";
     }
 
     function yearsText(c){
@@ -429,7 +448,10 @@
     let current = Array.isArray(base) ? base.slice() : [];
     let selectedIndex = -1;
 
-    // Pre-fill inputs från context (om söket innehöll hints)
+    // Visningscache
+    let lastRendered = [];
+
+    // Pre-fill inputs från context (hints)
     (function hydrateFromContext(){
       const hints = (context && Array.isArray(context.hints)) ? context.hints.slice() : [];
       const place = (context && context.place) ? String(context.place) : "";
@@ -441,6 +463,7 @@
       if(yMax != null) birthMaxEl.value = String(yMax);
 
       ctxQ.textContent = context && context.q ? String(context.q) : "—";
+      ctxApiQ.textContent = context && context.apiQuery ? String(context.apiQuery) : "—";
       ctxHints.textContent = hints.length ? hints.join(" | ") : "—";
 
       // Lägg in hints i clues också (så poängsystemet använder dem direkt)
@@ -448,6 +471,11 @@
         const existing = String(cluesEl.value || "").trim();
         const merged = (existing ? (existing + " ") : "") + hints.join(" ");
         cluesEl.value = merged.trim();
+      }
+
+      // Förvalt minScore: visa typ de bättre
+      if(!String(minScoreEl.value || "").trim()){
+        minScoreEl.value = "0";
       }
     })();
 
@@ -494,7 +522,7 @@
         else score -= 7;
       }
 
-      // Nyckelord (fri text)
+      // Nyckelord (fri text) – lite aggressiv men enkel
       for(const k of f.keywords){
         const hit = name.includes(k) || place.includes(k) || source.includes(k) || why.includes(k);
         score += hit ? 5 : -1;
@@ -516,35 +544,45 @@
         ? clues.split(/[\s,.;:()]+/).map(x => x.trim()).filter(x => x.length >= 3).slice(0, 30)
         : [];
 
-      return { place, birthMin, birthMax, deathMin, deathMax, keywords };
+      const minScore = parseYear(minScoreEl.value);
+      return { place, birthMin, birthMax, deathMin, deathMax, keywords, minScore: (minScore == null ? 0 : minScore) };
     }
 
     function applyScoring(showMessage){
       clearTopMsg();
       const f = getFilters();
 
+      // Score + sort
       const scored = current.map(c => ({ c, score: scoreCandidate(c, f) }));
       scored.sort((a,b) => (b.score - a.score));
 
-      current = scored.map(x => x.c);
+      // Filter for view (minScore)
+      const visible = scored.filter(x => x.score >= f.minScore);
 
-      renderList(scored);
-      refreshPills();
+      // Spara renderad lista (för click-index)
+      lastRendered = visible;
 
-      if(showMessage){
-        showTopMsg("ok", "✅ Poängsatt och sorterat. Högst score visas först.");
+      renderList(visible);
+      refreshPills(visible.length);
+
+      // UX: om bara 1 kandidat återstår i visningen, markera det tydligt
+      if(visible.length === 1){
+        showTopMsg("ok", "✅ Endast 1 kandidat kvar över tröskeln. Kontrollera och importera om det är rätt.");
+      }else if(showMessage){
+        showTopMsg("ok", "✅ Poängsatt och sorterat. Visar " + visible.length + " kandidat(er) (minScore=" + f.minScore + ").");
       }
     }
 
     /* ============================================================
        Render
        ============================================================ */
-    function setSelected(i){
-      selectedIndex = i;
-      const c = (i >= 0 && i < current.length) ? current[i] : null;
+    function setSelected(renderedIndex){
+      selectedIndex = renderedIndex;
+
+      const c = (renderedIndex >= 0 && renderedIndex < lastRendered.length) ? lastRendered[renderedIndex].c : null;
 
       const items = candList.querySelectorAll(".item");
-      items.forEach((el, idx) => el.classList.toggle("sel", idx === i));
+      items.forEach((el, idx) => el.classList.toggle("sel", idx === renderedIndex));
 
       if(!c){
         previewBox.className = "liftBox";
@@ -570,34 +608,33 @@
       dropBtn.disabled = false;
     }
 
-    function renderList(scored){
+    function renderList(visible){
       candList.innerHTML = "";
 
-      if(!current.length){
+      if(!visible.length){
         const li = document.createElement("li");
         li.className = "item";
         li.style.cursor = "default";
         li.innerHTML =
-          "<p class='itemTitle'>Inga kandidater kvar</p>" +
-          "<p class='itemMeta'>Nollställ frågor eller gå tillbaka till sök för att hämta ny lista.</p>";
+          "<p class='itemTitle'>0 kandidater visas</p>" +
+          "<p class='itemMeta'>Sänk minScore eller nollställ frågor. Du kan också fråga källan igen.</p>";
         candList.appendChild(li);
         setSelected(-1);
         return;
       }
 
-      const sArr = Array.isArray(scored)
-        ? scored
-        : current.map(c => ({ c, score: 0 }));
-
-      for(let i=0;i<sArr.length;i++){
-        const c = sArr[i].c;
-        const score = sArr[i].score;
+      for(let i=0;i<visible.length;i++){
+        const c = visible[i].c;
+        const score = visible[i].score;
 
         const li = document.createElement("li");
         li.className = "item";
+
+        const badgeClass = score >= 0 ? "badge good" : "badge bad";
+
         li.innerHTML =
           "<p class='itemTitle'>" +
-            "<span class='badge'>Score: " + String(score) + "</span>" +
+            "<span class='" + badgeClass + "'>Score: " + String(score) + "</span>" +
             escapeHtml(candTitle(c)) +
           "</p>" +
           "<p class='itemMeta'>" +
@@ -613,8 +650,8 @@
     }
 
     /* ============================================================
-       Ask source again (ny sökning på basnamn)
-       - Vi använder samma strategi: hämta listan -> poängsätt lokalt
+       Ask source again (ny sökning på API-query från context)
+       - Fail-closed: om context saknas -> tillbaka till sök
        ============================================================ */
     async function askSourceAgain(){
       clearTopMsg();
@@ -624,9 +661,9 @@
         return;
       }
 
-      const baseName = (context && context.q) ? String(context.q).trim() : "";
-      if(!baseName){
-        showTopMsg("err", "⛔ Saknar bas-sökterm. Gå tillbaka och gör ett nytt sök. (Fail-closed)");
+      const apiQuery = (context && context.apiQuery) ? String(context.apiQuery).trim() : "";
+      if(!apiQuery){
+        showTopMsg("err", "⛔ Saknar apiQuery. Gå tillbaka och gör ett nytt sök. (Fail-closed)");
         return;
       }
 
@@ -634,13 +671,23 @@
 
       try{
         const provider = window.RAProviders.pickProvider("searchapi");
-        const raw = await provider.search(baseName);
+        const raw = await provider.search(apiQuery);
 
-        // Behåll session-only: uppdatera listan
-        current = Array.isArray(raw) ? raw.slice(0, 50) : [];
+        // 0 träffar = 0 (ingen fallback här)
+        if(Array.isArray(raw) && raw.length === 0){
+          current = [];
+          base = [];
+          saveJsonSS(SS_CANDIDATES, []);
+          showTopMsg("warn", "⚠️ 0 träffar vid ny fråga: “" + apiQuery + "”. Gå tillbaka och ändra söket.");
+          applyScoring(false);
+          refreshPills(0);
+          return;
+        }
+
+        current = Array.isArray(raw) ? raw.slice(0, 80) : [];
         base = current.slice();
 
-        // Uppdatera context
+        // Uppdatera context label
         context = Object.assign({}, (context || {}), {
           providerId: "searchapi",
           providerLabel: provider.label || "Riksarkivet"
@@ -651,9 +698,8 @@
 
         // Poängsätt direkt (med dina nuvarande frågor)
         applyScoring(false);
-        refreshPills();
+        showTopMsg("ok", "✅ Nytt svar från källan. Listan är uppdaterad i session (inte sparad).");
 
-        showTopMsg("ok", "✅ Nytt svar från källan. Uppdaterat i session (inte sparat).");
       }catch(e){
         const msg = (e && e.message) ? String(e.message) : String(e || "");
         showTopMsg("warn", "⚠️ Kunde inte fråga källan igen: " + msg + " (fail-closed → behåller nuvarande lista).");
@@ -664,7 +710,8 @@
 
     /* ============================================================
        Import (explicit action only)
-       - 110-årsspärr på birthYear om vi har den
+       - 110-årsspärr på birthYear (fail-closed)
+       - Respekterar core storage-keys/datamodell
        ============================================================ */
     function importSelected(){
       clearTopMsg();
@@ -675,14 +722,14 @@
         return;
       }
 
-      if(!(selectedIndex >= 0 && selectedIndex < current.length)){
+      if(!(selectedIndex >= 0 && selectedIndex < lastRendered.length)){
         showTopMsg("warn", "⚠️ Välj en kandidat först.");
         return;
       }
 
-      const c = current[selectedIndex];
+      const c = lastRendered[selectedIndex].c;
 
-      // 110-årsspärr (fail-closed om birthYear är för “nytt”)
+      // 110-årsspärr (på födelseår om det finns)
       const nowYear = new Date().getFullYear();
       const cut = nowYear - 110;
       if(typeof c.birthYear === "number" && Number.isFinite(c.birthYear) && c.birthYear > cut){
@@ -690,16 +737,15 @@
         return;
       }
 
-      // Split namn (enkel)
+      // Split namn (enkel, fail-closed om tomt)
       const full = String(c.name || "").trim();
-      const parts = full.split(/\s+/).filter(Boolean);
-      const fornamn = parts.slice(0, Math.max(1, parts.length - 1)).join(" ");
-      const efternamn = (parts.length >= 2) ? parts.slice(-1).join(" ") : "";
-
-      if(!fornamn){
+      if(!full){
         showTopMsg("err", "⛔ Kan inte importera: namn saknas.");
         return;
       }
+      const parts = full.split(/\s+/).filter(Boolean);
+      const fornamn = parts.slice(0, Math.max(1, parts.length - 1)).join(" ");
+      const efternamn = (parts.length >= 2) ? parts.slice(-1).join(" ") : "";
 
       const people = loadJsonLS(cardsKey(t), []);
       const arr = Array.isArray(people) ? people : [];
@@ -717,10 +763,12 @@
         plats: String(c.place || "").trim(),
         coords: null,
         anteckning: [
-          "Importerad från extern källa (via puzzle).",
-          c.source ? ("Källa: " + c.source) : "",
+          "Importerad från extern källa (via person-puzzle).",
+          (context && context.providerLabel) ? ("Källa: " + context.providerLabel) : "",
+          c.source ? ("Source: " + c.source) : "",
           c.url ? ("URL: " + c.url) : "",
-          (Array.isArray(c.why) && c.why.length) ? ("Varför: " + c.why.join(" · ")) : ""
+          (Array.isArray(c.why) && c.why.length) ? ("Varför: " + c.why.join(" · ")) : "",
+          (context && context.apiQuery) ? ("Sök: " + context.apiQuery) : ""
         ].filter(Boolean).join("\n")
       };
 
@@ -738,9 +786,9 @@
     }
 
     async function copySelected(){
-      if(!(selectedIndex >= 0 && selectedIndex < current.length)) return;
+      if(!(selectedIndex >= 0 && selectedIndex < lastRendered.length)) return;
 
-      const c = current[selectedIndex];
+      const c = lastRendered[selectedIndex].c;
       const b = (c.birthYear != null) ? String(c.birthYear) : "—";
       const d = (c.deathYear != null) ? String(c.deathYear) : "—";
 
@@ -762,17 +810,25 @@
 
     function dropSelected(){
       clearTopMsg();
-      if(!(selectedIndex >= 0 && selectedIndex < current.length)){
+      if(!(selectedIndex >= 0 && selectedIndex < lastRendered.length)){
         showTopMsg("warn", "⚠️ Välj en kandidat först.");
         return;
       }
 
-      current.splice(selectedIndex, 1);
+      const c = lastRendered[selectedIndex].c;
+
+      // Ta bort från current (matcha på id/url/name)
+      current = current.filter(x => {
+        if(x === c) return false;
+        const sameId = x && c && x.id && c.id && String(x.id) === String(c.id);
+        const sameUrl = x && c && x.url && c.url && String(x.url) === String(c.url);
+        const sameName = x && c && x.name && c.name && String(x.name) === String(c.name);
+        return !(sameId || sameUrl || sameName);
+      });
+
       saveJsonSS(SS_CANDIDATES, current);
 
       applyScoring(false);
-      refreshPills();
-
       showTopMsg("ok", "✅ Kandidat borttagen (session-only).");
     }
 
@@ -783,6 +839,7 @@
       deathMinEl.value = "";
       deathMaxEl.value = "";
       cluesEl.value = "";
+      minScoreEl.value = "0";
       showTopMsg("ok", "✅ Frågor nollställda.");
       applyScoring(false);
     }
@@ -809,24 +866,33 @@
     copyBtn.addEventListener("click", copySelected);
     dropBtn.addEventListener("click", dropSelected);
 
+    // Enter = poängsätt (smidigt)
+    [placeEl, birthMinEl, birthMaxEl, deathMinEl, deathMaxEl, minScoreEl, cluesEl].forEach(el => {
+      el.addEventListener("keydown", (e) => {
+        if(e.key === "Enter" && el !== cluesEl){
+          e.preventDefault();
+          applyScoring(true);
+        }
+      });
+    });
+
     /* ============================================================
        Init
        ============================================================ */
     (function init(){
-      // Active tree check
+      // Active tree check (fail-closed)
       if(!activeTreeId()){
         showTopMsg("err", "⛔ Inget aktivt träd valt. Gå till Träd och välj aktivt träd. (Fail-closed)");
       }
 
-      // Render initial list (score directly)
-      refreshPills();
-      renderList(current.map(c => ({ c, score: 0 })));
+      // Start
       applyScoring(false);
 
       const q = (context && context.q) ? String(context.q) : "";
+      const apiQ = (context && context.apiQuery) ? String(context.apiQuery) : "";
       const hints = (context && Array.isArray(context.hints)) ? context.hints : [];
       if(q){
-        showTopMsg("warn", "ℹ️ Start: " + current.length + " kandidater från “" + q + "”. " + (hints.length ? ("Hints: " + hints.join(" | ") + ".") : "Lägg till pusselbitar för bättre score."));
+        showTopMsg("warn", "ℹ️ Start: " + current.length + " kandidater från sök. Bas: “" + q + "”. API: “" + (apiQ || "—") + "”. " + (hints.length ? ("Hints: " + hints.join(" | ") + ".") : "Lägg till pusselbitar för bättre score."));
       }else{
         showTopMsg("warn", "ℹ️ Start: " + current.length + " kandidater. Poängsätt för att ringa in rätt person.");
       }
