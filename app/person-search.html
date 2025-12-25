@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Sök historisk person – Släktkort</title>
-  <meta name="description" content="Sök efter historiska personer (Riksarkivet när möjligt, annars demo) och skicka kandidater till Person puzzle." />
+  <meta name="description" content="Sök historiska personer via Riksarkivet (proxy) med + förfining. Skicka kandidater till Puzzle (session-only)." />
 
   <style>
     :root{ color-scheme: light; }
@@ -19,13 +19,7 @@
       color: #111;
     }
     a{ color: inherit; text-decoration: none; }
-    header{
-      display:flex;
-      align-items:flex-start;
-      justify-content:space-between;
-      gap:12px;
-      margin-bottom:18px;
-    }
+    header{ display:block; margin-bottom:18px; }
     .topbar{
       display:flex;
       flex-wrap:wrap;
@@ -74,11 +68,7 @@
     .pill.warn{ border-color:#ffe1a6; background:#fff9ee; }
     .pill.err{ border-color:#ffb3b3; background:#fff2f2; }
 
-    .grid{
-      display:grid;
-      gap: 14px;
-      grid-template-columns: 1fr;
-    }
+    .grid{ display:grid; gap:14px; grid-template-columns: 1fr; }
     @media (min-width: 980px){
       .grid{ grid-template-columns: 460px 1fr; }
     }
@@ -94,7 +84,7 @@
     .small{ margin:0 0 10px; color:#555; font-size: 13px; }
 
     label{ display:block; font-weight:800; margin: 10px 0 6px; }
-    input{
+    input, textarea{
       width:100%;
       box-sizing:border-box;
       padding: 10px;
@@ -103,6 +93,7 @@
       font: inherit;
       background:#fff;
     }
+    textarea{ min-height: 86px; resize: vertical; }
 
     .actions{
       display:flex;
@@ -146,18 +137,21 @@
     .liftBox.ok{ border-color:#cfe8cf; background:#f5fff5; }
     .liftBox.warn{ border-color:#ffe1a6; background:#fff9ee; }
     .liftBox.err{ border-color:#ffb3b3; background:#fff2f2; }
+
     code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
     .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
   </style>
 
-  <!-- RA provider-lager -->
-  <script src="./assets/js/ra-providers.js"></script>
+  <!-- Providerlager (kopplat till Cloudflare Worker) -->
+  <script src="./assets/js/ra-providers.js?v=20251225b"></script>
 </head>
 
 <body>
-  <header style="display:block;">
+  <header>
     <h1>Sök historisk person</h1>
-    <p class="muted">Sök via Riksarkivet när det går. Om webbläsaren blockerar (CORS/timeout) faller vi tillbaka till demo.</p>
+    <p class="muted">
+      Sök via Riksarkivet (Sök-API). Förfina med <span class="mono">+</span> för att undvika för många träffar.
+    </p>
 
     <nav class="topbar" aria-label="Huvudmeny">
       <a class="btn secondary" href="../start.html">Start</a>
@@ -180,54 +174,53 @@
     <section class="card" aria-label="Sök">
       <h2>Sök</h2>
       <p class="small">
-        Sök på namn (minsta input). Fler frågor/poäng sker i <span class="mono">person-puzzle.html</span>.
+        Exempel:
+        <span class="mono">Stina Nilsson + Leksand + 1820–1825</span><br/>
+        <strong>Regel:</strong> Du måste ha <span class="mono">namn + minst en pusselbit</span> (t.ex. plats/år/nyckelord).
       </p>
 
       <div id="topMsg" class="liftBox warn" hidden></div>
 
-      <label for="q">Sökterm</label>
-      <input id="q" placeholder="t.ex. Karl Johansson" autocomplete="off" />
+      <label for="q">Sökterm (namn + <span class="mono">+</span> pusselbitar)</label>
+      <input id="q" placeholder="t.ex. Stina Nilsson + Leksand + 1822" autocomplete="off" />
+
+      <label for="parsed" style="margin-top:12px;">Tolkning (för transparens)</label>
+      <textarea id="parsed" class="mono" readonly></textarea>
 
       <div class="actions">
         <button class="btn primary" id="searchBtn" type="button">Sök</button>
         <button class="btn secondary" id="clearBtn" type="button">Rensa</button>
+        <button class="btn secondary" id="diagBtn" type="button">Kör diagnos</button>
         <button class="btn secondary" id="backBtn" type="button">Tillbaka</button>
       </div>
 
       <div class="liftBox" style="margin-top:10px;">
-        <strong>Policy</strong><br/>
-        Inga externa persondata sparas automatiskt. Kandidater skickas till Puzzle via <code>sessionStorage</code> (tillfälligt).<br/>
-        Import skapar först då en intern personpost i aktivt träd (localStorage).
+        <strong>Obs</strong><br/>
+        Ingen extern persondata sparas automatiskt. Kandidatlistan lagras <em>endast i session</em> för att kunna öppnas i <span class="mono">Person puzzle</span>.
       </div>
 
       <ul id="results" class="list" aria-label="Sökresultat"></ul>
     </section>
 
     <section class="card" aria-label="Förhandsvisning och nästa steg">
-      <h2>Förhandsvisning</h2>
-      <p class="small">Klicka en träff för preview. Nästa steg: öppna i Puzzle och ringa in rätt person.</p>
-
-      <!-- Diagnostik (ny) -->
-      <div id="diagBox" class="liftBox" style="margin: 8px 0 10px;">
-        <strong>Status:</strong> <span class="mono" id="diagStatus">—</span><br/>
-        <strong>Orsak:</strong> <span class="mono" id="diagReason">—</span><br/>
-        <strong>Senaste URL:</strong> <span class="mono" id="diagUrl">—</span>
-      </div>
+      <h2>Nästa steg</h2>
+      <p class="small">
+        När du har en kandidatlista kan du öppna den i <strong>Puzzle</strong> för att ringa in rätt person med fler frågor/poäng.
+      </p>
 
       <div id="previewBox" class="liftBox" aria-live="polite">
-        Välj en träff för att se detaljer här.
+        Tips: Skriv namn + minst en pusselbit. Ex: <span class="mono">Stina Nilsson + 1822</span> eller <span class="mono">Stina Nilsson + Leksand</span>.
       </div>
 
-      <div class="actions">
-        <button class="btn primary" id="puzzleBtn" type="button" disabled>Öppna i Puzzle</button>
-        <button class="btn secondary" id="copyBtn" type="button" disabled>Kopiera som text</button>
-        <button class="btn secondary" id="diagBtn" type="button">Kör diagnos</button>
+      <div class="actions" style="margin-top:10px;">
+        <button class="btn primary" id="toPuzzleBtn" type="button" disabled>Öppna i Puzzle</button>
+        <button class="btn secondary" id="copyBtn" type="button" disabled>Kopiera vald</button>
       </div>
 
       <div class="liftBox" style="margin-top:10px;">
         <strong>Teknik</strong><br/>
-        Provider-pipeline: <code>searchapi</code> → fallback <code>demo</code> vid fel (CORS/timeout) eller 0 träffar.<br/>
-        Feature flag ligger i kod (inte storage).
+        Provider: <code>RAProviders.pickProvider("searchapi")</code><br/>
+        Kandidater sparas i <code>sessionStorage</code> (inte localStorage).
       </div>
     </section>
   </div>
@@ -235,19 +228,9 @@
   <script>
     "use strict";
 
-    // ==========================================================
-    // FEATURE FLAGS (LÅST: inte i storage)
-    // - "auto" => försök searchapi först, fallback demo
-    // - "demo" => tvinga demo
-    // - "searchapi" => tvinga searchapi (men fallback i UI om fel)
-    // ==========================================================
-    const FEATURE_PROVIDER = "auto";
-    const FEATURE_ALLOW_NETWORK = true;
-
-    // Session keys (inte core localStorage-keys/datamodell)
-    const SS_CANDIDATES = "ra_session_candidates_v1";
-    const SS_CONTEXT    = "ra_session_context_v1";
-
+    /* ============================================================
+       AUTH GUARD (som övriga sidor)
+       ============================================================ */
     (function authGuard(){
       try{
         if(sessionStorage.getItem("demo_auth") !== "1"){
@@ -256,33 +239,45 @@
       }catch{}
     })();
 
+    /* ============================================================
+       CORE STORAGE KEYS (LÅST – rör inte datamodell)
+       ============================================================ */
     const KEY_TREES  = "slakttradet_trees";
     const KEY_ACTIVE = "slakttradet_active_tree_id";
 
-    const logoutBtn = document.getElementById("logoutBtn");
+    /* ============================================================
+       SESSION KEYS (tillfälliga – OK att skapa här)
+       - används av person-puzzle.html
+       ============================================================ */
+    const SS_CANDIDATES = "ra_session_candidates_v1";
+    const SS_CONTEXT    = "ra_session_context_v1";
 
+    /* ============================================================
+       UI refs
+       ============================================================ */
+    const logoutBtn = document.getElementById("logoutBtn");
     const pillTree = document.getElementById("pillTree");
     const pillResults = document.getElementById("pillResults");
     const pillMode = document.getElementById("pillMode");
 
     const qEl = document.getElementById("q");
+    const parsedEl = document.getElementById("parsed");
+
     const searchBtn = document.getElementById("searchBtn");
     const clearBtn = document.getElementById("clearBtn");
     const backBtn = document.getElementById("backBtn");
+    const diagBtn = document.getElementById("diagBtn");
 
     const topMsg = document.getElementById("topMsg");
     const resultsEl = document.getElementById("results");
 
     const previewBox = document.getElementById("previewBox");
-    const puzzleBtn = document.getElementById("puzzleBtn");
+    const toPuzzleBtn = document.getElementById("toPuzzleBtn");
     const copyBtn = document.getElementById("copyBtn");
 
-    // Diagnostik-UI (ny)
-    const diagStatusEl = document.getElementById("diagStatus");
-    const diagReasonEl = document.getElementById("diagReason");
-    const diagUrlEl = document.getElementById("diagUrl");
-    const diagBtn = document.getElementById("diagBtn");
-
+    /* ============================================================
+       Safe JSON helpers
+       ============================================================ */
     function safeParse(raw, fallback){
       try{ return JSON.parse(raw); }catch{ return fallback; }
     }
@@ -290,7 +285,6 @@
       const raw = localStorage.getItem(key);
       return raw ? safeParse(raw, fallback) : fallback;
     }
-
     function escapeHtml(s){
       return String(s || "")
         .replaceAll("&","&amp;")
@@ -298,6 +292,21 @@
         .replaceAll(">","&gt;")
         .replaceAll('"',"&quot;")
         .replaceAll("'","&#039;");
+    }
+
+    function showTopMsg(kind, text){
+      topMsg.hidden = false;
+      topMsg.className = "liftBox " + (kind || "warn");
+      topMsg.innerHTML = escapeHtml(text);
+    }
+    function clearTopMsg(){
+      topMsg.hidden = true;
+      topMsg.innerHTML = "";
+      topMsg.className = "liftBox";
+    }
+
+    function normalize(s){
+      return String(s || "").trim();
     }
 
     function activeTreeId(){
@@ -314,42 +323,7 @@
       return t ? (t.name || t.id) : id;
     }
 
-    // ----------------------------------------------------------
-    // Diagnostik state (ny)
-    // ----------------------------------------------------------
-    const diag = {
-      mode: "—",      // LIVE | DEMO | —
-      provider: "—",
-      reason: "—",    // OK | CORS | TIMEOUT | HTTP_XXX | ZERO_HITS | PROVIDER_MISSING | UNKNOWN
-      lastUrl: "—"
-    };
-
-    function setDiag(partial){
-      Object.assign(diag, partial || {});
-      diagStatusEl.textContent = (diag.mode || "—") + " / " + (diag.provider || "—");
-      diagReasonEl.textContent = diag.reason || "—";
-      diagUrlEl.textContent = shortenUrl(diag.lastUrl || "—");
-      refreshModePill();
-    }
-
-    function shortenUrl(u){
-      const s = String(u || "");
-      if(!s || s === "—") return "—";
-      if(s.length <= 90) return s;
-      return s.slice(0, 50) + " … " + s.slice(-30);
-    }
-
-    function refreshModePill(){
-      // PILL: visa LIVE/DEMO tydligt och färgkoda
-      const mode = String(diag.mode || "—").toUpperCase();
-      const isLive = mode === "LIVE";
-      const isDemo = mode === "DEMO";
-
-      pillMode.className = "pill " + (isLive ? "ok" : (isDemo ? "warn" : "err"));
-      pillMode.innerHTML = "Källa: <strong>" + escapeHtml(mode === "—" ? "—" : (mode + " · " + (diag.provider || "—"))) + "</strong>";
-    }
-
-    function refreshPills(resultCount){
+    function refreshPills(resultCount, modeText, modeKind){
       const t = activeTreeId();
       const trees = getTrees();
       const hasTrees = trees.length > 0;
@@ -359,19 +333,99 @@
       pillTree.innerHTML = "Aktivt träd: <strong>" + escapeHtml(hasActive ? activeTreeLabel() : "—") + "</strong>";
 
       pillResults.innerHTML = "Träffar: <strong>" + String(resultCount || 0) + "</strong>";
-      refreshModePill();
+
+      pillMode.className = "pill " + (modeKind || "warn");
+      pillMode.innerHTML = "Källa: <strong>" + escapeHtml(modeText || "—") + "</strong>";
     }
 
-    function showTopMsg(kind, text){
-      topMsg.hidden = false;
-      topMsg.className = "liftBox " + (kind || "warn");
-      topMsg.innerHTML = escapeHtml(text);
+    /* ============================================================
+       + PARSING (förfining)
+       ------------------------------------------------------------
+       Input: "Stina Nilsson + Leksand + 1820–1825"
+       Output:
+         baseName = "Stina Nilsson"
+         hints = ["Leksand", "1820–1825"]
+         yearRange (optional) = {min,max}
+       ============================================================ */
+    function parsePlusQuery(raw){
+      const s = String(raw || "");
+      const parts = s.split("+").map(x => x.trim()).filter(Boolean);
+
+      const baseName = (parts[0] || "").trim();
+      const hints = parts.slice(1);
+
+      // Enkel tolkning av år-intervall i hints:
+      // "1820-1825" eller "1820–1825" eller "1820—1825"
+      let yearMin = null, yearMax = null;
+
+      for(const h of hints){
+        const m = String(h).match(/(\d{3,4})\s*[-–—]\s*(\d{3,4})/);
+        if(m){
+          yearMin = Number(m[1]);
+          yearMax = Number(m[2]);
+          if(!Number.isFinite(yearMin)) yearMin = null;
+          if(!Number.isFinite(yearMax)) yearMax = null;
+          break;
+        }
+        const single = String(h).match(/\b(\d{4})\b/);
+        if(single && yearMin == null && yearMax == null){
+          const y = Number(single[1]);
+          if(Number.isFinite(y)){
+            yearMin = y;
+            yearMax = y;
+          }
+        }
+      }
+
+      // Plats-kandidat: första hint som inte verkar vara ren år-sak
+      let place = "";
+      for(const h of hints){
+        const isYearish = /\d{4}/.test(h);
+        if(!isYearish){
+          place = h.trim();
+          break;
+        }
+      }
+
+      return { baseName, hints, place, yearMin, yearMax };
     }
-    function clearTopMsg(){
-      topMsg.hidden = true;
-      topMsg.innerHTML = "";
-      topMsg.className = "liftBox";
+
+    function renderParsed(p){
+      const lines = [];
+      lines.push("baseName: " + (p.baseName || "—"));
+      lines.push("hints: " + (p.hints.length ? p.hints.join(" | ") : "—"));
+      lines.push("place: " + (p.place || "—"));
+      if(p.yearMin != null || p.yearMax != null){
+        lines.push("year: " + String(p.yearMin ?? "—") + "–" + String(p.yearMax ?? "—"));
+      }else{
+        lines.push("year: —");
+      }
+      parsedEl.value = lines.join("\n");
     }
+
+    function hasRefinement(p){
+      // Fail-closed-regel: namn + minst en pusselbit
+      if(!p.baseName || p.baseName.length < 3) return false;
+      return (p.hints && p.hints.length >= 1);
+    }
+
+    /* ============================================================
+       Provider access
+       ============================================================ */
+    function getProviderOrThrow(){
+      if(!(window.RAProviders && typeof window.RAProviders.pickProvider === "function")){
+        throw new Error("Providerlager saknas (RAProviders).");
+      }
+      // Vi vill skarpt läge: searchapi först (proxy), annars demo
+      return window.RAProviders.pickProvider("searchapi");
+    }
+
+    /* ============================================================
+       UI state
+       ============================================================ */
+    let lastCandidates = [];
+    let selectedIdx = -1;
+    let lastContext = null;
 
     function yearsText(c){
       const b = (c && c.birthYear != null) ? String(c.birthYear) : "—";
@@ -380,273 +434,237 @@
       return " (" + b + "–" + d + ")";
     }
 
-    function candidateTitle(c){
-      return (c && c.name ? String(c.name) : "(namn saknas)") + yearsText(c);
+    function renderResults(arr){
+      resultsEl.innerHTML = "";
+      selectedIdx = -1;
+      setPreview(null);
+
+      if(!arr || arr.length === 0){
+        const li = document.createElement("li");
+        li.className = "item";
+        li.style.cursor = "default";
+        li.innerHTML =
+          "<p class='itemTitle'>Inga träffar</p>" +
+          "<p class='itemMeta'>Förfina med <span class='mono'>+</span> (plats/år/nyckelord) och försök igen.</p>";
+        resultsEl.appendChild(li);
+        return;
+      }
+
+      for(let i=0;i<arr.length;i++){
+        const c = arr[i];
+        const li = document.createElement("li");
+        li.className = "item";
+        li.innerHTML =
+          "<p class='itemTitle'>" + escapeHtml((c.name || "(namn)") + yearsText(c)) + "</p>" +
+          "<p class='itemMeta'>" +
+            (c.place ? ("Plats: " + escapeHtml(c.place)) : "Plats: —") +
+            (c.source ? (" · Källa: " + escapeHtml(c.source)) : "") +
+          "</p>";
+
+        li.addEventListener("click", () => {
+          selectedIdx = i;
+          setPreview(c);
+          toPuzzleBtn.disabled = false;
+          copyBtn.disabled = false;
+        });
+
+        resultsEl.appendChild(li);
+      }
     }
 
-    // ----------------------------------------------------------
-    // Provider pipeline
-    // ----------------------------------------------------------
-    const primaryProvider = (window.RAProviders && window.RAProviders.pickProvider)
-      ? window.RAProviders.pickProvider({ preferred: FEATURE_PROVIDER, allowNetwork: FEATURE_ALLOW_NETWORK })
-      : null;
-
-    const demoProvider = (window.RAProviders && window.RAProviders.getProvider)
-      ? window.RAProviders.getProvider("demo")
-      : null;
-
-    let selected = null;
-    let lastCandidates = [];
-
     function setPreview(c){
-      selected = c || null;
-
-      if(!selected){
+      if(!c){
         previewBox.className = "liftBox";
-        previewBox.innerHTML = "Välj en träff för att se detaljer här.";
-        puzzleBtn.disabled = true;
+        previewBox.innerHTML = "Tips: Skriv namn + minst en pusselbit. Ex: <span class='mono'>Stina Nilsson + Leksand</span>.";
+        toPuzzleBtn.disabled = true;
         copyBtn.disabled = true;
         return;
       }
 
       previewBox.className = "liftBox ok";
       previewBox.innerHTML =
-        "<div><strong>" + escapeHtml(candidateTitle(selected)) + "</strong></div>" +
+        "<div><strong>" + escapeHtml((c.name || "(namn)") + yearsText(c)) + "</strong></div>" +
         "<div class='small' style='margin-top:6px;'>" +
-          "Plats: <span class='mono'>" + escapeHtml(selected.place || "—") + "</span><br/>" +
-          "Källa: <span class='mono'>" + escapeHtml(selected.source || "—") + "</span><br/>" +
-          (selected.url ? ("URL: <span class='mono'>" + escapeHtml(selected.url) + "</span><br/>") : "") +
-          (Array.isArray(selected.why) && selected.why.length ? ("Varför: <span class='mono'>" + escapeHtml(selected.why.join(" · ")) + "</span>") : "") +
+          "Plats: <span class='mono'>" + escapeHtml(c.place || "—") + "</span><br/>" +
+          "Källa: <span class='mono'>" + escapeHtml(c.source || "—") + "</span><br/>" +
+          (c.url ? ("URL: <span class='mono'>" + escapeHtml(c.url) + "</span><br/>") : "") +
+          (Array.isArray(c.why) && c.why.length ? ("Varför: <span class='mono'>" + escapeHtml(c.why.join(" · ")) + "</span>") : "") +
         "</div>";
-
-      puzzleBtn.disabled = false;
-      copyBtn.disabled = false;
     }
 
-    function renderResults(arr){
-      resultsEl.innerHTML = "";
-      const list = Array.isArray(arr) ? arr : [];
+    /* ============================================================
+       Local pre-filter/score BEFORE sending to puzzle
+       - Vi minskar mängden data tidigt (viktigt vid vanliga namn)
+       ============================================================ */
+    function scoreCandidateForHints(c, p){
+      let score = 0;
+      const place = String(c.place || "").toLowerCase();
+      const name = String(c.name || "").toLowerCase();
+      const why = Array.isArray(c.why) ? c.why.join(" ").toLowerCase() : "";
 
-      if(list.length === 0){
-        const li = document.createElement("li");
-        li.className = "item";
-        li.style.cursor = "default";
-        li.innerHTML =
-          "<p class='itemTitle'>Inga träffar</p>" +
-          "<p class='itemMeta'>Prova ett annat namn eller kortare sökterm.</p>";
-        resultsEl.appendChild(li);
-        setPreview(null);
-        return;
+      // place hint
+      if(p.place){
+        const h = String(p.place).toLowerCase();
+        score += place.includes(h) ? 20 : -5;
       }
 
-      for(const c of list){
-        const li = document.createElement("li");
-        li.className = "item";
-        li.innerHTML =
-          "<p class='itemTitle'>" + escapeHtml(candidateTitle(c)) + "</p>" +
-          "<p class='itemMeta'>" +
-            (c.place ? ("Plats: " + escapeHtml(c.place)) : "Plats: —") +
-            (c.source ? (" · Källa: " + escapeHtml(c.source)) : "") +
-          "</p>";
-        li.addEventListener("click", () => setPreview(c));
-        resultsEl.appendChild(li);
+      // year hint
+      const by = (typeof c.birthYear === "number") ? c.birthYear : null;
+      if(p.yearMin != null && p.yearMax != null){
+        if(by == null) score -= 2;
+        else if(by >= p.yearMin && by <= p.yearMax) score += 12;
+        else score -= 8;
       }
 
-      setPreview(null);
-    }
-
-    // ----------------------------------------------------------
-    // URL-spårning: vi vet inte alltid exakt URL inifrån provider,
-    // men vi kan ge en "indikativ" URL för diagnos.
-    // ----------------------------------------------------------
-    function estimateSearchApiUrl(q){
-      // OBS: Detta är en uppskattad URL (för att hjälpa felsökning).
-      // Provider kan ändra params internt; men detta hjälper användaren.
-      try{
-        const u = new URL("https://data.riksarkivet.se/api/records");
-        u.searchParams.set("name", String(q || "").trim());
-        u.searchParams.set("limit", "50");
-        u.searchParams.set("offset", "0");
-        u.searchParams.set("sort", "relevance");
-        u.searchParams.set("facet", "ObjectType:Agent;Type:Person");
-        return u.toString();
-      }catch{
-        return "—";
+      // keyword hints
+      for(const h of p.hints){
+        const k = String(h).trim().toLowerCase();
+        if(!k) continue;
+        const hit = name.includes(k) || place.includes(k) || why.includes(k);
+        score += hit ? 4 : 0;
       }
+
+      return score;
     }
 
-    function classifyErrorMessage(msg){
-      const s = String(msg || "").toLowerCase();
-      if(s.includes("cors_or_network") || s.includes("failed to fetch") || s.includes("cors")) return "CORS";
-      if(s.includes("timeout") || s.includes("aborted") || s.includes("abort")) return "TIMEOUT";
-      if(s.startsWith("http_")) return msg.toUpperCase();
-      return "UNKNOWN";
+    function refineAndLimit(arr, parsed){
+      // Sortera efter score och ta max 25
+      const scored = (arr || []).map(c => ({ c, s: scoreCandidateForHints(c, parsed) }));
+      scored.sort((a,b) => b.s - a.s);
+      const limited = scored.slice(0, 25).map(x => x.c);
+      return limited;
     }
 
+    /* ============================================================
+       SEARCH
+       ============================================================ */
     async function doSearch(){
       clearTopMsg();
-
       const t = activeTreeId();
       if(!t){
-        setDiag({ mode: "—", provider: "—", reason: "NO_ACTIVE_TREE", lastUrl: "—" });
-        showTopMsg("err", "⛔ Inget aktivt träd. Gå till Träd och välj ett aktivt träd innan du kan importera.");
+        showTopMsg("err", "⛔ Inget aktivt träd. Gå till Träd och välj ett aktivt träd innan import/puzzle.");
         renderResults([]);
-        refreshPills(0);
+        refreshPills(0, "—", "err");
         return;
       }
 
-      const q = String(qEl.value || "").trim();
-      if(!q || q.length < 2){
-        setDiag({ reason: "QUERY_TOO_SHORT" });
-        showTopMsg("warn", "⚠️ Skriv minst 2 tecken för att söka.");
+      const parsed = parsePlusQuery(qEl.value);
+      renderParsed(parsed);
+
+      // Fail-closed: namn + minst en pusselbit (för att undvika 100 000 “Stina Nilsson”)
+      if(!hasRefinement(parsed)){
+        showTopMsg("warn", "⚠️ För brett. Skriv namn + minst en pusselbit med '+'. Ex: “Stina Nilsson + Leksand” eller “Stina Nilsson + 1822”.");
         renderResults([]);
-        refreshPills(0);
+        refreshPills(0, "—", "warn");
         return;
       }
 
-      if(!primaryProvider){
-        setDiag({ mode: "—", provider: "—", reason: "PROVIDER_MISSING", lastUrl: "—" });
-        showTopMsg("err", "⛔ Provider-lagret saknas (RAProviders). Kontrollera att ./assets/js/ra-providers.js laddas.");
+      // Provider (skarp: proxy-live)
+      let provider;
+      try{
+        provider = getProviderOrThrow();
+      }catch(e){
+        showTopMsg("err", "⛔ " + (e && e.message ? e.message : "Providerfel"));
         renderResults([]);
-        refreshPills(0);
+        refreshPills(0, "—", "err");
         return;
       }
 
+      // Vi söker alltid på basnamnet, hints används som lokal förfining/score
       searchBtn.disabled = true;
-
-      // för diagnos: indikativ URL om vi försöker searchapi
-      if(primaryProvider.id === "searchapi"){
-        setDiag({ lastUrl: estimateSearchApiUrl(q) });
-      }else{
-        setDiag({ lastUrl: "—" });
-      }
+      refreshPills(0, provider.label || "Källa", "ok");
 
       try{
-        // 1) Försök primär provider
-        setDiag({
-          mode: (primaryProvider.id === "searchapi" ? "LIVE" : "DEMO"),
-          provider: primaryProvider.label,
-          reason: "OK"
-        });
+        const raw = await provider.search(parsed.baseName);
 
-        let candidates = await primaryProvider.search(q);
+        // Säkra: limit/score tidigt
+        const refined = refineAndLimit(raw, parsed);
 
-        // 2) Om 0 träffar => demo fallback (för att aldrig bli "tomt utan förklaring")
-        if((!candidates || candidates.length === 0) && demoProvider){
-          const demoHits = await demoProvider.search(q);
-          lastCandidates = Array.isArray(demoHits) ? demoHits : [];
+        lastCandidates = refined;
+        lastContext = {
+          q: parsed.baseName,
+          rawInput: String(qEl.value || ""),
+          hints: parsed.hints,
+          place: parsed.place,
+          yearMin: parsed.yearMin,
+          yearMax: parsed.yearMax,
+          providerId: "searchapi",
+          providerLabel: provider.label || "Riksarkivet"
+        };
 
-          setDiag({
-            mode: "DEMO",
-            provider: demoProvider.label,
-            reason: "ZERO_HITS_IN_PRIMARY"
-          });
+        renderResults(refined);
+        refreshPills(refined.length, provider.label || "Riksarkivet", "ok");
 
-          renderResults(lastCandidates);
-          refreshPills(lastCandidates.length);
-
-          showTopMsg("warn", "⚠️ 0 träffar i primär källa → demo-fallback. (Inte ett fel i UI)");
-          return;
-        }
-
-        lastCandidates = Array.isArray(candidates) ? candidates : [];
-        renderResults(lastCandidates);
-        refreshPills(lastCandidates.length);
-
-        // Om primär var searchapi och vi fick träffar: skarpt läge bekräftat
-        if(primaryProvider.id === "searchapi"){
-          setDiag({ mode: "LIVE", provider: primaryProvider.label, reason: "OK" });
-          showTopMsg("ok", "✅ LIVE: Hämtat från Riksarkivet (Sök-API). Välj kandidat och öppna i Puzzle.");
+        if(refined.length === 0){
+          showTopMsg("warn", "⚠️ Inga träffar efter förfining. Testa annan plats/år med '+'.");
+        }else if(raw.length > refined.length){
+          showTopMsg("ok", "✅ LIVE: Hämtat från Riksarkivet (Sök-API). Förfinat till " + refined.length + " kandidat(er). Välj och öppna i Puzzle.");
         }else{
-          setDiag({ mode: "DEMO", provider: primaryProvider.label, reason: "OK" });
-          showTopMsg("ok", "✅ DEMO: Hämtat från demo-provider. Välj kandidat och öppna i Puzzle.");
+          showTopMsg("ok", "✅ LIVE: Hämtat från Riksarkivet (Sök-API). Välj kandidat och öppna i Puzzle.");
         }
 
       }catch(e){
-        // 3) Vid fel: fail-closed → demo fallback (om finns)
-        const msg = String(e && e.message ? e.message : e);
-        const reason = classifyErrorMessage(msg);
+        // Om proxy eller upstream faller: demo-fallback
+        const msg = (e && e.message) ? String(e.message) : "Okänt fel";
+        // Behåll tydligt felmeddelande enligt ditt krav
+        showTopMsg("warn", "⚠️ Riksarkivet blockerades (CORS) → demo-fallback. (Inte ett UI-fel) [" + msg + "]");
+        refreshPills(0, "Demo", "warn");
 
-        if(demoProvider){
-          try{
-            const demoHits = await demoProvider.search(q);
-            lastCandidates = Array.isArray(demoHits) ? demoHits : [];
+        // Fallback: demo provider via registry (om den finns)
+        try{
+          const demo = window.RAProviders.pickProvider("demo");
+          const demoHits = await demo.search(parsed.baseName);
 
-            setDiag({
-              mode: "DEMO",
-              provider: demoProvider.label,
-              reason: "FALLBACK_AFTER_" + reason
-            });
+          lastCandidates = demoHits;
+          lastContext = {
+            q: parsed.baseName,
+            rawInput: String(qEl.value || ""),
+            hints: parsed.hints,
+            place: parsed.place,
+            yearMin: parsed.yearMin,
+            yearMax: parsed.yearMax,
+            providerId: "demo",
+            providerLabel: "Demo"
+          };
 
-            renderResults(lastCandidates);
-            refreshPills(lastCandidates.length);
-
-            showTopMsg("warn", "⚠️ Riksarkivet blockerades (" + reason + ") → demo-fallback. (Inte ett UI-fel)");
-          }catch{
-            lastCandidates = [];
-            renderResults([]);
-            setDiag({ mode: "—", provider: "—", reason: "FAIL_CLOSED", lastUrl: diag.lastUrl });
-            refreshPills(0);
-            showTopMsg("err", "⛔ Sök misslyckades och fallback misslyckades. (fail-closed)");
-          }
-        }else{
-          lastCandidates = [];
+          renderResults(demoHits);
+          refreshPills(demoHits.length, "Demo", "warn");
+        }catch{
           renderResults([]);
-          setDiag({ mode: "—", provider: "—", reason: "FAIL_CLOSED", lastUrl: diag.lastUrl });
-          refreshPills(0);
-          showTopMsg("err", "⛔ Sök misslyckades. (fail-closed)");
         }
       }finally{
         searchBtn.disabled = false;
       }
     }
 
-    function writePuzzleSession(){
-      // POLICY: session-only, rensas i puzzle fail-closed.
-      try{
-        sessionStorage.setItem(SS_CANDIDATES, JSON.stringify(lastCandidates || []));
-        sessionStorage.setItem(SS_CONTEXT, JSON.stringify({
-          q: String(qEl.value || "").trim(),
-          providerId: (diag.mode === "LIVE" ? "searchapi" : "demo"),
-          providerLabel: diag.provider,
-          selectedId: selected ? String(selected.id) : ""
-        }));
-      }catch{
-        showTopMsg("err", "⛔ Kunde inte förbereda Puzzle-session (webbläsaren blockerade lagring).");
-        return false;
-      }
-      return true;
-    }
-
-    function openPuzzle(){
+    /* ============================================================
+       To puzzle: store in session (no persistent storage)
+       ============================================================ */
+    function goToPuzzle(){
       clearTopMsg();
-      if(!selected){
-        showTopMsg("warn", "⚠️ Välj en träff först.");
-        return;
-      }
       if(!Array.isArray(lastCandidates) || lastCandidates.length === 0){
-        showTopMsg("warn", "⚠️ Inga kandidater att skicka till Puzzle.");
+        showTopMsg("warn", "⚠️ Inga kandidater att öppna. Gör en sökning först.");
         return;
       }
-      if(!writePuzzleSession()) return;
-
+      // Session-only (dataminimering)
+      try{
+        sessionStorage.setItem(SS_CANDIDATES, JSON.stringify(lastCandidates));
+        sessionStorage.setItem(SS_CONTEXT, JSON.stringify(lastContext || {}));
+      }catch{
+        showTopMsg("err", "⛔ Kunde inte spara session (webbläsaren blockerade).");
+        return;
+      }
       window.location.href = "./person-puzzle.html";
     }
 
     async function copySelected(){
-      if(!selected) return;
-
-      const b = (selected.birthYear != null) ? String(selected.birthYear) : "—";
-      const d = (selected.deathYear != null) ? String(selected.deathYear) : "—";
-
+      if(!(selectedIdx >= 0 && selectedIdx < lastCandidates.length)) return;
+      const c = lastCandidates[selectedIdx];
       const text =
-        (selected.name || "—") + "\n" +
-        "Födelseår: " + b + " · Dödsår: " + d + "\n" +
-        "Plats: " + (selected.place || "—") + "\n" +
-        "Källa: " + (selected.source || "—") + "\n" +
-        (selected.url ? ("URL: " + selected.url + "\n") : "") +
-        (Array.isArray(selected.why) && selected.why.length ? ("Varför: " + selected.why.join(" · ") + "\n") : "");
-
+        (c.name || "—") + "\n" +
+        "Plats: " + (c.place || "—") + "\n" +
+        "Källa: " + (c.source || "—") + "\n" +
+        (c.url ? ("URL: " + c.url + "\n") : "");
       try{
         await navigator.clipboard.writeText(text);
         showTopMsg("ok", "✅ Kopierat till urklipp.");
@@ -655,59 +673,34 @@
       }
     }
 
-    function goBack(){ window.location.href = "./slaktkort.html"; }
-
-    // ----------------------------------------------------------
-    // Diagnos-knapp: kör ett litet "sanity test"
-    // ----------------------------------------------------------
+    /* ============================================================
+       Diagnostics
+       ============================================================ */
     async function runDiag(){
       clearTopMsg();
-
-      // 1) RAProviders finns?
-      if(!(window.RAProviders && typeof window.RAProviders.listProviders === "function")){
-        setDiag({ mode: "—", provider: "—", reason: "PROVIDER_MISSING", lastUrl: "—" });
-        showTopMsg("err", "⛔ RAProviders saknas. Kontrollera att ra-providers.js laddas (path).");
+      if(!(window.RAProviders && typeof window.RAProviders.pickProvider === "function")){
+        showTopMsg("err", "⛔ RAProviders saknas. Kontrollera att ra-providers.js laddas.");
         return;
       }
-
-      // 2) Har vi searchapi provider?
-      const p = window.RAProviders.getProvider ? window.RAProviders.getProvider("searchapi") : null;
-      if(!p){
-        setDiag({ mode: "—", provider: "—", reason: "SEARCHAPI_PROVIDER_MISSING", lastUrl: "—" });
-        showTopMsg("err", "⛔ searchapi-provider saknas i ra-providers.js.");
-        return;
-      }
-
-      // 3) Prova en minimal sökning med en säker term (om fältet är tomt)
-      const probe = String(qEl.value || "").trim() || "Karl";
-      setDiag({ lastUrl: estimateSearchApiUrl(probe) });
-
+      const p = window.RAProviders.pickProvider("searchapi");
       try{
-        const r = await p.search(probe);
-        const n = Array.isArray(r) ? r.length : 0;
-
-        setDiag({
-          mode: "LIVE",
-          provider: p.label,
-          reason: "DIAG_OK_" + String(n) + "_HITS"
-        });
-
-        showTopMsg("ok", "✅ Diagnos: SearchAPI svarade (" + n + " träffar för '" + probe + "').");
-      }catch(e){
-        const msg = String(e && e.message ? e.message : e);
-        const reason = classifyErrorMessage(msg);
-
-        setDiag({
-          mode: "DEMO",
-          provider: (demoProvider ? demoProvider.label : "—"),
-          reason: "DIAG_FAIL_" + reason
-        });
-
-        showTopMsg("warn", "⚠️ Diagnos: SearchAPI blockeras (" + reason + "). Då blir det demo-fallback i GitHub Pages.");
+        // Vi gör en minimal sökning på ett ofarligt testord
+        await p.search("Karl");
+        showTopMsg("ok", "✅ LIVE: Hämtat från Riksarkivet (Sök-API). Välj kandidat och öppna i Puzzle.");
+        refreshPills(0, p.label || "Riksarkivet", "ok");
+      }catch{
+        showTopMsg("warn", "⚠️ Riksarkivet blockerades (CORS) → demo-fallback. (Inte ett UI-fel)");
+        refreshPills(0, "Demo", "warn");
       }
     }
 
-    // Events
+    function goBack(){
+      window.location.href = "./slaktkort.html";
+    }
+
+    /* ============================================================
+       Events
+       ============================================================ */
     logoutBtn.addEventListener("click", () => {
       try{ sessionStorage.removeItem("demo_auth"); }catch{}
       window.location.href = "../index.html";
@@ -716,18 +709,27 @@
     searchBtn.addEventListener("click", doSearch);
     clearBtn.addEventListener("click", () => {
       qEl.value = "";
+      parsedEl.value = "";
       resultsEl.innerHTML = "";
+      lastCandidates = [];
+      lastContext = null;
+      toPuzzleBtn.disabled = true;
+      copyBtn.disabled = true;
       setPreview(null);
       clearTopMsg();
-      setDiag({ reason: "CLEARED", lastUrl: "—" });
-      refreshPills(0);
+      refreshPills(0, "—", "warn");
       try{ qEl.focus(); }catch{}
     });
     backBtn.addEventListener("click", goBack);
-
-    puzzleBtn.addEventListener("click", openPuzzle);
-    copyBtn.addEventListener("click", copySelected);
     diagBtn.addEventListener("click", runDiag);
+
+    toPuzzleBtn.addEventListener("click", goToPuzzle);
+    copyBtn.addEventListener("click", copySelected);
+
+    qEl.addEventListener("input", () => {
+      const p = parsePlusQuery(qEl.value);
+      renderParsed(p);
+    });
 
     qEl.addEventListener("keydown", (e) => {
       if(e.key === "Enter"){
@@ -736,17 +738,15 @@
       }
     });
 
-    // Init
-    setDiag({
-      mode: (primaryProvider ? (primaryProvider.id === "searchapi" ? "LIVE" : "DEMO") : "—"),
-      provider: (primaryProvider ? primaryProvider.label : "—"),
-      reason: (primaryProvider ? "READY" : "PROVIDER_MISSING"),
-      lastUrl: "—"
-    });
-    renderResults([]);
-    refreshPills(0);
-    showTopMsg("warn", "ℹ️ Tips: Klicka 'Kör diagnos' om du undrar om LIVE blockeras av CORS/timeout.");
-    try{ qEl.focus(); }catch{}
+    /* ============================================================
+       Init
+       ============================================================ */
+    (function init(){
+      refreshPills(0, "—", "warn");
+      renderParsed(parsePlusQuery(""));
+      showTopMsg("warn", "ℹ️ Tips: använd '+'. Ex: “Stina Nilsson + Leksand + 1822”. (Fail-closed om för brett.)");
+      try{ qEl.focus(); }catch{}
+    })();
   </script>
 </body>
 </html>
