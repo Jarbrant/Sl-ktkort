@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Sök historisk person – Släktkort</title>
-  <meta name="description" content="Sök efter historiska personer (demo/placeholder) och importera som person i aktivt träd." />
+  <meta name="description" content="Starta en sökning (namn) och gå vidare till Puzzle för avgränsning, sök mot källor och manuell import." />
 
   <style>
     :root{ color-scheme: light; }
@@ -16,7 +16,7 @@
       max-width: 1180px;
       margin-inline: auto;
       background: #fff;
-      color: #111;
+      color:#111;
     }
     a{ color: inherit; text-decoration: none; }
     header{
@@ -135,9 +135,8 @@
       border-radius: 14px;
       padding: 10px;
       background:#fff;
-      cursor:pointer;
+      cursor:default;
     }
-    .item:hover{ background:#fafafa; }
     .itemTitle{ font-weight:900; margin:0 0 2px; }
     .itemMeta{ margin:0; color:#555; font-size: 13px; }
 
@@ -160,7 +159,7 @@
 <body>
   <header style="display:block;">
     <h1>Sök historisk person</h1>
-    <p class="muted">Demo/placeholder: sök lokalt i en enkel datakälla och importera till aktivt träd.</p>
+    <p class="muted">Steg 1: skriv namn och gå vidare till <strong>Puzzle</strong> där alla källfrågor och avgränsningar sker.</p>
 
     <nav class="topbar" aria-label="Huvudmeny">
       <a class="btn secondary" href="../start.html">Start</a>
@@ -176,51 +175,56 @@
   <section class="pillRow" aria-label="Status">
     <span id="pillTree" class="pill warn">Aktivt träd: <strong>—</strong></span>
     <span id="pillResults" class="pill">Träffar: <strong>0</strong></span>
-    <span id="pillMode" class="pill">Källa: <strong>Demo</strong></span>
+    <span id="pillMode" class="pill">Läge: <strong>Start → Puzzle</strong></span>
   </section>
 
   <div class="grid">
-    <section class="card" aria-label="Sök">
-      <h2>Sök</h2>
-      <p class="small">Sök på namn. Denna sida är byggd för att senare kunna kopplas mot externa källor, men kör nu som demo.</p>
+    <section class="card" aria-label="Starta sökning">
+      <h2>Starta sökning</h2>
+      <p class="small">Den här sidan gör <strong>inga API-anrop</strong>. Den sparar bara en sökstart kopplad till <code>activePersonId</code> och skickar dig till Puzzle.</p>
 
       <div id="topMsg" class="liftBox warn" hidden></div>
 
-      <label for="q">Sökterm</label>
-      <input id="q" placeholder="t.ex. Karl Johansson" autocomplete="off" />
+      <label for="q">Sökterm (namn)</label>
+      <input id="q" placeholder="t.ex. Stina Nilsson" autocomplete="off" />
 
       <div class="actions">
-        <button class="btn primary" id="searchBtn" type="button">Sök</button>
+        <button class="btn primary" id="searchBtn" type="button">Nästa: Puzzle</button>
         <button class="btn secondary" id="clearBtn" type="button">Rensa</button>
         <button class="btn secondary" id="backBtn" type="button">Tillbaka</button>
       </div>
 
       <div class="liftBox" style="margin-top:10px;">
         <strong>Obs</strong><br/>
-        Ingen känslig data lagras. Importen skapar bara en personpost i aktivt träd (localStorage).<br/>
-        Senare kan FORGE koppla denna sida till öppna källor och matchningslogik.
+        Inga externa data hämtas här. Alla “frågor till databasen” och matchning sker i <code>person-puzzle.html</code>.<br/>
+        Endast en lokal “startmarkör” skapas kopplad till <code>activePersonId</code> för att bära sökstarten vidare.
       </div>
 
-      <ul id="results" class="list" aria-label="Sökresultat"></ul>
+      <ul id="results" class="list" aria-label="Info">
+        <li class="item">
+          <p class="itemTitle">Hur flödet fungerar</p>
+          <p class="itemMeta">person-search → person-puzzle (avgränsa, fråga källor, poäng) → slaktkort (valfritt spara)</p>
+        </li>
+      </ul>
     </section>
 
-    <section class="card" aria-label="Förhandsvisning och import">
-      <h2>Förhandsvisning</h2>
-      <p class="small">Klicka ett resultat för att förhandsvisa. Import skapar personen i aktivt träd och öppnar den i Personer.</p>
+    <section class="card" aria-label="Förhandsinfo">
+      <h2>Puzzle (nästa steg)</h2>
+      <p class="small">I Puzzle kan fler frågor ställas (år/plats/varianter). Kandidater kan stärkas/försvagas via poäng tills en är rätt.</p>
 
       <div id="previewBox" class="liftBox" aria-live="polite">
-        Välj en träff för att se detaljer här.
+        När du klickar <strong>Nästa: Puzzle</strong> skapas en lokal startmarkör och du skickas vidare.
       </div>
 
       <div class="actions">
-        <button class="btn primary" id="importBtn" type="button" disabled>Importera till Personer</button>
-        <button class="btn secondary" id="copyBtn" type="button" disabled>Kopiera som text</button>
+        <button class="btn secondary" id="goPuzzleBtn" type="button" disabled>Öppna Puzzle</button>
       </div>
 
       <div class="liftBox" style="margin-top:10px;">
         <strong>Teknik</strong><br/>
-        Personer lagras per träd i <code>slakttradet_slaktkort_&lt;treeId&gt;</code>.<br/>
-        Efter import navigerar vi till <code>slaktkort.html#open=&lt;personId&gt;</code>.
+        Aktivt träd: <code>slakttradet_active_tree_id</code><br/>
+        Personkort per träd: <code>slakttradet_slaktkort_&lt;treeId&gt;</code><br/>
+        Fokus mellan sidor: <code>activePersonId</code> (LÅST)
       </div>
     </section>
   </div>
@@ -236,28 +240,35 @@
       }catch{}
     })();
 
-    const KEY_TREES  = "slakttradet_trees";
-    const KEY_ACTIVE = "slakttradet_active_tree_id";
+    // ==========================================================
+    // STATE / KEYS (LÅST)
+    // ==========================================================
+    const KEY_TREES       = "slakttradet_trees";
+    const KEY_ACTIVE_TREE = "slakttradet_active_tree_id";
+    const KEY_ACTIVE_PID  = "activePersonId"; // LÅST: används för fokus mellan sidor
+
     const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
 
-    const logoutBtn = document.getElementById("logoutBtn");
-
-    const pillTree = document.getElementById("pillTree");
+    // ==========================================================
+    // DOM
+    // ==========================================================
+    const logoutBtn   = document.getElementById("logoutBtn");
+    const pillTree    = document.getElementById("pillTree");
     const pillResults = document.getElementById("pillResults");
-    const pillMode = document.getElementById("pillMode");
+    const pillMode    = document.getElementById("pillMode");
 
-    const qEl = document.getElementById("q");
-    const searchBtn = document.getElementById("searchBtn");
-    const clearBtn = document.getElementById("clearBtn");
-    const backBtn = document.getElementById("backBtn");
+    const qEl        = document.getElementById("q");
+    const searchBtn  = document.getElementById("searchBtn");
+    const clearBtn   = document.getElementById("clearBtn");
+    const backBtn    = document.getElementById("backBtn");
 
-    const topMsg = document.getElementById("topMsg");
-    const resultsEl = document.getElementById("results");
-
+    const topMsg     = document.getElementById("topMsg");
     const previewBox = document.getElementById("previewBox");
-    const importBtn = document.getElementById("importBtn");
-    const copyBtn = document.getElementById("copyBtn");
+    const goPuzzleBtn= document.getElementById("goPuzzleBtn");
 
+    // ==========================================================
+    // STORAGE HELPERS
+    // ==========================================================
     function safeParse(raw, fallback){
       try{ return JSON.parse(raw); }catch{ return fallback; }
     }
@@ -269,6 +280,9 @@
       localStorage.setItem(key, JSON.stringify(value));
     }
 
+    // ==========================================================
+    // UI HELPERS
+    // ==========================================================
     function escapeHtml(s){
       return String(s || "")
         .replaceAll("&","&amp;")
@@ -276,33 +290,6 @@
         .replaceAll(">","&gt;")
         .replaceAll('"',"&quot;")
         .replaceAll("'","&#039;");
-    }
-
-    function activeTreeId(){
-      return localStorage.getItem(KEY_ACTIVE) || "";
-    }
-    function getTrees(){
-      const arr = loadJson(KEY_TREES, []);
-      return Array.isArray(arr) ? arr : [];
-    }
-    function activeTreeLabel(){
-      const id = activeTreeId();
-      if(!id) return "—";
-      const t = getTrees().find(x => String(x.id) === String(id));
-      return t ? (t.name || t.id) : id;
-    }
-
-    function refreshPills(resultCount){
-      const t = activeTreeId();
-      const trees = getTrees();
-      const hasTrees = trees.length > 0;
-      const hasActive = !!t;
-
-      pillTree.className = "pill " + (hasActive ? "ok" : (hasTrees ? "warn" : "err"));
-      pillTree.innerHTML = "Aktivt träd: <strong>" + escapeHtml(hasActive ? activeTreeLabel() : "—") + "</strong>";
-
-      pillResults.innerHTML = "Träffar: <strong>" + String(resultCount || 0) + "</strong>";
-      pillMode.innerHTML = "Källa: <strong>Demo</strong>";
     }
 
     function showTopMsg(kind, text){
@@ -316,242 +303,170 @@
       topMsg.className = "liftBox";
     }
 
+    // ==========================================================
+    // TREE / CONTEXT
+    // ==========================================================
+    function activeTreeId(){
+      return localStorage.getItem(KEY_ACTIVE_TREE) || "";
+    }
+    function getTrees(){
+      const arr = loadJson(KEY_TREES, []);
+      return Array.isArray(arr) ? arr : [];
+    }
+    function activeTreeLabel(){
+      const id = activeTreeId();
+      if(!id) return "—";
+      const t = getTrees().find(x => String(x.id) === String(id));
+      return t ? (t.name || t.id) : id;
+    }
+    function refreshPills(){
+      const t = activeTreeId();
+      const trees = getTrees();
+      const hasTrees = trees.length > 0;
+      const hasActive = !!t;
+
+      pillTree.className = "pill " + (hasActive ? "ok" : (hasTrees ? "warn" : "err"));
+      pillTree.innerHTML = "Aktivt träd: <strong>" + escapeHtml(hasActive ? activeTreeLabel() : "—") + "</strong>";
+
+      // Den här sidan visar inga resultat (det sker i puzzle)
+      pillResults.innerHTML = "Träffar: <strong>0</strong>";
+      pillMode.innerHTML = "Läge: <strong>Start → Puzzle</strong>";
+    }
+
+    // ==========================================================
+    // VALIDATION
+    // ==========================================================
     function normalize(s){
-      return String(s || "").trim().toLowerCase();
+      return String(s || "").trim();
     }
-
-    function parseYear(v){
-      const s = String(v || "").trim();
-      if(!s) return "";
-      const n = Number(s);
-      if(!Number.isFinite(n)) return "";
-      const i = Math.trunc(n);
-      if(i < 0 || i > 3000) return "";
-      return String(i);
+    function splitName(full){
+      // Minimal, deterministisk split: sista ordet = efternamn, resten = förnamn.
+      const s = normalize(full).replace(/\s+/g, " ");
+      const parts = s ? s.split(" ") : [];
+      if(parts.length === 0) return { fornamn:"", efternamn:"" };
+      if(parts.length === 1) return { fornamn: parts[0], efternamn: "" };
+      const efternamn = parts[parts.length - 1];
+      const fornamn = parts.slice(0, -1).join(" ");
+      return { fornamn, efternamn };
     }
-
     function newId(){
       return "p_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,7);
     }
 
     // ==========================================================
-    // DEMO DATASET (placeholder)
-    // - Byt ut detta senare mot riktig källa (Riksarkivet etc.)
+    // NAVIGATION
     // ==========================================================
-    const DEMO = [
-      { fornamn:"Karl", efternamn:"Johansson", fodelsear:"1872", dodsar:"1939", plats:"Falun", kon:"man", yrke:"Smed", notes:"Demo-post." },
-      { fornamn:"Anna", efternamn:"Persdotter", fodelsear:"1878", dodsar:"1951", plats:"Leksand", kon:"kvinna", yrke:"Piga", notes:"Demo-post." },
-      { fornamn:"Erik", efternamn:"Lind", fodelsear:"1901", dodsar:"1977", plats:"Gävle", kon:"man", yrke:"Lokförare", notes:"Demo-post." },
-      { fornamn:"Maria", efternamn:"Nilsdotter", fodelsear:"1822", dodsar:"1890", plats:"Uppsala", kon:"kvinna", yrke:"Sömmerska", notes:"Demo-post." },
-      { fornamn:"Olof", efternamn:"Bergström", fodelsear:"1799", dodsar:"1866", plats:"Örebro", kon:"man", yrke:"Handlare", notes:"Demo-post." }
-    ];
-
-    function personTitle(x){
-      const n = (String(x.fornamn||"") + " " + String(x.efternamn||"")).trim();
-      const born = parseYear(x.fodelsear);
-      const dead = parseYear(x.dodsar);
-      const years = (born || dead) ? (" (" + (born || "—") + "–" + (dead || "—") + ")") : "";
-      return (n || "(namnlös)") + years;
+    function goBack(){
+      window.location.href = "./slaktkort.html";
+    }
+    function goPuzzle(){
+      window.location.href = "./person-puzzle.html";
     }
 
-    function doSearch(){
+    // ==========================================================
+    // CORE: START PUZZLE (0 FETCH)
+    // ==========================================================
+    function startPuzzle(){
       clearTopMsg();
-      const t = activeTreeId();
-      if(!t){
-        showTopMsg("err", "⛔ Inget aktivt träd. Gå till Träd och välj ett aktivt träd innan import.");
-        resultsEl.innerHTML = "";
-        setPreview(null);
-        refreshPills(0);
+
+      const treeId = activeTreeId();
+      if(!treeId){
+        showTopMsg("err", "⛔ Inget aktivt träd. Gå till Träd och välj ett aktivt träd innan du fortsätter.");
         return;
       }
 
       const q = normalize(qEl.value);
-      if(!q || q.length < 2){
-        showTopMsg("warn", "⚠️ Skriv minst 2 tecken för att söka.");
-        resultsEl.innerHTML = "";
-        setPreview(null);
-        refreshPills(0);
+      if(!q || q.length < 3){
+        showTopMsg("warn", "⚠️ Skriv minst 3 tecken (namn) för att gå vidare till Puzzle.");
         return;
       }
 
-      const hits = DEMO.filter(x => {
-        const full = normalize((x.fornamn||"") + " " + (x.efternamn||""));
-        const place = normalize(x.plats||"");
-        return full.includes(q) || place.includes(q);
-      });
-
-      renderResults(hits);
-      refreshPills(hits.length);
-
-      if(hits.length === 0){
-        showTopMsg("warn", "⚠️ Inga träffar (demo). Prova t.ex. “Karl”, “Anna”, “Falun”, “Uppsala”.");
-      }
-    }
-
-    let selected = null;
-
-    function setPreview(x){
-      selected = x || null;
-      if(!selected){
-        previewBox.className = "liftBox";
-        previewBox.innerHTML = "Välj en träff för att se detaljer här.";
-        importBtn.disabled = true;
-        copyBtn.disabled = true;
-        return;
-      }
-
-      const born = parseYear(selected.fodelsear);
-      const dead = parseYear(selected.dodsar);
-
-      previewBox.className = "liftBox ok";
-      previewBox.innerHTML =
-        "<div><strong>" + escapeHtml(personTitle(selected)) + "</strong></div>" +
-        "<div class='small' style='margin-top:6px;'>" +
-          "Kön: <span class='mono'>" + escapeHtml(selected.kon || "—") + "</span><br/>" +
-          "Yrke: <span class='mono'>" + escapeHtml(selected.yrke || "—") + "</span><br/>" +
-          "Plats: <span class='mono'>" + escapeHtml(selected.plats || "—") + "</span><br/>" +
-          "Födelseår: <span class='mono'>" + escapeHtml(born || "—") + "</span> · " +
-          "Dödsår: <span class='mono'>" + escapeHtml(dead || "—") + "</span><br/>" +
-          (selected.notes ? ("Notis: <span class='mono'>" + escapeHtml(selected.notes) + "</span>") : "") +
-        "</div>";
-
-      importBtn.disabled = false;
-      copyBtn.disabled = false;
-    }
-
-    function renderResults(arr){
-      resultsEl.innerHTML = "";
-
-      if(!arr || arr.length === 0){
-        const li = document.createElement("li");
-        li.className = "item";
-        li.style.cursor = "default";
-        li.innerHTML =
-          "<p class='itemTitle'>Inga träffar</p>" +
-          "<p class='itemMeta'>Denna sida är demo. Byt ut datakällan när ni kopplar mot riktig källa.</p>";
-        resultsEl.appendChild(li);
-        return;
-      }
-
-      for(const x of arr){
-        const li = document.createElement("li");
-        li.className = "item";
-        li.innerHTML =
-          "<p class='itemTitle'>" + escapeHtml(personTitle(x)) + "</p>" +
-          "<p class='itemMeta'>" +
-            (x.plats ? ("Plats: " + escapeHtml(x.plats)) : "Plats: —") +
-            (x.yrke ? (" · Yrke: " + escapeHtml(x.yrke)) : "") +
-          "</p>";
-
-        li.addEventListener("click", () => {
-          setPreview(x);
-        });
-
-        resultsEl.appendChild(li);
-      }
-
-      setPreview(null);
-    }
-
-    function importSelected(){
-      clearTopMsg();
-      const t = activeTreeId();
-      if(!t){
-        showTopMsg("err", "⛔ Inget aktivt träd. Gå till Träd och välj ett aktivt träd innan import.");
-        return;
-      }
-      if(!selected){
-        showTopMsg("warn", "⚠️ Välj en träff först.");
-        return;
-      }
-
-      const people = loadJson(cardsKey(t), []);
+      // ----------------------------------------------------------
+      // STATE / activePersonId (LÅST)
+      // Vi skapar en lokal “startmarkör” (ingen extern data)
+      // som puzzle kan läsa och använda för att ställa fler frågor.
+      // ----------------------------------------------------------
+      const listKey = cardsKey(treeId);
+      const people = loadJson(listKey, []);
       const arr = Array.isArray(people) ? people : [];
 
       const id = newId();
+      const nm = splitName(q);
 
-      const created = {
+      const seed = {
         id,
-        fornamn: String(selected.fornamn || "").trim(),
-        efternamn: String(selected.efternamn || "").trim(),
-        kon: String(selected.kon || ""),
-        yrke: String(selected.yrke || "").trim(),
-        fodelsear: parseYear(selected.fodelsear),
-        dodsar: parseYear(selected.dodsar),
-        plats: String(selected.plats || "").trim(),
+        fornamn: String(nm.fornamn || "").trim(),
+        efternamn: String(nm.efternamn || "").trim(),
+        kon: "",
+        yrke: "",
+        fodelsear: "",
+        dodsar: "",
+        plats: "",
         coords: null,
-        anteckning: ("Importerad från demo-sök. " + (selected.notes ? String(selected.notes) : "")).trim()
+        // LÅST: endast query-seed, ingen extern data
+        anteckning: ("PUZZLE-SEED (namn): " + q).trim()
       };
 
-      // minimal validering
-      if(!created.fornamn || !created.efternamn){
-        showTopMsg("err", "⛔ Kan inte importera: saknar förnamn/efternamn.");
+      // Minimal validering: måste ha minst förnamn (efternamn kan vara tomt i seed)
+      if(!seed.fornamn){
+        showTopMsg("err", "⛔ Ogiltigt namn. Skriv minst ett namn.");
         return;
       }
 
-      arr.push(created);
-      saveJson(cardsKey(t), arr);
+      arr.push(seed);
+      saveJson(listKey, arr);
 
-      // Navigera tillbaka och öppna personen
-      window.location.href = "./slaktkort.html#open=" + encodeURIComponent(id);
+      // LÅST: fokus mellan sidor
+      localStorage.setItem(KEY_ACTIVE_PID, String(id));
+
+      // UI feedback + navigation
+      previewBox.className = "liftBox ok";
+      previewBox.innerHTML =
+        "✅ Startmarkör skapad. <br/>" +
+        "Fokus satt via <code>activePersonId</code>: <span class='mono'>" + escapeHtml(id) + "</span><br/>" +
+        "Du skickas nu till <code>person-puzzle.html</code>.";
+
+      goPuzzleBtn.disabled = false;
+
+      // Direkt vidare (enligt flöde)
+      goPuzzle();
     }
 
-    async function copySelected(){
-      if(!selected) return;
-
-      const born = parseYear(selected.fodelsear);
-      const dead = parseYear(selected.dodsar);
-
-      const text =
-        personTitle(selected) + "\n" +
-        "Kön: " + (selected.kon || "—") + "\n" +
-        "Yrke: " + (selected.yrke || "—") + "\n" +
-        "Plats: " + (selected.plats || "—") + "\n" +
-        "Födelseår: " + (born || "—") + " · Dödsår: " + (dead || "—") + "\n";
-
-      try{
-        await navigator.clipboard.writeText(text);
-        showTopMsg("ok", "✅ Kopierat till urklipp.");
-      }catch{
-        showTopMsg("warn", "⚠️ Kunde inte kopiera (webbläsaren blockerade). Markera texten manuellt i förhandsvisningen.");
-      }
-    }
-
-    function goBack(){
-      window.location.href = "./slaktkort.html";
-    }
-
-    // Events
+    // ==========================================================
+    // EVENTS
+    // ==========================================================
     logoutBtn.addEventListener("click", () => {
       try{ sessionStorage.removeItem("demo_auth"); }catch{}
       window.location.href = "../index.html";
     });
 
-    searchBtn.addEventListener("click", doSearch);
+    searchBtn.addEventListener("click", startPuzzle);
+
     clearBtn.addEventListener("click", () => {
       qEl.value = "";
-      resultsEl.innerHTML = "";
-      setPreview(null);
       clearTopMsg();
-      refreshPills(0);
+      previewBox.className = "liftBox";
+      previewBox.innerHTML = "När du klickar <strong>Nästa: Puzzle</strong> skapas en lokal startmarkör och du skickas vidare.";
+      goPuzzleBtn.disabled = true;
       try{ qEl.focus(); }catch{}
     });
+
     backBtn.addEventListener("click", goBack);
 
-    importBtn.addEventListener("click", importSelected);
-    copyBtn.addEventListener("click", copySelected);
+    goPuzzleBtn.addEventListener("click", goPuzzle);
 
     qEl.addEventListener("keydown", (e) => {
       if(e.key === "Enter"){
         e.preventDefault();
-        doSearch();
+        startPuzzle();
       }
     });
 
-    // Init
-    refreshPills(0);
-    renderResults([]);
-    showTopMsg("warn", "⚠️ Demo-läge: detta är en placeholder. Nästa steg är att koppla mot riktig källa och matchningslogik.");
+    // ==========================================================
+    // INIT
+    // ==========================================================
+    refreshPills();
+    showTopMsg("warn", "⚠️ Startläge: inga externa sökningar här. Klicka “Nästa: Puzzle” för att fortsätta.");
     try{ qEl.focus(); }catch{}
   </script>
 </body>
