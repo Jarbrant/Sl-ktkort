@@ -1,382 +1,390 @@
-/* =========================================================
-FILE: app/assets/js/ra-providers.js
-========================================================= */
-/**
- * Riksarkivet Provider-lager (RA Providers)
- * ----------------------------------------------------------
- * MÅL:
- * - Standardisera sök mot flera källor utan att UI behöver ändras.
- * - Fail-closed + fallback (demo) vid CORS/timeout/fel.
- *
- * LÅST KONTRAKT (AO-API-01):
- * Provider:
- * - id: string
- * - label: string
- * - search(query): Promise<Candidate[]>
- *
- * Candidate (minsta gemensamma):
- * {
- *   id: "string",
- *   name: "string",
- *   birthYear: 1820,
- *   deathYear: 1893,
- *   place: "string",
- *   source: "string",
- *   url: "string",
- *   why: ["string", "string"]
- * }
- *
- * POLICY:
- * - Ingen extern persondata sparas här.
- * - Allt returneras till UI in-memory. UI får välja om import sker.
- */
+/* ============================================================
+   ra-providers.js
+   ------------------------------------------------------------
+   Släktkort – Riksarkivet Providerlager (AO-API-01)
+   Mål:
+   - Providerstruktur som UI kan använda utan att UI behöver veta
+     om det är demo, direkt-API eller proxy.
+   - Fail-closed: om krav inte uppfylls => kasta fel (UI fallbackar).
+   - Ingen automatisk lagring av extern persondata.
+   - Session-only i UI (person-search/person-puzzle) – inte här.
+
+   Providers:
+   - demo: lokal demo/testdata
+   - searchapi_proxy: via Cloudflare Worker (löser CORS)
+   - searchapi_direct: direkt mot data.riksarkivet.se (kan CORS-blockas)
+   ------------------------------------------------------------ */
 
 (function(){
   "use strict";
 
-  // ---------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------
-  function isNonEmptyString(v){ return typeof v === "string" && v.trim().length > 0; }
+  // ============================================================
+  // KONFIG (LÅST: ej i storage)
+  // ============================================================
+  // Sätt denna till din publika Worker-URL (inte dashboard-länken):
+  // Exempel: "https://slaktkort01234.<dittkonto>.workers.dev"
+  const PROXY_BASE = ""; // <-- FYLL I
 
-  function safeInt(v){
-    const n = Number(v);
-    if(!Number.isFinite(n)) return null;
-    const i = Math.trunc(n);
-    if(i < 0 || i > 3000) return null;
+  // Riksarkivet Sök-API base (direkt)
+  const RA_BASE = "https://data.riksarkivet.se/api";
+
+  // Timeouts (ms)
+  const FETCH_TIMEOUT_MS = 8000;
+
+  // Begränsa resultat för att skydda både UI och upstream
+  const DEFAULT_LIMIT = 50;
+  const MAX_LIMIT = 200;
+
+  // ============================================================
+  // HELPERS
+  // ============================================================
+  function clampInt(n, min, max, fallback){
+    const x = Number(n);
+    if(!Number.isFinite(x)) return fallback;
+    const i = Math.trunc(x);
+    if(i < min) return min;
+    if(i > max) return max;
     return i;
   }
 
-  function pickFirstString(){
-    for(let i=0;i<arguments.length;i++){
-      const v = arguments[i];
-      if(isNonEmptyString(v)) return v.trim();
-    }
-    return "";
+  function toStr(v){ return String(v == null ? "" : v); }
+
+  function normalize(s){
+    return toStr(s).trim().toLowerCase();
   }
 
-  function uniqueWhy(arr){
-    const out = [];
-    const seen = new Set();
-    for(const x of (arr || [])){
-      const s = String(x || "").trim();
-      if(!s) continue;
-      if(seen.has(s)) continue;
-      seen.add(s);
-      out.push(s);
+  function safeArray(v){
+    return Array.isArray(v) ? v : [];
+  }
+
+  function abortableFetch(url, opts){
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+    const merged = Object.assign({}, (opts || {}), { signal: controller.signal });
+
+    return fetch(url, merged)
+      .finally(() => clearTimeout(id));
+  }
+
+  function corsOrNetworkError(err){
+    // Browser: "TypeError: Failed to fetch" vid CORS/nätverk
+    const msg = (err && err.message) ? String(err.message) : String(err || "");
+    const lower = msg.toLowerCase();
+    if(lower.includes("failed to fetch") || lower.includes("network") || lower.includes("cors")){
+      return true;
     }
+    // AbortError räknas inte som CORS, men som timeout (hanteras separat)
+    return false;
+  }
+
+  function isAbortError(err){
+    const name = err && err.name ? String(err.name) : "";
+    return name === "AbortError";
+  }
+
+  function mustString(v){
+    const s = toStr(v).trim();
+    return s ? s : "";
+  }
+
+  // ============================================================
+  // Candidate mapping (LÅST format)
+  // { id, name, birthYear, deathYear, place, source, url, why[] }
+  // ============================================================
+  function makeCandidate(partial){
+    const c = partial || {};
+    return {
+      id: mustString(c.id),
+      name: mustString(c.name),
+      birthYear: (c.birthYear == null ? null : Number(c.birthYear)),
+      deathYear: (c.deathYear == null ? null : Number(c.deathYear)),
+      place: mustString(c.place),
+      source: mustString(c.source),
+      url: mustString(c.url),
+      why: safeArray(c.why).map(x => mustString(x)).filter(Boolean)
+    };
+  }
+
+  // ============================================================
+  // DEMO provider (för fallback)
+  // ============================================================
+  const DEMO = [
+    { id:"demo_1", name:"Karl Johansson", birthYear:1872, deathYear:1939, place:"Falun", source:"Demo", url:"", why:["Demo-post"] },
+    { id:"demo_2", name:"Anna Persdotter", birthYear:1878, deathYear:1951, place:"Leksand", source:"Demo", url:"", why:["Demo-post"] },
+    { id:"demo_3", name:"Erik Lind", birthYear:1901, deathYear:1977, place:"Gävle", source:"Demo", url:"", why:["Demo-post"] },
+    { id:"demo_4", name:"Maria Nilsdotter", birthYear:1822, deathYear:1890, place:"Uppsala", source:"Demo", url:"", why:["Demo-post"] },
+    { id:"demo_5", name:"Olof Bergström", birthYear:1799, deathYear:1866, place:"Örebro", source:"Demo", url:"", why:["Demo-post"] }
+  ];
+
+  const DemoProvider = {
+    id: "demo",
+    label: "Demo (offline)",
+    async search(query){
+      const q = normalize(query);
+      if(!q || q.length < 2) return [];
+      const hits = DEMO.filter(x => normalize(x.name).includes(q) || normalize(x.place).includes(q));
+      return hits.map(makeCandidate);
+    }
+  };
+
+  // ============================================================
+  // Riksarkivet Sök-API v0 (proxy/direct)
+  // OBS: Vi håller detta minimalt och robust.
+  // ============================================================
+  function buildRecordsUrl(base, query, limit){
+    // base: "https://.../api" (direct) ELLER "https://...workers.dev" (proxy)
+    // direct endpoint: /records
+    // proxy endpoint:  /records  (workern mappar till /api/records)
+    const q = mustString(query);
+    if(!q || q.length < 2) return "";
+
+    const lim = clampInt(limit, 1, MAX_LIMIT, DEFAULT_LIMIT);
+
+    const u = new URL(base.replace(/\/+$/, "") + "/records");
+    u.searchParams.set("name", q);
+    u.searchParams.set("limit", String(lim));
+    u.searchParams.set("offset", "0");
+    u.searchParams.set("sort", "relevance");
+
+    // Lätt “hint” – kan ändras senare, men hjälper relevans:
+    // (Om RA ignorerar okända params är det fine.)
+    // u.searchParams.set("facet", "ObjectType:Agent;Type:Person");
+
+    return u.toString();
+  }
+
+  function mapRecordsToCandidates(payload, sourceLabel){
+    // payload-format kan variera. Vi mappar defensivt.
+    // Målet: få ut id + label/name + ev år + ev plats + ev url.
+    const out = [];
+
+    // Vanliga mönster: payload.records / payload.items / payload.hits
+    const records =
+      safeArray(payload && payload.records) ||
+      safeArray(payload && payload.items) ||
+      safeArray(payload && payload.hits) ||
+      [];
+
+    for(const r of records){
+      // Fält kan heta olika: id/identifier/uri, title/name/label
+      const id =
+        mustString(r && (r.id || r.identifier || r.uri || r.arkivid || r.guid));
+
+      const name =
+        mustString(r && (r.name || r.title || r.label || r.displayName));
+
+      // År: ibland finns interval/årtal i olika fält.
+      // Vi tar bara heltal om vi hittar dem.
+      let birthYear = null;
+      let deathYear = null;
+
+      const by = r && (r.birthYear || r.birth || r.fodelsear || r.yearOfBirth);
+      const dy = r && (r.deathYear || r.death || r.dodsar || r.yearOfDeath);
+
+      const bNum = Number(by);
+      const dNum = Number(dy);
+      if(Number.isFinite(bNum)) birthYear = Math.trunc(bNum);
+      if(Number.isFinite(dNum)) deathYear = Math.trunc(dNum);
+
+      const place =
+        mustString(r && (r.place || r.location || r.plats || r.placeName));
+
+      const url =
+        mustString(r && (r.url || r.link || r.href || r.uri)) ||
+        (id ? ("https://data.riksarkivet.se/" + encodeURIComponent(id)) : "");
+
+      // Varför: keep short
+      const why = [];
+      if(sourceLabel) why.push(sourceLabel);
+      if(place) why.push("Plats: " + place);
+
+      const cand = makeCandidate({
+        id: id || ("ra_" + Math.random().toString(36).slice(2)),
+        name: name || "(namn saknas)",
+        birthYear,
+        deathYear,
+        place,
+        source: sourceLabel,
+        url,
+        why
+      });
+
+      // Minimivalidering enligt kontraktet: id + name måste finnas
+      if(cand.id && cand.name) out.push(cand);
+    }
+
     return out;
   }
 
-  async function fetchJsonWithTimeout(url, timeoutMs){
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), Math.max(1, timeoutMs|0));
+  function makeSearchApiProvider(opts){
+    const id = opts.id;
+    const label = opts.label;
+    const base = opts.base; // PROXY_BASE or RA_BASE
+    const sourceLabel = opts.sourceLabel;
 
-    try{
-      const res = await fetch(url, {
-        method: "GET",
-        mode: "cors",
-        credentials: "omit",
-        cache: "no-store",
-        signal: ctrl.signal,
-        headers: { "Accept": "application/json" }
-      });
+    return {
+      id,
+      label,
 
-      if(!res.ok){
-        const txt = await res.text().catch(() => "");
-        const err = new Error("HTTP_" + res.status);
-        err.details = txt ? txt.slice(0, 400) : "";
-        err.httpStatus = res.status;
-        throw err;
-      }
+      // --------------------------------------------------------
+      // search(query): Promise<Candidate[]>
+      // - Fail-closed: kasta fel vid nät/CORS/timeout/HTTP
+      // - Returnera [] om query för kort
+      // --------------------------------------------------------
+      async search(query){
+        const url = buildRecordsUrl(base, query, DEFAULT_LIMIT);
+        if(!url) return [];
 
-      return await res.json();
-    }catch(e){
-      const msg = String(e && e.message ? e.message : e);
-      if(msg.toLowerCase().includes("failed to fetch") || msg.toLowerCase().includes("cors")){
-        const err = new Error("CORS_OR_NETWORK");
-        err.cause = e;
-        throw err;
-      }
-      if(msg.toLowerCase().includes("aborted") || msg.toLowerCase().includes("abort")){
-        const err = new Error("TIMEOUT");
-        err.cause = e;
-        throw err;
-      }
-      throw e;
-    }finally{
-      clearTimeout(t);
-    }
-  }
-
-  // ---------------------------------------------------------
-  // Candidate mappning: robust (API-format kan variera)
-  // ---------------------------------------------------------
-  function tryGet(obj, path){
-    // path ex: "foo.bar[0].baz"
-    try{
-      let cur = obj;
-      const parts = String(path).replaceAll("[", ".[").split(".");
-      for(const p of parts){
-        if(!cur) return undefined;
-        if(p.startsWith("[")){
-          const idx = Number(p.slice(1, -1));
-          if(!Array.isArray(cur)) return undefined;
-          cur = cur[idx];
-        }else{
-          cur = cur[p];
+        let res;
+        try{
+          res = await abortableFetch(url, { method:"GET", headers:{ "Accept":"application/json" } });
+        }catch(err){
+          if(isAbortError(err)){
+            throw new Error("TIMEOUT");
+          }
+          if(corsOrNetworkError(err)){
+            throw new Error("CORS_OR_NETWORK");
+          }
+          throw new Error("NETWORK_UNKNOWN");
         }
-      }
-      return cur;
-    }catch{
-      return undefined;
-    }
-  }
 
-  function toCandidateFromAny(item, sourceLabel, baseWhy){
-    const id =
-      pickFirstString(
-        item && item.id,
-        item && item["@id"],
-        item && item.uri,
-        item && item.recordId,
-        item && item.reference,
-        tryGet(item, "identifier"),
-        tryGet(item, "record.id"),
-        tryGet(item, "hit.id")
-      ) || ("ra_" + Math.random().toString(36).slice(2,10));
+        if(!res || !res.ok){
+          const code = res ? res.status : 0;
+          throw new Error("HTTP_" + String(code || "0"));
+        }
 
-    const name =
-      pickFirstString(
-        item && item.name,
-        item && item.title,
-        item && item.label,
-        item && item.prefLabel,
-        tryGet(item, "rdfs:label.[0].@value"),
-        tryGet(item, "rdfs:label.[0].value"),
-        tryGet(item, "displayLabel"),
-        tryGet(item, "record.title")
-      ) || "(namn saknas)";
+        let json;
+        try{
+          json = await res.json();
+        }catch{
+          throw new Error("BAD_JSON");
+        }
 
-    const birthYear =
-      safeInt(item && item.birthYear) ??
-      safeInt(tryGet(item, "birth.year")) ??
-      safeInt(tryGet(item, "lifeSpan.birthYear")) ??
-      null;
+        // Proxy kan välja att returnera {ok:false,...}
+        if(json && json.ok === false){
+          const e = mustString(json.error) || "UPSTREAM_ERROR";
+          throw new Error(e);
+        }
 
-    const deathYear =
-      safeInt(item && item.deathYear) ??
-      safeInt(tryGet(item, "death.year")) ??
-      safeInt(tryGet(item, "lifeSpan.deathYear")) ??
-      null;
-
-    const place =
-      pickFirstString(
-        item && item.place,
-        item && item.location,
-        tryGet(item, "topography"),
-        tryGet(item, "record.place"),
-        tryGet(item, "placeName")
-      );
-
-    let url =
-      pickFirstString(
-        item && item.url,
-        item && item["@id"],
-        item && item.uri,
-        tryGet(item, "links.self"),
-        tryGet(item, "record.url")
-      );
-
-    if(url && !/^https?:\/\//i.test(url)){
-      if(url.startsWith("/")) url = "https://data.riksarkivet.se" + url;
-    }
-
-    const why = uniqueWhy([].concat(baseWhy || [], place ? ("Plats: " + place) : []));
-
-    return {
-      id: String(id),
-      name: String(name),
-      birthYear: birthYear === null ? null : birthYear,
-      deathYear: deathYear === null ? null : deathYear,
-      place: place || "",
-      source: String(sourceLabel || "Okänd källa"),
-      url: url || "",
-      why
-    };
-  }
-
-  function extractItemsFromRecordsResponse(data){
-    if(Array.isArray(data)) return data;
-
-    if(data && Array.isArray(data.records)) return data.records;
-    if(data && Array.isArray(data.hits)) return data.hits;
-    if(data && Array.isArray(data.items)) return data.items;
-    if(data && data.result && Array.isArray(data.result.records)) return data.result.records;
-    if(data && Array.isArray(data.data)) return data.data;
-
-    return [];
-  }
-
-  // ---------------------------------------------------------
-  // DemoProvider (fallback)
-  // ---------------------------------------------------------
-  function createDemoProvider(){
-    const DEMO = [
-      { fornamn:"Karl",  efternamn:"Johansson",  fodelsear:"1872", dodsar:"1939", plats:"Falun",   yrke:"Smed" },
-      { fornamn:"Anna",  efternamn:"Persdotter", fodelsear:"1878", dodsar:"1951", plats:"Leksand", yrke:"Piga" },
-      { fornamn:"Erik",  efternamn:"Lind",       fodelsear:"1901", dodsar:"1977", plats:"Gävle",   yrke:"Lokförare" },
-      { fornamn:"Maria", efternamn:"Nilsdotter", fodelsear:"1822", dodsar:"1890", plats:"Uppsala", yrke:"Sömmerska" },
-      { fornamn:"Olof",  efternamn:"Bergström",  fodelsear:"1799", dodsar:"1866", plats:"Örebro",  yrke:"Handlare" }
-    ];
-
-    function normalize(s){ return String(s || "").trim().toLowerCase(); }
-    function parseYear(v){ const i = safeInt(String(v||"").trim()); return i === null ? null : i; }
-
-    return {
-      id: "demo",
-      label: "Demo (offline)",
-      async search(query){
-        const q = normalize(query);
-        if(!q || q.length < 2) return [];
-
-        const hits = DEMO.filter(x => {
-          const full = normalize((x.fornamn||"") + " " + (x.efternamn||""));
-          const place = normalize(x.plats||"");
-          return full.includes(q) || place.includes(q);
-        });
-
-        return hits.map((x, idx) => ({
-          id: "demo_" + idx,
-          name: ((x.fornamn||"") + " " + (x.efternamn||"")).trim(),
-          birthYear: parseYear(x.fodelsear),
-          deathYear: parseYear(x.dodsar),
-          place: String(x.plats||""),
-          source: "Demo",
-          url: "",
-          why: ["Fallback: demo-data", "Match: namn/plats"]
-        }));
-      }
-    };
-  }
-
-  // ---------------------------------------------------------
-  // SearchApiProvider (Riksarkivet Sök-API, records)
-  // ---------------------------------------------------------
-  function createSearchApiProvider(opts){
-    const baseUrl = (opts && opts.baseUrl) ? String(opts.baseUrl) : "https://data.riksarkivet.se/api/records";
-    const timeoutMs = (opts && opts.timeoutMs) ? Number(opts.timeoutMs) : 7000;
-
-    function buildUrl(params){
-      const u = new URL(baseUrl);
-
-      if(isNonEmptyString(params.name)) u.searchParams.set("name", params.name);
-      else if(isNonEmptyString(params.text)) u.searchParams.set("text", params.text);
-
-      if(isNonEmptyString(params.place)) u.searchParams.set("place", params.place);
-
-      if(params.yearMin != null) u.searchParams.set("year_min", String(params.yearMin));
-      if(params.yearMax != null) u.searchParams.set("year_max", String(params.yearMax));
-
-      u.searchParams.set("limit", String(params.limit != null ? params.limit : 50));
-      u.searchParams.set("offset", String(params.offset != null ? params.offset : 0));
-      u.searchParams.set("sort", String(params.sort || "relevance"));
-
-      if(isNonEmptyString(params.facet)) u.searchParams.set("facet", params.facet);
-
-      return u.toString();
-    }
-
-    async function searchBase(params, why){
-      const q = pickFirstString(params.name, params.text);
-      if(!q || q.trim().length < 2) return [];
-
-      const url = buildUrl(params);
-      const data = await fetchJsonWithTimeout(url, timeoutMs);
-
-      const items = extractItemsFromRecordsResponse(data);
-      const out = [];
-
-      for(const it of items){
-        out.push(toCandidateFromAny(it, "Riksarkivet Sök-API", why));
-      }
-
-      return out;
-    }
-
-    return {
-      id: "searchapi",
-      label: "Riksarkivet Sök-API (beta)",
-      async search(query){
-        const q = String(query || "").trim();
-        return await searchBase({
-          name: q,
-          limit: 50,
-          offset: 0,
-          sort: "relevance",
-          facet: "ObjectType:Agent;Type:Person"
-        }, ["Match: name", "Källa: Sök-API"]);
+        return mapRecordsToCandidates(json, sourceLabel);
       },
 
-      // OPTIONAL (puzzle kan använda om den vill)
+      // --------------------------------------------------------
+      // refine(...) – valfritt. Förberett men inte krav nu.
+      // Person-puzzle aktiverar knappen bara om refine finns.
+      // --------------------------------------------------------
       async refine(params){
-        const name = pickFirstString(params && params.name, "");
-        const place = pickFirstString(params && params.place, "");
-        const yearMin = safeInt(params && params.yearMin);
-        const yearMax = safeInt(params && params.yearMax);
+        // Minimal v0: bygg en bättre query-sträng och kör search igen.
+        // Detta ändrar inte UI och kräver inte ny datamodell.
+        const name = mustString(params && params.name);
+        if(!name || name.length < 2) return [];
 
-        return await searchBase({
-          name,
-          place,
-          yearMin,
-          yearMax,
-          limit: 100,
-          offset: 0,
-          sort: "relevance",
-          facet: "ObjectType:Agent;Type:Person"
-        }, [
-          "Refine: name/place/year",
-          place ? ("Filter: place=" + place) : "",
-          (yearMin != null || yearMax != null) ? ("Filter: year=" + String(yearMin||"") + "–" + String(yearMax||"")) : ""
-        ]);
+        const place = mustString(params && params.place);
+        const yearMin = params && Number.isFinite(params.yearMin) ? Math.trunc(params.yearMin) : null;
+        const yearMax = params && Number.isFinite(params.yearMax) ? Math.trunc(params.yearMax) : null;
+
+        // Bygg en “förfinad” söksträng (kan justeras senare)
+        // Ex: "Karl Johansson Falun 1820 1890"
+        const parts = [name];
+        if(place) parts.push(place);
+        if(yearMin != null) parts.push(String(yearMin));
+        if(yearMax != null) parts.push(String(yearMax));
+
+        const q = parts.join(" ").trim();
+        return this.search(q);
       }
     };
   }
 
-  // ---------------------------------------------------------
-  // Registry + global API
-  // ---------------------------------------------------------
-  const registry = new Map();
-  const demoProvider = createDemoProvider();
-  const searchApiProvider = createSearchApiProvider();
+  const SearchApiProxyProvider = makeSearchApiProvider({
+    id: "searchapi",
+    label: "Riksarkivet Sök-API (via Cloudflare proxy)",
+    base: (PROXY_BASE || "").replace(/\/+$/, ""),
+    sourceLabel: "Riksarkivet (proxy)"
+  });
 
-  registry.set(demoProvider.id, demoProvider);
-  registry.set(searchApiProvider.id, searchApiProvider);
+  const SearchApiDirectProvider = makeSearchApiProvider({
+    id: "searchapi_direct",
+    label: "Riksarkivet Sök-API (direkt, kan CORS-blockas)",
+    base: RA_BASE,
+    sourceLabel: "Riksarkivet (direkt)"
+  });
+
+  // ============================================================
+  // Provider registry
+  // ============================================================
+  const registry = new Map();
+
+  function register(p){
+    if(!p || !p.id || typeof p.search !== "function") return;
+    registry.set(String(p.id), p);
+  }
+
+  register(DemoProvider);
+
+  // Viktigt: bara registrera proxy-provider om PROXY_BASE är satt,
+  // annars blir den “trasig” och vi vill fail-closed tidigt.
+  if(mustString(PROXY_BASE)){
+    register(SearchApiProxyProvider);
+  }
+
+  register(SearchApiDirectProvider);
+
+  // ============================================================
+  // Public API (window.RAProviders)
+  // ============================================================
+  function listProviders(){
+    return Array.from(registry.values()).map(p => ({ id: p.id, label: p.label }));
+  }
 
   function getProvider(id){
-    const p = registry.get(String(id || ""));
-    return p || null;
+    return registry.get(String(id)) || null;
   }
 
   /**
    * pickProvider({ preferred, allowNetwork })
-   * preferred: "demo" | "searchapi" | "auto"
+   * preferred: "auto" | "demo" | "searchapi" | "searchapi_direct"
+   *
+   * auto-regel:
+   * - Om proxy finns -> använd proxy searchapi
+   * - annars om allowNetwork -> direct
+   * - annars demo
    */
   function pickProvider(opts){
-    const preferred = String((opts && opts.preferred) || "auto");
-    const allowNetwork = (opts && typeof opts.allowNetwork === "boolean") ? opts.allowNetwork : true;
+    const preferred = opts && opts.preferred ? String(opts.preferred) : "auto";
+    const allowNetwork = !(opts && opts.allowNetwork === false);
 
-    if(preferred === "demo") return demoProvider;
-    if(preferred === "searchapi") return (allowNetwork ? searchApiProvider : demoProvider);
+    if(preferred === "demo") return getProvider("demo");
+
+    if(preferred === "searchapi"){
+      // "searchapi" betyder proxy-variant i detta system
+      const p = getProvider("searchapi");
+      if(p) return p;
+      // om proxy saknas: fall tillbaka till direct om tillåtet
+      if(allowNetwork) return getProvider("searchapi_direct");
+      return getProvider("demo");
+    }
+
+    if(preferred === "searchapi_direct"){
+      if(allowNetwork) return getProvider("searchapi_direct");
+      return getProvider("demo");
+    }
 
     // auto
-    return (allowNetwork ? searchApiProvider : demoProvider);
+    const proxy = getProvider("searchapi");
+    if(proxy) return proxy;
+
+    if(allowNetwork) return getProvider("searchapi_direct");
+
+    return getProvider("demo");
   }
 
+  // Exponera i global scope
   window.RAProviders = {
+    listProviders,
     getProvider,
-    pickProvider,
-    listProviders: () => Array.from(registry.values()).map(p => ({ id: p.id, label: p.label }))
+    pickProvider
   };
-})();
 
+})();
