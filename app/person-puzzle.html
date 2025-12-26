@@ -259,7 +259,7 @@
       </div>
 
       <h2 style="margin-top:16px;">Kandidater (poäng)</h2>
-      <p class="small">Just nu: endast vald kandidat poängsätts. Nästa AO kan lägga till “ny sökning från Puzzle”.</p>
+      <p class="small">AO-API-03: endast vald kandidat poängsätts. AO-API-04 kan lägga till “pool/Top 10”.</p>
       <ul id="scoreList" class="list" aria-label="Poänglista"></ul>
 
       <h2 style="margin-top:16px;">Pusselbitar</h2>
@@ -269,9 +269,9 @@
   </div>
 
   <!-- =====================================================
-       RA Providers (måste finnas i repot enligt AO-API-03)
+       RA Providers (AO-API-03)
        Fil: app/assets/js/ra-providers.js
-       Exponerar: window.RAProviders (se integration nedan)
+       Exponerar: window.RAProviders + enrichProviders
        ===================================================== -->
   <script src="./assets/js/ra-providers.js"></script>
 
@@ -380,7 +380,7 @@
 
       try{
         const b64 = base64UrlToBase64(raw);
-        const json = atob(b64);
+        const json = decodeURIComponent(escape(atob(b64)));
         const obj = JSON.parse(json);
 
         // minimal candidate validation
@@ -505,7 +505,7 @@
     }
 
     function isEligibleForExternalCalls(candidate){
-      // fail-closed: måste ha grundnamn minst 2 token eller minst 3 tecken
+      // fail-closed: måste ha grundnamn minst 3 tecken
       const n = normalize(candidate?.name || "");
       if(!n) return false;
       if(n.replaceAll(" ", "").length < 3) return false;
@@ -610,9 +610,11 @@
     }
 
     // =====================================================
-    // Enrich pipeline (via RAProviders)
+    // Enrich pipeline (via RAProviders.enrichProviders)
+    // AO-API-03: in-memory only (policy)
     // =====================================================
-    let enrichBits = []; // in-memory only (policy)
+    let enrichBits = [];
+
     function renderBits(bits){
       bitsList.innerHTML = "";
       const arr = Array.isArray(bits) ? bits : [];
@@ -624,7 +626,7 @@
         li.style.cursor = "default";
         li.innerHTML =
           "<p class='itemTitle'>Inga pusselbitar</p>" +
-          "<p class='itemMeta'>Klicka “Hämta pusselbitar”. Om RA blockeras av CORS visas status men inget UI-fel.</p>";
+          "<p class='itemMeta'>Klicka “Hämta pusselbitar”. Om källa blockeras (CORS/timeout) visas status men inget UI-fel.</p>";
         bitsList.appendChild(li);
         return;
       }
@@ -670,20 +672,24 @@
         return [];
       }
 
-      // RAProviders måste finnas
       const RA = window.RAProviders;
-      if(!RA || !RA.enrichProviders || !Array.isArray(RA.enrichProviders)){
-        showTopMsg("err", "⛔ RAProviders saknas. Kontrollera att ./assets/js/ra-providers.js laddas och exponerar enrichProviders.");
+      if(!RA){
+        showTopMsg("err", "⛔ RAProviders saknas. Kontrollera att ./assets/js/ra-providers.js laddas.");
+        return [];
+      }
+
+      const providers = Array.isArray(RA.enrichProviders) ? RA.enrichProviders : null;
+      if(!providers){
+        showTopMsg("err", "⛔ enrichProviders saknas i RAProviders. (AO-API-03 kräver window.RAProviders.enrichProviders)");
         return [];
       }
 
       const bits = [];
-      for(const p of RA.enrichProviders){
+      for(const p of providers){
         try{
           if(!p || typeof p.supports !== "function" || typeof p.enrich !== "function") continue;
           if(!p.supports(candidate)) continue;
 
-          // skydd mot häng
           const r = await p.enrich(candidate, hints);
           if(Array.isArray(r) && r.length){
             for(const b of r){
@@ -706,9 +712,11 @@
     }
 
     // =====================================================
-    // Import (skapa person i aktivt träd) – ingen ny key
-    // - använder samma keys som slaktkort.html:
-    //   KEY_ACTIVE + slakttradet_slaktkort_<treeId>
+    // Import (skapa person i aktivt träd) – inga nya keys
+    // använder befintliga keys:
+    //   slakttradet_trees
+    //   slakttradet_active_tree_id
+    //   slakttradet_slaktkort_<treeId>
     // =====================================================
     const KEY_TREES  = "slakttradet_trees";
     const KEY_ACTIVE = "slakttradet_active_tree_id";
@@ -779,7 +787,7 @@
         id,
         fornamn: String(nm.fornamn || "").trim(),
         efternamn: String(nm.efternamn || "").trim(),
-        kon: "", // okänt här
+        kon: "",
         yrke: "",
         fodelsear: Number.isFinite(Number(candidate.birthYear)) ? String(Math.trunc(Number(candidate.birthYear))) : "",
         dodsar: Number.isFinite(Number(candidate.deathYear)) ? String(Math.trunc(Number(candidate.deathYear))) : "",
@@ -788,7 +796,6 @@
         anteckning: ("Importerad från Puzzle. " + noteParts.join(" · ")).trim()
       };
 
-      // minimal validering (som i demo)
       if(!created.fornamn || !created.efternamn){
         showTopMsg("err", "⛔ Kan inte importera: saknar förnamn/efternamn. (Kandidaten hade inte ett normalt namnformat.)");
         return;
@@ -881,7 +888,6 @@
 
       const hints = collectHints(candidate);
 
-      // fail-closed: om inget namn → inga anrop
       if(!isEligibleForExternalCalls(candidate)){
         showTopMsg("warn", "⚠️ För kort namn/kandidat → inga anrop (fail-closed).");
         return;
@@ -893,7 +899,7 @@
       try{
         const bits = await enrichAll(candidate, hints);
 
-        // alltid lägg till NOTE (om providers inte gjorde det)
+        // alltid NOTE (för tydlighet)
         if(!bits.some(x => String(x.type) === "note")){
           bits.unshift({
             providerId: "note",
@@ -912,7 +918,7 @@
         setRunInfo("Klart (" + ms + " ms)");
 
         if(bits.length <= 1){
-          showTopMsg("warn", "⚠️ Inga externa pusselbitar hittades eller RA blockerades (CORS/timeout) → fortsätter utan. (Inte ett UI-fel)");
+          showTopMsg("warn", "⚠️ Inga externa pusselbitar hittades eller källa blockerades → fortsätter utan. (Inte ett UI-fel)");
         }else{
           showTopMsg("ok", "✅ Pusselbitar hämtade.");
         }
@@ -936,7 +942,6 @@
     plusQueryEl.addEventListener("keydown", (e) => {
       if(e.key === "Enter"){
         e.preventDefault();
-        // snabb: kör scoring
         scoreBtn.click();
       }
     });
@@ -955,7 +960,6 @@
     pillEnrich.innerHTML = "Pusselbitar: <strong>0</strong>";
     setRunInfo("Redo");
 
-    // Om kandidat saknas: tydligt
     if(!candidate){
       showTopMsg("err", "⛔ Ingen kandidat i URL. Puzzle kräver ?candidate=... från person-search.html.");
     }
