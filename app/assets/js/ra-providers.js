@@ -156,15 +156,15 @@
       // fail-closed: tolerera flera format
        const records = safeArray(json.hits || json.records || json.items || json.data || []);
        
-      return records.map(r => makeCandidate({
-        id: r.id || r.identifier || (crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()),
-        name: r.name || r.title || r.label || "(namn saknas)",
-        birthYear: Number.isFinite(+r.birthYear) ? +r.birthYear : null,
-        deathYear: Number.isFinite(+r.deathYear) ? +r.deathYear : null,
-        place: r.place || r.location || "",
-        source: "Riksarkivet",
-        url: r.url || r.uri || "",
-        why: ["Match via namn"]
+return records.map(r => makeCandidate({
+  id: pickText(r.id || r.identifier) || (crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()),
+  name: pickText(r.name || r.title || r.label) || "(namn saknas)",
+  birthYear: Number.isFinite(+pickText(r.birthYear)) ? +pickText(r.birthYear) : null,
+  deathYear: Number.isFinite(+pickText(r.deathYear)) ? +pickText(r.deathYear) : null,
+  place: pickText(r.place || r.location || r.placeName || r.ort || ""),
+  source: "Riksarkivet",
+  url: pickText(r.url || r.uri || r.link || ""),
+  why: ["Match via namn"]
       }));
     }
   };
