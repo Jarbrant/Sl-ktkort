@@ -154,8 +154,8 @@
       }
 
       // fail-closed: tolerera flera format
-      const records = safeArray(json.records || json.items || json.data || []);
-
+       const records = safeArray(json.hits || json.records || json.items || json.data || []);
+       
       return records.map(r => makeCandidate({
         id: r.id || r.identifier || (crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()),
         name: r.name || r.title || r.label || "(namn saknas)",
