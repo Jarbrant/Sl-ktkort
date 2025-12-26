@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Person Puzzle – Släktkort</title>
-  <meta name="description" content="Förfina kandidat (scoring) och hämta pusselbitar (enrich) innan import till aktivt träd." />
+  <meta name="description" content="Stegvis förfining av kandidatpool (DB1→DB4) för att hitta bästa match." />
 
   <style>
     :root{ color-scheme: light; }
@@ -19,950 +19,247 @@
       color: #111;
     }
     a{ color: inherit; text-decoration:none; }
-    header{ display:block; margin-bottom:18px; }
+    header{ margin-bottom:18px; }
     h1{ margin:0 0 6px; font-size: 28px; }
     .muted{ color:#555; margin:0; }
 
-    .topbar{
-      display:flex;
-      flex-wrap:wrap;
-      gap:10px;
-      align-items:center;
-      margin: 10px 0 0;
-    }
-    .btn, button{
-      display:inline-block;
-      padding:10px 12px;
-      border:1px solid #333;
-      border-radius:10px;
-      background:#fff;
-      font:inherit;
-      cursor:pointer;
-      user-select:none;
-    }
-    .btn.secondary{ border-color:#bbb; background:#fafafa; }
-    .btn.primary{ background:#111; color:#fff; border-color:#111; }
-    .btn:disabled, button:disabled{ opacity:.55; cursor:not-allowed; }
-    .spacer{ flex:1 1 auto; }
-
     .pillRow{
-      display:flex;
-      flex-wrap:wrap;
-      gap:10px;
-      align-items:center;
-      margin: 10px 0 18px;
+      display:flex; flex-wrap:wrap; gap:10px; margin:12px 0 18px;
     }
     .pill{
-      display:inline-flex;
-      gap:8px;
-      align-items:center;
-      padding:8px 10px;
-      border:1px solid #ddd;
-      border-radius:999px;
-      background:#fafafa;
-      font-size: .95rem;
+      padding:8px 12px; border-radius:999px; border:1px solid #ddd;
+      background:#fafafa; font-size:14px;
     }
-    .pill strong{ font-weight:900; }
-    .pill.ok{ border-color:#cfe8cf; background:#f5fff5; }
-    .pill.warn{ border-color:#ffe1a6; background:#fff9ee; }
-    .pill.err{ border-color:#ffb3b3; background:#fff2f2; }
+    .ok{ background:#f5fff5; border-color:#cfe8cf; }
+    .warn{ background:#fff9ee; border-color:#ffe1a6; }
+    .err{ background:#fff2f2; border-color:#ffb3b3; }
 
-    .grid{
-      display:grid;
-      gap:14px;
-      grid-template-columns: 1fr;
-    }
+    .grid{ display:grid; gap:14px; grid-template-columns: 1fr; }
     @media (min-width: 980px){
-      .grid{ grid-template-columns: 430px 1fr; }
+      .grid{ grid-template-columns: 420px 1fr; }
     }
 
     .card{
-      border:1px solid #e6e8eb;
-      border-radius: 16px;
-      padding: 14px;
-      background:#fff;
+      border:1px solid #e6e8eb; border-radius:16px; padding:14px; background:#fff;
       box-shadow: 0 1px 0 rgba(0,0,0,.03);
     }
-    .card h2{ margin:0 0 6px; font-size: 18px; }
-    .small{ margin:0 0 10px; color:#555; font-size: 13px; }
+    .card h2{ margin:0 0 6px; font-size:18px; }
+    .small{ color:#555; font-size:13px; }
 
-    label{ display:block; font-weight:800; margin: 10px 0 6px; }
-    input, select, textarea{
-      width:100%;
-      box-sizing:border-box;
-      padding: 10px;
-      border-radius: 12px;
-      border: 1px solid #bbb;
-      font: inherit;
-      background:#fff;
+    .actions{ display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; }
+    button{
+      padding:10px 14px; border-radius:12px; border:1px solid #333;
+      background:#111; color:#fff; font:inherit; cursor:pointer;
     }
+    button.secondary{ background:#fff; color:#111; border-color:#bbb; }
+    button:disabled{ opacity:.55; cursor:not-allowed; }
 
-    .row2{
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-    @media (max-width: 520px){
-      .row2{ grid-template-columns: 1fr; }
-    }
-
-    .actions{
-      display:flex;
-      flex-wrap:wrap;
-      gap:10px;
-      align-items:center;
-      margin-top: 12px;
-    }
-
-    .liftBox{
-      border: 1px solid #e6e8eb;
-      background: #fafafa;
-      border-radius: 12px;
-      padding: 10px 12px;
-      font-size: 13px;
-      color:#333;
-    }
-    .liftBox.ok{ border-color:#cfe8cf; background:#f5fff5; }
-    .liftBox.warn{ border-color:#ffe1a6; background:#fff9ee; }
-    .liftBox.err{ border-color:#ffb3b3; background:#fff2f2; }
-
-    .list{
-      margin: 10px 0 0;
-      padding: 0;
-      list-style:none;
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-      max-height: 420px;
-      overflow:auto;
-      border-top: 1px solid #eee;
-      padding-top: 10px;
-    }
-    .item{
-      border:1px solid #eee;
-      border-radius: 14px;
-      padding: 10px;
-      background:#fff;
-      cursor:pointer;
-    }
-    .item:hover{ background:#fafafa; }
-    .itemTitle{ font-weight:900; margin:0 0 2px; }
-    .itemMeta{ margin:0; color:#555; font-size: 13px; }
+    .list{ list-style:none; padding:0; margin-top:10px; display:flex; flex-direction:column; gap:10px; }
+    .item{ border:1px solid #eee; border-radius:14px; padding:10px; background:#fff; }
+    .itemTitle{ font-weight:800; margin:0 0 2px; }
+    .itemMeta{ font-size:13px; color:#555; margin:0; }
 
     .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
-    code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
-    .rightNote{ font-size:12px; color:#555; }
   </style>
 </head>
 
 <body>
-  <header>
-    <h1>Person Puzzle</h1>
-    <p class="muted">Förfina kandidat (poäng) och hämta pusselbitar (metadata) innan import.</p>
+<header>
+  <h1>Person Puzzle</h1>
+  <p class="muted">Stegvis pipeline: bygg kandidatpool → förfina → hitta bästa match.</p>
+</header>
 
-    <nav class="topbar" aria-label="Huvudmeny">
-      <a class="btn secondary" href="../start.html">Start</a>
-      <a class="btn secondary" href="./trees.html">Träd</a>
-      <a class="btn secondary" href="./slaktkort.html">Personer</a>
-      <a class="btn secondary" href="./create-relation.html">Relationer</a>
-      <a class="btn secondary" href="./map.html">Karta</a>
-      <a class="btn secondary" href="./person-search.html">Sök historisk person</a>
-      <span class="spacer"></span>
-      <button class="btn secondary" id="logoutBtn" type="button">Logga ut</button>
-    </nav>
-  </header>
+<section class="pillRow">
+  <span id="pillStage" class="pill warn">Steg: <strong>Init</strong></span>
+  <span id="pillCount" class="pill">Kandidater: <strong>0</strong></span>
+  <span id="pillInfo" class="pill">Status: <strong>Väntar</strong></span>
+</section>
 
-  <section class="pillRow" aria-label="Status">
-    <span id="pillMode" class="pill warn">Läge: <strong>—</strong></span>
-    <span id="pillScore" class="pill">Top score: <strong>—</strong></span>
-    <span id="pillEnrich" class="pill">Pusselbitar: <strong>0</strong></span>
+<div class="grid">
+  <section class="card">
+    <h2>Pipeline</h2>
+    <p class="small">
+      DB1 bygger pool. DB2–DB4 förfinar samma kandidater.
+      Listan kapas efter varje steg.
+    </p>
+
+    <div class="actions">
+      <button id="stage1Btn">Steg 1 – Grovsortera (Top 20)</button>
+      <button id="stage2Btn" class="secondary">Steg 2 – Enrich A (Top 10–20)</button>
+      <button id="stage3Btn" class="secondary">Steg 3 – Enrich B (Top 5–10)</button>
+      <button id="stage4Btn" class="secondary">Steg 4 – Slutrankning (Top 1–10)</button>
+    </div>
+
+    <div class="actions">
+      <button id="resetBtn" class="secondary">Nollställ Puzzle</button>
+    </div>
   </section>
 
-  <div class="grid">
-    <section class="card" aria-label="Vald kandidat">
-      <h2>Vald kandidat</h2>
-      <p class="small">Det här är kandidaten du vill ringa in. Puzzle kan göra fler frågor och ge poäng.</p>
+  <section class="card">
+    <h2>Kandidater</h2>
+    <ul id="list" class="list"></ul>
+  </section>
+</div>
 
-      <div id="candBox" class="liftBox warn" aria-live="polite">Ingen kandidat angiven.</div>
+<script src="./assets/js/ra-providers.js"></script>
+<script>
+"use strict";
 
-      <div class="actions">
-        <button class="btn secondary" id="backBtn" type="button">Tillbaka</button>
-      </div>
+/* ============================================================
+   STATE (in-memory only)
+   ============================================================ */
+let pool = [];     // [{ candidate, score, why, enrichBits }]
+let stage = 0;
 
-      <div class="liftBox" style="margin-top:10px;">
-        <strong>Policy</strong><br/>
-        Inga data sparas automatiskt från externa källor. Puzzle håller allt i minnet tills du importerar.
-      </div>
-    </section>
+/* ============================================================
+   DOM
+   ============================================================ */
+const pillStage = document.getElementById("pillStage");
+const pillCount = document.getElementById("pillCount");
+const pillInfo  = document.getElementById("pillInfo");
+const listEl    = document.getElementById("list");
 
-    <section class="card" aria-label="Förfina och pusselbitar">
-      <h2>Förfina</h2>
-      <p class="small">Du kan använda <span class="mono">+</span> för tokens: <span class="mono">Anders+Leksand+1820</span>.</p>
+const stage1Btn = document.getElementById("stage1Btn");
+const stage2Btn = document.getElementById("stage2Btn");
+const stage3Btn = document.getElementById("stage3Btn");
+const stage4Btn = document.getElementById("stage4Btn");
+const resetBtn  = document.getElementById("resetBtn");
 
-      <div id="topMsg" class="liftBox warn" hidden></div>
+/* ============================================================
+   Helpers
+   ============================================================ */
+function normalize(s){ return String(s||"").toLowerCase().trim(); }
+function clamp(n,min,max){ return Math.min(Math.max(n,min),max); }
 
-      <label for="plusQuery">Snabbfråga (tokens med +)</label>
-      <input id="plusQuery" placeholder="t.ex. Stina Nilsson+Leksand+1820" autocomplete="off" />
+function updatePills(){
+  pillStage.innerHTML = "Steg: <strong>" + stage + "</strong>";
+  pillCount.innerHTML = "Kandidater: <strong>" + pool.length + "</strong>";
+}
 
-      <div class="row2">
-        <div>
-          <label for="placeHint">Plats (valfritt)</label>
-          <input id="placeHint" placeholder="t.ex. Leksand" autocomplete="off" />
-        </div>
-        <div>
-          <label for="nameTokens">Namn-tokens (komma-separerat)</label>
-          <input id="nameTokens" placeholder="t.ex. Stina, Nilsson" autocomplete="off" />
-        </div>
-      </div>
+function render(){
+  listEl.innerHTML = "";
+  for(const p of pool){
+    const li = document.createElement("li");
+    li.className = "item";
+    li.innerHTML =
+      "<p class='itemTitle'>" + p.candidate.name + "</p>" +
+      "<p class='itemMeta'>Score: <span class='mono'>" + p.score + "</span></p>";
+    listEl.appendChild(li);
+  }
+  updatePills();
+}
 
-      <div class="row2">
-        <div>
-          <label for="birthYear">Födelseår (valfritt)</label>
-          <input id="birthYear" inputmode="numeric" placeholder="t.ex. 1820" />
-        </div>
-        <div>
-          <label for="birthRange">± år (range)</label>
-          <select id="birthRange">
-            <option value="0">0</option>
-            <option value="2">2</option>
-            <option value="5" selected>5</option>
-            <option value="10">10</option>
-          </select>
-        </div>
-      </div>
+/* ============================================================
+   SCORING (enkel, deterministisk)
+   ============================================================ */
+function scoreCandidate(c){
+  let s = 0;
+  if(c.name) s += 20;
+  if(c.place) s += 10;
+  if(c.birthYear) s += 15;
+  if(c.deathYear) s += 10;
+  if(c.url) s += 5;
+  return s;
+}
 
-      <div class="row2">
-        <div>
-          <label for="deathYear">Dödsår (valfritt)</label>
-          <input id="deathYear" inputmode="numeric" placeholder="t.ex. 1890" />
-        </div>
-        <div>
-          <label for="deathRange">± år (range)</label>
-          <select id="deathRange">
-            <option value="0">0</option>
-            <option value="2">2</option>
-            <option value="5" selected>5</option>
-            <option value="10">10</option>
-          </select>
-        </div>
-      </div>
+/* ============================================================
+   PIPELINE STEPS
+   ============================================================ */
+function step1(){
+  stage = 1;
+  pillInfo.textContent = "Grovsorterar…";
+  pool.forEach(p => p.score = scoreCandidate(p.candidate));
+  pool.sort((a,b)=>b.score-a.score);
+  pool = pool.slice(0,20);
+  render();
+  pillInfo.textContent = "Steg 1 klart";
+}
 
-      <div class="actions">
-        <button class="btn primary" id="scoreBtn" type="button">Kör poängsättning</button>
-        <button class="btn secondary" id="enrichBtn" type="button">Hämta pusselbitar</button>
-        <span class="rightNote" id="runInfo">—</span>
-      </div>
-
-      <div class="actions" style="margin-top:6px;">
-        <button class="btn primary" id="importBtn" type="button" disabled>Importera till Personer</button>
-        <button class="btn secondary" id="copyBtn" type="button" disabled>Kopiera sammanfattning</button>
-      </div>
-
-      <h2 style="margin-top:16px;">Kandidater (poäng)</h2>
-      <p class="small">AO-API-03: endast vald kandidat poängsätts. AO-API-04 kan lägga till “pool/Top 10”.</p>
-      <ul id="scoreList" class="list" aria-label="Poänglista"></ul>
-
-      <h2 style="margin-top:16px;">Pusselbitar</h2>
-      <p class="small">Metadata/länkar från providers (IIIF/OAI stubs). Inga bilder.</p>
-      <ul id="bitsList" class="list" aria-label="Pusselbitar"></ul>
-    </section>
-  </div>
-
-  <!-- =====================================================
-       RA Providers (AO-API-03)
-       Fil: app/assets/js/ra-providers.js
-       Exponerar: window.RAProviders + enrichProviders
-       ===================================================== -->
-  <script src="./assets/js/ra-providers.js"></script>
-
-  <script>
-    "use strict";
-
-    // =====================================================
-    // AUTH (samma demo-guard som övriga sidor)
-    // =====================================================
-    (function authGuard(){
+async function enrichWithProviders(limitMin, limitMax){
+  const providers = (window.RAProviders && window.RAProviders.enrichProviders) || [];
+  for(const p of pool){
+    p.enrichBits = [];
+    for(const prov of providers){
       try{
-        if(sessionStorage.getItem("demo_auth") !== "1"){
-          window.location.href = "../index.html";
+        if(prov.supports && prov.supports(p.candidate)){
+          const bits = await prov.enrich(p.candidate,{});
+          if(Array.isArray(bits)) p.enrichBits.push(...bits);
         }
       }catch{}
-    })();
-
-    // =====================================================
-    // DOM
-    // =====================================================
-    const logoutBtn = document.getElementById("logoutBtn");
-    const backBtn = document.getElementById("backBtn");
-
-    const pillMode = document.getElementById("pillMode");
-    const pillScore = document.getElementById("pillScore");
-    const pillEnrich = document.getElementById("pillEnrich");
-
-    const candBox = document.getElementById("candBox");
-    const topMsg = document.getElementById("topMsg");
-
-    const plusQueryEl = document.getElementById("plusQuery");
-    const placeHintEl = document.getElementById("placeHint");
-    const nameTokensEl = document.getElementById("nameTokens");
-
-    const birthYearEl = document.getElementById("birthYear");
-    const birthRangeEl = document.getElementById("birthRange");
-    const deathYearEl = document.getElementById("deathYear");
-    const deathRangeEl = document.getElementById("deathRange");
-
-    const scoreBtn = document.getElementById("scoreBtn");
-    const enrichBtn = document.getElementById("enrichBtn");
-    const importBtn = document.getElementById("importBtn");
-    const copyBtn = document.getElementById("copyBtn");
-    const runInfo = document.getElementById("runInfo");
-
-    const scoreList = document.getElementById("scoreList");
-    const bitsList = document.getElementById("bitsList");
-
-    // =====================================================
-    // Helpers
-    // =====================================================
-    function escapeHtml(s){
-      return String(s || "")
-        .replaceAll("&","&amp;")
-        .replaceAll("<","&lt;")
-        .replaceAll(">","&gt;")
-        .replaceAll('"',"&quot;")
-        .replaceAll("'","&#039;");
     }
-
-    function showTopMsg(kind, text){
-      topMsg.hidden = false;
-      topMsg.className = "liftBox " + (kind || "warn");
-      topMsg.innerHTML = escapeHtml(text);
-    }
-    function clearTopMsg(){
-      topMsg.hidden = true;
-      topMsg.className = "liftBox";
-      topMsg.innerHTML = "";
-    }
-
-    function normalize(s){
-      return String(s || "").trim().toLowerCase();
-    }
-
-    function parseIntSafe(v){
-      const s = String(v || "").trim();
-      if(!s) return null;
-      const n = Number(s);
-      if(!Number.isFinite(n)) return null;
-      const i = Math.trunc(n);
-      if(i < 0 || i > 3000) return null;
-      return i;
-    }
-
-    function clamp01(x){
-      const n = Number(x);
-      if(!Number.isFinite(n)) return 0;
-      if(n < 0) return 0;
-      if(n > 1) return 1;
-      return n;
-    }
-
-    // =====================================================
-    // Candidate payload (URL)
-    // - v1: ?candidate=<base64url-json>
-    // =====================================================
-    function base64UrlToBase64(s){
-      return String(s || "").replaceAll("-","+").replaceAll("_","/") + "===".slice((String(s||"").length + 3) % 4);
-    }
-
-    function readCandidateFromUrl(){
-      const u = new URL(window.location.href);
-      const raw = u.searchParams.get("candidate");
-      if(!raw) return null;
-
-      try{
-        const b64 = base64UrlToBase64(raw);
-        const json = decodeURIComponent(escape(atob(b64)));
-        const obj = JSON.parse(json);
-
-        // minimal candidate validation
-        if(!obj || typeof obj !== "object") return null;
-        if(!obj.id || !obj.name) return null;
-
-        return {
-          id: String(obj.id),
-          name: String(obj.name),
-          birthYear: (obj.birthYear === null || obj.birthYear === undefined) ? null : Number(obj.birthYear),
-          deathYear: (obj.deathYear === null || obj.deathYear === undefined) ? null : Number(obj.deathYear),
-          place: String(obj.place || ""),
-          source: String(obj.source || ""),
-          url: String(obj.url || ""),
-          why: Array.isArray(obj.why) ? obj.why.map(x => String(x)) : []
-        };
-      }catch{
-        return null;
-      }
-    }
-
-    function candidateYears(c){
-      const by = Number.isFinite(Number(c.birthYear)) ? String(Math.trunc(Number(c.birthYear))) : "—";
-      const dy = Number.isFinite(Number(c.deathYear)) ? String(Math.trunc(Number(c.deathYear))) : "—";
-      if(by === "—" && dy === "—") return "";
-      return " (" + by + "–" + dy + ")";
-    }
-
-    function renderCandidate(c){
-      if(!c){
-        candBox.className = "liftBox err";
-        candBox.innerHTML = "⛔ Ingen kandidat angiven. Gå tillbaka till sök och välj en kandidat.";
-        importBtn.disabled = true;
-        copyBtn.disabled = true;
-        pillMode.className = "pill err";
-        pillMode.innerHTML = "Läge: <strong>Ingen kandidat</strong>";
-        return;
-      }
-
-      candBox.className = "liftBox ok";
-      candBox.innerHTML =
-        "<div><strong>" + escapeHtml(c.name + candidateYears(c)) + "</strong></div>" +
-        "<div class='small' style='margin-top:6px;'>" +
-          "Plats: <span class='mono'>" + escapeHtml(c.place || "—") + "</span><br/>" +
-          "Källa: <span class='mono'>" + escapeHtml(c.source || "—") + "</span><br/>" +
-          "URL: " + (c.url ? ("<span class='mono'>" + escapeHtml(c.url) + "</span>") : "<span class='mono'>—</span>") + "<br/>" +
-          "ID: <span class='mono'>" + escapeHtml(c.id) + "</span>" +
-        "</div>";
-
-      importBtn.disabled = false;
-      copyBtn.disabled = false;
-
-      pillMode.className = "pill ok";
-      pillMode.innerHTML = "Läge: <strong>Kandidat laddad</strong>";
-    }
-
-    // =====================================================
-    // Hints (frågor)
-    // =====================================================
-    function splitPlusTokens(s){
-      const raw = String(s || "").trim();
-      if(!raw) return [];
-      return raw.split("+").map(x => x.trim()).filter(Boolean);
-    }
-
-    function inferFromPlus(tokens){
-      // enkel heuristik: siffror 3-4 tecken => år
-      const years = [];
-      const words = [];
-
-      for(const t of tokens){
-        const n = parseIntSafe(t);
-        if(n !== null && String(n).length >= 3) years.push(n);
-        else words.push(t);
-      }
-
-      return { years, words };
-    }
-
-    function collectHints(candidate){
-      // tokens från kandidatens namn
-      const baseTokens = normalize(candidate?.name || "")
-        .split(/\s+/).map(x => x.trim()).filter(Boolean);
-
-      // tokens från användarens plusQuery
-      const plusTokens = splitPlusTokens(plusQueryEl.value);
-      const plusInf = inferFromPlus(plusTokens);
-
-      // namn-tokens från fält
-      const fieldTokens = String(nameTokensEl.value || "")
-        .split(",").map(x => x.trim()).filter(Boolean);
-
-      const tokens = []
-        .concat(baseTokens)
-        .concat(plusInf.words)
-        .concat(fieldTokens)
-        .map(x => normalize(x))
-        .filter(Boolean);
-
-      // dedup, max 6
-      const uniq = [];
-      for(const t of tokens){
-        if(!uniq.includes(t)) uniq.push(t);
-        if(uniq.length >= 6) break;
-      }
-
-      const place = String(placeHintEl.value || "").trim() || (plusTokens.find(x => x && !parseIntSafe(x) && x.length >= 3) || "");
-      const birthYear = parseIntSafe(birthYearEl.value) ?? (plusInf.years[0] ?? null);
-      const deathYear = parseIntSafe(deathYearEl.value) ?? (plusInf.years[1] ?? null);
-
-      const birthRange = Number(birthRangeEl.value || 0) || 0;
-      const deathRange = Number(deathRangeEl.value || 0) || 0;
-
-      return {
-        nameTokens: uniq,
-        place: String(place || "").trim(),
-        birthYear,
-        birthRange,
-        deathYear,
-        deathRange
-      };
-    }
-
-    function isEligibleForExternalCalls(candidate){
-      // fail-closed: måste ha grundnamn minst 3 tecken
-      const n = normalize(candidate?.name || "");
-      if(!n) return false;
-      if(n.replaceAll(" ", "").length < 3) return false;
-      return true;
-    }
-
-    // =====================================================
-    // Scoring (LÅST regler enligt AO-API-03)
-    // =====================================================
-    function containsCI(hay, needle){
-      const h = normalize(hay);
-      const n = normalize(needle);
-      if(!h || !n) return false;
-      return h.includes(n);
-    }
-
-    function yearInRange(candidateYear, targetYear, range){
-      if(targetYear === null || targetYear === undefined) return null; // ej tillämpbart
-      const cy = Number.isFinite(Number(candidateYear)) ? Math.trunc(Number(candidateYear)) : null;
-      if(cy === null) return false;
-      const r = Number(range || 0) || 0;
-      return Math.abs(cy - targetYear) <= r;
-    }
-
-    function scoreCandidate(candidate, hints, enrichBits){
-      const why = [];
-      let score = 0;
-
-      // Namn tokens: +20 per token (max 60)
-      let tokenScore = 0;
-      for(const t of (hints.nameTokens || [])){
-        if(!t) continue;
-        if(containsCI(candidate.name, t)){
-          tokenScore += 20;
-          why.push("Match: namn (“" + t + "”) (+20)");
-          if(tokenScore >= 60) break;
-        }
-      }
-      score += Math.min(tokenScore, 60);
-
-      // Plats: +30
-      if(hints.place && containsCI(candidate.place, hints.place)){
-        score += 30;
-        why.push("Match: plats (+30)");
-      }
-
-      // Födelseår: +40 (inom range)
-      const byOk = yearInRange(candidate.birthYear, hints.birthYear, hints.birthRange);
-      if(byOk === true){
-        score += 40;
-        why.push("Match: födelseår (+40)");
-      }
-
-      // Dödsår: +30 (inom range)
-      const dyOk = yearInRange(candidate.deathYear, hints.deathYear, hints.deathRange);
-      if(dyOk === true){
-        score += 30;
-        why.push("Match: dödsår (+30)");
-      }
-
-      // Har URL: +10
-      if(candidate.url){
-        score += 10;
-        why.push("Signal: har URL (+10)");
-      }
-
-      // Har EnrichBit confidence >= 0.6: +10
-      if(Array.isArray(enrichBits) && enrichBits.some(b => clamp01(b.confidence) >= 0.6)){
-        score += 10;
-        why.push("Signal: stark pusselbit (+10)");
-      }
-
-      return { score, why };
-    }
-
-    function renderScoreList(items){
-      scoreList.innerHTML = "";
-      if(!items || items.length === 0){
-        const li = document.createElement("li");
-        li.className = "item";
-        li.style.cursor = "default";
-        li.innerHTML = "<p class='itemTitle'>Ingen poänglista</p><p class='itemMeta'>Klicka “Kör poängsättning”.</p>";
-        scoreList.appendChild(li);
-        pillScore.innerHTML = "Top score: <strong>—</strong>";
-        return;
-      }
-
-      const top = items[0];
-      pillScore.innerHTML = "Top score: <strong>" + String(top.score) + "</strong>";
-
-      for(const it of items){
-        const li = document.createElement("li");
-        li.className = "item";
-        li.style.cursor = "default";
-        li.innerHTML =
-          "<p class='itemTitle'>" + escapeHtml(it.candidate.name + candidateYears(it.candidate)) + " — " + "<span class='mono'>" + String(it.score) + "p</span></p>" +
-          "<p class='itemMeta'>" +
-            (it.why && it.why.length ? escapeHtml(it.why.slice(0,4).join(" · ")) : "—") +
-          "</p>";
-        scoreList.appendChild(li);
-      }
-    }
-
-    // =====================================================
-    // Enrich pipeline (via RAProviders.enrichProviders)
-    // AO-API-03: in-memory only (policy)
-    // =====================================================
-    let enrichBits = [];
-
-    function renderBits(bits){
-      bitsList.innerHTML = "";
-      const arr = Array.isArray(bits) ? bits : [];
-      pillEnrich.innerHTML = "Pusselbitar: <strong>" + String(arr.length) + "</strong>";
-
-      if(arr.length === 0){
-        const li = document.createElement("li");
-        li.className = "item";
-        li.style.cursor = "default";
-        li.innerHTML =
-          "<p class='itemTitle'>Inga pusselbitar</p>" +
-          "<p class='itemMeta'>Klicka “Hämta pusselbitar”. Om källa blockeras (CORS/timeout) visas status men inget UI-fel.</p>";
-        bitsList.appendChild(li);
-        return;
-      }
-
-      for(const b of arr){
-        const li = document.createElement("li");
-        li.className = "item";
-        li.style.cursor = "default";
-
-        const conf = Math.round(clamp01(b.confidence) * 100);
-        const url = String(b.url || "");
-
-        li.innerHTML =
-          "<p class='itemTitle'>" + escapeHtml(b.title || "(pusselbit)") + "</p>" +
-          "<p class='itemMeta'>" +
-            "Provider: " + escapeHtml(b.providerId || "—") +
-            " · Typ: " + escapeHtml(b.type || "—") +
-            " · Conf: " + String(conf) + "%" +
-          "</p>" +
-          (url ? ("<p class='itemMeta'>URL: <span class='mono'>" + escapeHtml(url) + "</span></p>") : "");
-
-        bitsList.appendChild(li);
-      }
-    }
-
-    function dedupBits(bits){
-      const out = [];
-      const seen = new Set();
-      for(const b of (bits || [])){
-        const key = String(b.url || "") || (String(b.providerId || "") + "::" + String(b.title || ""));
-        if(!key) continue;
-        if(seen.has(key)) continue;
-        seen.add(key);
-        out.push(b);
-      }
-      return out;
-    }
-
-    async function enrichAll(candidate, hints){
-      // fail-closed
-      if(!candidate || !isEligibleForExternalCalls(candidate)){
-        showTopMsg("warn", "⚠️ För kort/ingen kandidat – inga externa anrop görs (fail-closed).");
-        return [];
-      }
-
-      const RA = window.RAProviders;
-      if(!RA){
-        showTopMsg("err", "⛔ RAProviders saknas. Kontrollera att ./assets/js/ra-providers.js laddas.");
-        return [];
-      }
-
-      const providers = Array.isArray(RA.enrichProviders) ? RA.enrichProviders : null;
-      if(!providers){
-        showTopMsg("err", "⛔ enrichProviders saknas i RAProviders. (AO-API-03 kräver window.RAProviders.enrichProviders)");
-        return [];
-      }
-
-      const bits = [];
-      for(const p of providers){
-        try{
-          if(!p || typeof p.supports !== "function" || typeof p.enrich !== "function") continue;
-          if(!p.supports(candidate)) continue;
-
-          const r = await p.enrich(candidate, hints);
-          if(Array.isArray(r) && r.length){
-            for(const b of r){
-              bits.push({
-                providerId: String(b.providerId || p.id || ""),
-                type: String(b.type || "note"),
-                title: String(b.title || ""),
-                confidence: clamp01(b.confidence),
-                fields: (b.fields && typeof b.fields === "object") ? b.fields : {},
-                url: String(b.url || "")
-              });
-            }
-          }
-        }catch(e){
-          // fail-closed: ignorera provider, fortsätt
-        }
-      }
-
-      return dedupBits(bits).slice(0, 30);
-    }
-
-    // =====================================================
-    // Import (skapa person i aktivt träd) – inga nya keys
-    // använder befintliga keys:
-    //   slakttradet_trees
-    //   slakttradet_active_tree_id
-    //   slakttradet_slaktkort_<treeId>
-    // =====================================================
-    const KEY_TREES  = "slakttradet_trees";
-    const KEY_ACTIVE = "slakttradet_active_tree_id";
-    const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
-
-    function safeParse(raw, fallback){
-      try{ return JSON.parse(raw); }catch{ return fallback; }
-    }
-    function loadJson(key, fallback){
-      const raw = localStorage.getItem(key);
-      return raw ? safeParse(raw, fallback) : fallback;
-    }
-    function saveJson(key, value){
-      localStorage.setItem(key, JSON.stringify(value));
-    }
-    function activeTreeId(){
-      return localStorage.getItem(KEY_ACTIVE) || "";
-    }
-
-    function newId(){
-      return "p_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,7);
-    }
-
-    function splitName(name){
-      const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
-      if(parts.length === 0) return { fornamn:"", efternamn:"" };
-      if(parts.length === 1) return { fornamn: parts[0], efternamn:"" };
-      return { fornamn: parts[0], efternamn: parts.slice(1).join(" ") };
-    }
-
-    function importCandidate(candidate, hints, bits){
-      clearTopMsg();
-      const t = activeTreeId();
-      if(!t){
-        showTopMsg("err", "⛔ Inget aktivt träd. Gå till Träd och välj ett aktivt träd innan import.");
-        return;
-      }
-      if(!candidate){
-        showTopMsg("err", "⛔ Ingen kandidat att importera.");
-        return;
-      }
-
-      const people = loadJson(cardsKey(t), []);
-      const arr = Array.isArray(people) ? people : [];
-
-      const id = newId();
-      const nm = splitName(candidate.name);
-
-      // Anteckning: kort, ingen rå dump av massdata
-      const noteParts = [];
-      if(candidate.source) noteParts.push("Källa: " + candidate.source);
-      if(candidate.url) noteParts.push("URL: " + candidate.url);
-      if(hints?.place) noteParts.push("Puzzle-hint plats: " + hints.place);
-      if(hints?.birthYear) noteParts.push("Puzzle-hint födelseår: " + String(hints.birthYear) + " ±" + String(hints.birthRange||0));
-      if(hints?.deathYear) noteParts.push("Puzzle-hint dödsår: " + String(hints.deathYear) + " ±" + String(hints.deathRange||0));
-
-      // Ta bara med “pusselbitar” som länkar (inga stora fields)
-      const linkBits = (Array.isArray(bits) ? bits : [])
-        .filter(b => b && b.url)
-        .slice(0, 5)
-        .map(b => (b.type + " (" + (b.providerId||"") + "): " + b.url));
-
-      if(linkBits.length){
-        noteParts.push("Pusselbitar: " + linkBits.join(" | "));
-      }
-
-      const created = {
-        id,
-        fornamn: String(nm.fornamn || "").trim(),
-        efternamn: String(nm.efternamn || "").trim(),
-        kon: "",
-        yrke: "",
-        fodelsear: Number.isFinite(Number(candidate.birthYear)) ? String(Math.trunc(Number(candidate.birthYear))) : "",
-        dodsar: Number.isFinite(Number(candidate.deathYear)) ? String(Math.trunc(Number(candidate.deathYear))) : "",
-        plats: String(candidate.place || hints?.place || "").trim(),
-        coords: null,
-        anteckning: ("Importerad från Puzzle. " + noteParts.join(" · ")).trim()
-      };
-
-      if(!created.fornamn || !created.efternamn){
-        showTopMsg("err", "⛔ Kan inte importera: saknar förnamn/efternamn. (Kandidaten hade inte ett normalt namnformat.)");
-        return;
-      }
-
-      arr.push(created);
-      saveJson(cardsKey(t), arr);
-
-      window.location.href = "./slaktkort.html#open=" + encodeURIComponent(id);
-    }
-
-    async function copySummary(candidate, hints, bits){
-      if(!candidate) return;
-
-      const lines = [];
-      lines.push(candidate.name + candidateYears(candidate));
-      if(candidate.place) lines.push("Plats: " + candidate.place);
-      if(candidate.source) lines.push("Källa: " + candidate.source);
-      if(candidate.url) lines.push("URL: " + candidate.url);
-      lines.push("");
-      lines.push("Hints:");
-      lines.push("- tokens: " + (hints?.nameTokens || []).join(", "));
-      lines.push("- plats: " + (hints?.place || "—"));
-      lines.push("- födelse: " + (hints?.birthYear ?? "—") + " ±" + (hints?.birthRange ?? 0));
-      lines.push("- död: " + (hints?.deathYear ?? "—") + " ±" + (hints?.deathRange ?? 0));
-      lines.push("");
-      lines.push("Pusselbitar:");
-      const b = Array.isArray(bits) ? bits : [];
-      if(!b.length) lines.push("- (inga)");
-      else{
-        for(const x of b.slice(0, 10)){
-          lines.push("- " + (x.type || "note") + " / " + (x.providerId || "—") + ": " + (x.title || "") + (x.url ? (" (" + x.url + ")") : ""));
-        }
-      }
-
-      try{
-        await navigator.clipboard.writeText(lines.join("\n"));
-        showTopMsg("ok", "✅ Sammanfattning kopierad.");
-      }catch{
-        showTopMsg("warn", "⚠️ Kunde inte kopiera (webbläsaren blockerade).");
-      }
-    }
-
-    // =====================================================
-    // Init
-    // =====================================================
-    const candidate = readCandidateFromUrl();
-    renderCandidate(candidate);
-    renderScoreList([]);
-    renderBits([]);
-
-    // prefill tokens från kandidat
-    if(candidate){
-      const base = String(candidate.name || "").trim();
-      plusQueryEl.value = base;
-      nameTokensEl.value = base.split(/\s+/).slice(0,2).join(", ");
-      placeHintEl.value = String(candidate.place || "");
-      if(Number.isFinite(Number(candidate.birthYear))) birthYearEl.value = String(Math.trunc(Number(candidate.birthYear)));
-      if(Number.isFinite(Number(candidate.deathYear))) deathYearEl.value = String(Math.trunc(Number(candidate.deathYear)));
-    }
-
-    function setRunInfo(s){
-      runInfo.textContent = s || "—";
-    }
-
-    scoreBtn.addEventListener("click", async () => {
-      clearTopMsg();
-      if(!candidate){
-        showTopMsg("err", "⛔ Ingen kandidat. Gå tillbaka och välj en kandidat.");
-        return;
-      }
-
-      const hints = collectHints(candidate);
-      const items = [];
-      const sc = scoreCandidate(candidate, hints, enrichBits);
-      items.push({ candidate, score: sc.score, why: sc.why });
-      items.sort((a,b) => b.score - a.score);
-
-      renderScoreList(items);
-      setRunInfo("Poängsatt: " + new Date().toLocaleTimeString());
-      showTopMsg("ok", "✅ Poängsättning klar.");
-    });
-
-    enrichBtn.addEventListener("click", async () => {
-      clearTopMsg();
-      if(!candidate){
-        showTopMsg("err", "⛔ Ingen kandidat. Gå tillbaka och välj en kandidat.");
-        return;
-      }
-
-      const hints = collectHints(candidate);
-
-      if(!isEligibleForExternalCalls(candidate)){
-        showTopMsg("warn", "⚠️ För kort namn/kandidat → inga anrop (fail-closed).");
-        return;
-      }
-
-      setRunInfo("Hämtar pusselbitar…");
-      const started = Date.now();
-
-      try{
-        const bits = await enrichAll(candidate, hints);
-
-        // alltid NOTE (för tydlighet)
-        if(!bits.some(x => String(x.type) === "note")){
-          bits.unshift({
-            providerId: "note",
-            type: "note",
-            title: "Puzzle körde enrich utan att spara data",
-            confidence: 1.0,
-            fields: { policy: "no-storage" },
-            url: ""
-          });
-        }
-
-        enrichBits = bits;
-        renderBits(enrichBits);
-
-        const ms = Date.now() - started;
-        setRunInfo("Klart (" + ms + " ms)");
-
-        if(bits.length <= 1){
-          showTopMsg("warn", "⚠️ Inga externa pusselbitar hittades eller källa blockerades → fortsätter utan. (Inte ett UI-fel)");
-        }else{
-          showTopMsg("ok", "✅ Pusselbitar hämtade.");
-        }
-      }catch{
-        setRunInfo("Fel");
-        renderBits([]);
-        showTopMsg("warn", "⚠️ Källa blockerades (CORS/timeout) → inga pusselbitar. (Inte ett UI-fel)");
-      }
-    });
-
-    importBtn.addEventListener("click", () => {
-      const hints = candidate ? collectHints(candidate) : null;
-      importCandidate(candidate, hints, enrichBits);
-    });
-
-    copyBtn.addEventListener("click", async () => {
-      const hints = candidate ? collectHints(candidate) : null;
-      await copySummary(candidate, hints, enrichBits);
-    });
-
-    plusQueryEl.addEventListener("keydown", (e) => {
-      if(e.key === "Enter"){
-        e.preventDefault();
-        scoreBtn.click();
-      }
-    });
-
-    backBtn.addEventListener("click", () => {
-      window.location.href = "./person-search.html";
-    });
-
-    logoutBtn.addEventListener("click", () => {
-      try{ sessionStorage.removeItem("demo_auth"); }catch{}
-      window.location.href = "../index.html";
-    });
-
-    // Status init
-    pillScore.innerHTML = "Top score: <strong>—</strong>";
-    pillEnrich.innerHTML = "Pusselbitar: <strong>0</strong>";
-    setRunInfo("Redo");
-
-    if(!candidate){
-      showTopMsg("err", "⛔ Ingen kandidat i URL. Puzzle kräver ?candidate=... från person-search.html.");
-    }
-  </script>
+    if(p.enrichBits.length) p.score += 10;
+  }
+  pool.sort((a,b)=>b.score-a.score);
+  pool = pool.slice(0, clamp(pool.length, limitMin, limitMax));
+}
+
+async function step2(){
+  stage = 2;
+  pillInfo.textContent = "Enrich A…";
+  await enrichWithProviders(10,20);
+  render();
+  pillInfo.textContent = "Steg 2 klart";
+}
+
+async function step3(){
+  stage = 3;
+  pillInfo.textContent = "Enrich B…";
+  await enrichWithProviders(5,10);
+  render();
+  pillInfo.textContent = "Steg 3 klart";
+}
+
+async function step4(){
+  stage = 4;
+  pillInfo.textContent = "Slutrankning…";
+  pool.sort((a,b)=>b.score-a.score);
+  pool = pool.slice(0,10);
+  render();
+  pillInfo.textContent = "Steg 4 klart";
+}
+
+/* ============================================================
+   EVENTS
+   ============================================================ */
+stage1Btn.onclick = step1;
+stage2Btn.onclick = step2;
+stage3Btn.onclick = step3;
+stage4Btn.onclick = step4;
+
+resetBtn.onclick = () => {
+  pool = [];
+  stage = 0;
+  render();
+  pillInfo.textContent = "Nollställd";
+};
+
+/* ============================================================
+   INTAKE
+   - Via postMessage (pool-läge)
+   - Via ?candidate= (fallback)
+   ============================================================ */
+window.addEventListener("message", (e)=>{
+  if(e.data && e.data.type === "PUZZLE_POOL" && Array.isArray(e.data.items)){
+    pool = e.data.items.map(c => ({ candidate:c, score:0, enrichBits:[] }));
+    stage = 0;
+    render();
+    pillInfo.textContent = "Pool mottagen";
+  }
+});
+
+// fallback: single candidate via URL
+(function(){
+  const u = new URL(location.href);
+  const raw = u.searchParams.get("candidate");
+  if(!raw) return;
+  try{
+    const json = decodeURIComponent(atob(raw.replace(/-/g,"+").replace(/_/g,"/")));
+    const c = JSON.parse(json);
+    pool = [{ candidate:c, score:0, enrichBits:[] }];
+    render();
+    pillInfo.textContent = "En kandidat laddad";
+  }catch{}
+})();
+</script>
 </body>
 </html>
