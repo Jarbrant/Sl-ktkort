@@ -920,7 +920,16 @@
     }
 
     // =====================================================
-    // PATCH: AUTO-OPEN FROM HASH (#open=<personId>)
+    // AO-API-02 PATCH – AUTO-OPEN FROM HASH (#open=<personId>)
+    // -----------------------------------------------------
+    // Syfte: När vi kommer från person-puzzle.html (import),
+    //        så landar vi här med #open=<id>. Då ska rätt
+    //        person auto-öppnas i formuläret.
+    //
+    // Policy:
+    // - Ingen ny datamodell
+    // - Ingen ny storage-key
+    // - Fail-closed: om id inte finns -> visa tydligt och fortsätt
     // =====================================================
     function getOpenIdFromHash(){
       const h = String(window.location.hash || "");
@@ -947,7 +956,7 @@
 
       const t = activeTreeId();
       if(!t){
-        showTopMsg("warn", "⚠️ Kan inte öppna importerad person: inget aktivt träd valt.");
+        showTopMsg("warn", "⚠️ Import klar men kan inte öppna person: inget aktivt träd valt.");
         clearHash();
         return true;
       }
@@ -955,16 +964,23 @@
       const people = loadPeople();
       const p = people.find(x => String(x.id) === String(openId));
       if(!p){
-        showTopMsg("warn", "⚠️ Kunde inte hitta importerad person (id saknas i listan).");
+        showTopMsg("warn", "⚠️ Import klar men kunde inte hitta personen i listan (id saknas).");
         clearHash();
         return true;
       }
 
+      // Sätt edit state + draft och öppna i UI
       setEditId(String(p.id));
       const d = makeDraftFromPerson(p);
       saveDraft(d);
       applyDraftToForm(d);
       setFormMode("EDIT", p);
+
+      // Bonus: scrolla lite mot formuläret (utan redesign)
+      try{
+        formTitle.scrollIntoView({ behavior: "smooth", block: "start" });
+      }catch{}
+
       showTopMsg("ok", "✅ Import klar. Personen är öppnad för redigering.");
       clearHash();
       return true;
@@ -994,28 +1010,28 @@
     });
 
     // FIX: knappen ska faktiskt gå till sidan
-  findHistoricalBtn.addEventListener("click", async () => {
-  // Failsafe: testa att filen finns och går att läsa utan att navigera "blint"
-  const target = "./person-search.html";
+    findHistoricalBtn.addEventListener("click", async () => {
+      // Failsafe: testa att filen finns och går att läsa utan att navigera "blint"
+      const target = "./person-search.html";
 
-  try{
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 2500);
+      try{
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 2500);
 
-    const r = await fetch(target, { cache: "no-store", signal: ctrl.signal });
-    clearTimeout(t);
+        const r = await fetch(target, { cache: "no-store", signal: ctrl.signal });
+        clearTimeout(t);
 
-    if(!r.ok){
-      showTopMsg("err", "⛔ Kan inte öppna söksidan (fil saknas eller gav " + r.status + "). Kontrollera att app/person-search.html finns i repot.");
-      return;
-    }
+        if(!r.ok){
+          showTopMsg("err", "⛔ Kan inte öppna söksidan (fil saknas eller gav " + r.status + "). Kontrollera att app/person-search.html finns i repot.");
+          return;
+        }
 
-    window.location.href = target;
-  }catch(e){
-    // fetch kan blockeras på file://, men på GitHub Pages ska den funka.
-    window.location.href = target;
-  }
-});
+        window.location.href = target;
+      }catch(e){
+        // fetch kan blockeras på file://, men på GitHub Pages ska den funka.
+        window.location.href = target;
+      }
+    });
 
     saveBtn.addEventListener("click", saveCurrent);
     deleteBtn.addEventListener("click", deleteCurrent);
@@ -1045,7 +1061,8 @@
     // START
     initForm();
     renderList();
-    // efter init: försök öppna om vi kom hit från import
+
+    // AO-API-02: Om vi kom hit från import (puzzle) → auto-öppna personen
     tryOpenFromHash();
   </script>
 </body>
