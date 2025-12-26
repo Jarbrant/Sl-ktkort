@@ -1,8 +1,7 @@
 /* ============================================================
    ra-providers.js
    ------------------------------------------------------------
-   Släktkort – Riksarkivet Providerlager (AO-API-01)
-   + AO-API-03: Enrich Providers (IIIF/OAI stubs) för person-puzzle
+   Släktkort – Riksarkivet Providerlager (AO-API-03 PATCH)
    ------------------------------------------------------------
    Ansvar:
    - All extern datainhämtning (Riksarkivet m.fl.)
@@ -13,6 +12,11 @@
    Används av:
    - person-search.html
    - person-puzzle.html
+   ------------------------------------------------------------
+   AO-API-03:
+   - Limit utökas till 150
+   - Exponerar window.RAProviders.enrichProviders (IIIF/OAI stubs)
+   - Inga nya storage-keys, ingen datamodell ändras
    ============================================================ */
 
 (function () {
@@ -28,9 +32,9 @@
   // Timeout för nätverksanrop (ms)
   const FETCH_TIMEOUT = 8000;
 
-  // Resultatgränser
-  const DEFAULT_LIMIT = 50;
-  const MAX_LIMIT = 200;
+  // Resultatgränser (AO-API-03: 150)
+  const DEFAULT_LIMIT = 150;
+  const MAX_LIMIT = 150;
 
   /* ============================================================
      HJÄLPFUNKTIONER
@@ -57,19 +61,12 @@
     return Math.min(Math.max(Math.trunc(n), min), max);
   }
 
-  function clamp01(x) {
-    const n = Number(x);
-    if (!Number.isFinite(n)) return 0;
-    if (n < 0) return 0;
-    if (n > 1) return 1;
-    return n;
-  }
-
-  function safeUUID() {
-    try {
-      if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
-    } catch {}
-    return "id_" + Math.random().toString(16).slice(2) + "_" + Date.now();
+  function safeUrl(s) {
+    const u = String(s || "").trim();
+    if (!u) return "";
+    // enkel fail-closed: bara http(s)
+    if (!/^https?:\/\//i.test(u)) return "";
+    return u;
   }
 
   /* ============================================================
@@ -84,7 +81,7 @@
       deathYear: o.deathYear ?? null,
       place: String(o.place || ""),
       source: String(o.source || ""),
-      url: String(o.url || ""),
+      url: safeUrl(o.url || ""),
       why: safeArray(o.why).map(String)
     };
   }
@@ -141,6 +138,7 @@
       try {
         res = await abortableFetch(url);
       } catch {
+        // fail-closed: bubbla fel så UI kan visa “källa blockerad”
         throw new Error("NETWORK_OR_TIMEOUT");
       }
 
@@ -155,10 +153,11 @@
         throw new Error("BAD_JSON");
       }
 
-      const records = safeArray(json.records || json.items || []);
+      // fail-closed: tolerera flera format
+      const records = safeArray(json.records || json.items || json.data || []);
 
       return records.map(r => makeCandidate({
-        id: r.id || r.identifier || safeUUID(),
+        id: r.id || r.identifier || (crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()),
         name: r.name || r.title || r.label || "(namn saknas)",
         birthYear: Number.isFinite(+r.birthYear) ? +r.birthYear : null,
         deathYear: Number.isFinite(+r.deathYear) ? +r.deathYear : null,
@@ -171,143 +170,51 @@
   };
 
   /* ============================================================
-     AO-API-03: ENRICH PROVIDERS (IIIF/OAI stubs)
-     ------------------------------------------------------------
-     VIKTIGT (LÅST):
-     - Returnerar metadata/länkar endast (ingen bildrendering)
-     - Fail-closed: fel => []
-     - Ingen storage
-     - UI (person-puzzle) förväntar sig:
-       window.RAProviders.enrichProviders = [{id,supports,enrich}, ...]
+     ENRICH PROVIDERS (AO-API-03)
+     - IIIF / OAI stubs: metadata/länkar endast
+     - Ingen bildrendering, ingen lagring
+     - Fail-closed: fel -> []
      ============================================================ */
 
-  function baseCandidateOk(c) {
-    const n = normalize(c && c.name);
-    if (!n) return false;
-    if (n.replace(/\s+/g, "").length < 3) return false;
-    // url/id hjälper men krävs inte
-    return true;
-  }
-
-  function makeBit(providerId, type, title, confidence, url, fields) {
-    return {
-      providerId: String(providerId || ""),
-      type: String(type || "note"),
-      title: String(title || ""),
-      confidence: clamp01(confidence),
-      url: String(url || ""),
-      fields: (fields && typeof fields === "object") ? fields : {}
-    };
-  }
-
-  // IIIF stub:
-  // - Om candidate.url redan ser ut som iiif/manifest -> returnera länk
-  // - Annars (om recordId finns) prova proxy: /iiif?recordId=
-  const EnrichIIIF = {
-    id: "enrich-iiif-01",
-    supports(candidate) {
-      return baseCandidateOk(candidate);
-    },
-    async enrich(candidate /*, hints */) {
-      const bits = [];
-      const cUrl = String(candidate && candidate.url ? candidate.url : "");
-      const cId  = String(candidate && candidate.id ? candidate.id : "");
-
-      try {
-        const looksIiif = /iiif/i.test(cUrl) || /manifest/i.test(cUrl);
-        if (cUrl && looksIiif) {
-          bits.push(makeBit(
-            "enrich-iiif-01",
-            "iiif",
-            "IIIF (manifest-länk)",
-            0.8,
-            cUrl,
-            { note: "Länk från kandidat (heuristik).", recordId: cId || "" }
-          ));
-          return bits;
+  const enrichProviders = [
+    {
+      id: "iiif_stub",
+      label: "IIIF (stub)",
+      supports(candidate) {
+        // vi kräver bara en länk att visa vidare
+        return Boolean(candidate && safeUrl(candidate.url));
+      },
+      async enrich(candidate /*, hints */) {
+        try {
+          const u = safeUrl(candidate.url);
+          if (!u) return [];
+          return [
+            {
+              providerId: "iiif_stub",
+              type: "iiif",
+              title: "IIIF (stub) – öppna källa",
+              confidence: 0.35,
+              fields: { note: "stub" },
+              url: u
+            }
+          ];
+        } catch {
+          return [];
         }
-
-        // Valfri proxy endpoint: /iiif?recordId=<id>
-        if (!cId) return bits;
-
-        const probeUrl = PROXY_BASE + "/iiif?recordId=" + encodeURIComponent(cId);
-        const res = await abortableFetch(probeUrl);
-        if (!res.ok) return bits;
-
-        const json = await res.json().catch(() => null);
-        const manifest = json && (json.manifest || json.url || json.iiifManifest);
-        if (!manifest) return bits;
-
-        bits.push(makeBit(
-          "enrich-iiif-01",
-          "iiif",
-          "IIIF (manifest-länk)",
-          0.75,
-          String(manifest),
-          { note: "Hämtad via proxy.", recordId: cId }
-        ));
-        return bits;
-      } catch {
-        // fail-closed
+      }
+    },
+    {
+      id: "oai_stub",
+      label: "OAI-PMH (stub)",
+      supports(candidate) {
+        return Boolean(candidate && String(candidate.id || "").trim());
+      },
+      async enrich(/* candidate, hints */) {
+        // Stub: vi vet inte korrekt OAI-id utan att mappa mot RA:s OAI-set/identifier
         return [];
       }
     }
-  };
-
-  // OAI stub:
-  // - Prova proxy: /oai?recordId=
-  // - Plus: alltid (om candidate.url finns) en “käll-länk” (typ: link)
-  const EnrichOAI = {
-    id: "enrich-oai-01",
-    supports(candidate) {
-      return baseCandidateOk(candidate);
-    },
-    async enrich(candidate /*, hints */) {
-      const bits = [];
-      const cUrl = String(candidate && candidate.url ? candidate.url : "");
-      const cId  = String(candidate && candidate.id ? candidate.id : "");
-
-      try {
-        if (cUrl) {
-          bits.push(makeBit(
-            "enrich-oai-01",
-            "link",
-            "Källpost (länk)",
-            0.55,
-            cUrl,
-            { note: "Grundlänk från kandidat.", recordId: cId || "" }
-          ));
-        }
-
-        if (!cId) return bits;
-
-        // Valfri proxy endpoint: /oai?recordId=<id>
-        const probeUrl = PROXY_BASE + "/oai?recordId=" + encodeURIComponent(cId);
-        const res = await abortableFetch(probeUrl);
-        if (!res.ok) return bits;
-
-        const json = await res.json().catch(() => null);
-        const oaiUrl = json && (json.url || json.oaiUrl);
-        const ident  = json && (json.identifier || json.oaiIdentifier);
-
-        if (oaiUrl) {
-          bits.push(makeBit(
-            "enrich-oai-01",
-            "oai",
-            "OAI-PMH (GetRecord-länk)",
-            0.7,
-            String(oaiUrl),
-            { oaiIdentifier: ident ? String(ident) : "", recordId: cId, note: "Hämtad via proxy." }
-          ));
-        }
-
-        return bits;
-      } catch {
-        // fail-closed
-        return bits; // behåll ev. käll-länk men inget mer
-      }
-    }
-  };
+  ];
 
   /* ============================================================
      PROVIDER-REGISTRY
@@ -331,20 +238,14 @@
   function pickProvider(preferred = "auto") {
     if (preferred === "demo") return DemoProvider;
     if (preferred === "searchapi") return SearchApiProvider;
-    // auto = proxy först
+    // auto = proxy först, annars demo
     return SearchApiProvider || DemoProvider;
   }
 
   window.RAProviders = {
-    // AO-API-01
     listProviders,
     pickProvider,
-
-    // AO-API-03 (för din befintliga person-puzzle.html)
-    enrichProviders: [
-      EnrichIIIF,
-      EnrichOAI
-    ]
+    enrichProviders
   };
 
 })();
