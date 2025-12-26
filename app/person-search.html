@@ -23,9 +23,10 @@
     h1{ margin:0 0 6px; font-size: 26px; }
     .muted{ color:#555; margin:0; }
 
-    .row{ display:flex; gap:10px; margin-top:12px; }
+    .row{ display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
     input{
       flex:1;
+      min-width: 220px;
       padding:10px;
       border-radius:12px;
       border:1px solid #bbb;
@@ -45,6 +46,7 @@
       color:#111;
       border-color:#bbb;
     }
+    button:disabled{ opacity:.55; cursor:not-allowed; }
 
     .list{
       margin-top:18px;
@@ -62,7 +64,21 @@
     }
     .item h3{ margin:0 0 4px; font-size:16px; }
     .meta{ font-size:13px; color:#555; }
-    .actions{ margin-top:8px; display:flex; gap:8px; }
+    .actions{ margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; }
+
+    /* AO-API-04-ish beteende utan ny AO:
+       - Sortering/scoring sker här (in-memory)
+       - Ingen redesign, bara extra meta-rad */
+    .badgeRow{ margin-top:10px; font-size:13px; color:#555; }
+    .badge{
+      display:inline-block;
+      border:1px solid #e6e8eb;
+      background:#fafafa;
+      padding:6px 10px;
+      border-radius:999px;
+      margin-right:8px;
+    }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
   </style>
 </head>
 
@@ -70,11 +86,17 @@
   <header>
     <h1>Sök historisk person</h1>
     <p class="muted">Sök i öppna källor och öppna vald kandidat i Puzzle.</p>
+
+    <div class="badgeRow" aria-label="Info">
+      <span class="badge">Tips: använd <span class="mono">+</span> för tokens: <span class="mono">Erik+Leksand+1820</span></span>
+      <span class="badge" id="countBadge">Träffar: —</span>
+    </div>
   </header>
 
   <div class="row">
-    <input id="q" placeholder="t.ex. Stina Nilsson" autocomplete="off" />
+    <input id="q" placeholder="t.ex. Stina Nilsson eller Erik+Leksand+1820" autocomplete="off" />
     <button id="searchBtn">Sök</button>
+    <button class="secondary" id="clearBtn" type="button">Rensa</button>
   </div>
 
   <ul id="results" class="list" aria-label="Sökresultat"></ul>
@@ -87,8 +109,13 @@
 
     const qEl = document.getElementById("q");
     const searchBtn = document.getElementById("searchBtn");
+    const clearBtn = document.getElementById("clearBtn");
     const resultsEl = document.getElementById("results");
+    const countBadge = document.getElementById("countBadge");
 
+    // =====================================================
+    // Helpers
+    // =====================================================
     function escapeHtml(s){
       return String(s || "")
         .replaceAll("&","&amp;")
@@ -96,6 +123,10 @@
         .replaceAll(">","&gt;")
         .replaceAll('"',"&quot;")
         .replaceAll("'","&#039;");
+    }
+
+    function normalize(s){
+      return String(s || "").trim().toLowerCase();
     }
 
     function candidateYears(c){
@@ -110,6 +141,7 @@
     }
 
     function encodeCandidateForUrl(candidate){
+      // AO: ingen lagring, payload skickas via URL
       const json = JSON.stringify(candidate);
       const b64 = btoa(unescape(encodeURIComponent(json)));
       return base64ToBase64Url(b64);
@@ -121,43 +153,186 @@
         "./person-puzzle.html?candidate=" + encodeURIComponent(payload);
     }
 
-    async function runSearch(){
+    function setCount(n){
+      countBadge.textContent = "Träffar: " + (Number.isFinite(Number(n)) ? String(n) : "—");
+    }
+
+    function showMessage(text){
+      resultsEl.innerHTML = "<li class='item'><div class='meta'>" + escapeHtml(text) + "</div></li>";
+    }
+
+    function safeArray(v){ return Array.isArray(v) ? v : []; }
+
+    function parseIntSafe(v){
+      const s = String(v || "").trim();
+      if(!s) return null;
+      const n = Number(s);
+      if(!Number.isFinite(n)) return null;
+      const i = Math.trunc(n);
+      if(i < 0 || i > 3000) return null;
+      return i;
+    }
+
+    // =====================================================
+    // Query tokens (för sortering/scoring)
+    // - Vi stödjer: "erik + leksand + 1820"
+    // - Vi stödjer även bara mellanslag: "erik leksand 1820"
+    // =====================================================
+    function splitTokens(input){
+      const raw = String(input || "").trim();
+      if(!raw) return [];
+
+      // Bygg tokens från både '+' och whitespace, fail-closed
+      const parts = raw
+        .split("+")
+        .map(x => x.trim())
+        .filter(Boolean)
+        .flatMap(x => x.split(/\s+/).map(y => y.trim()).filter(Boolean));
+
+      // dedup, max 8 för stabilitet
+      const out = [];
+      for(const p of parts){
+        const k = normalize(p);
+        if(!k) continue;
+        if(out.includes(k)) continue;
+        out.push(k);
+        if(out.length >= 8) break;
+      }
+      return out;
+    }
+
+    function inferHintsFromTokens(tokens){
+      const years = [];
+      const words = [];
+
+      for(const t of (tokens || [])){
+        const n = parseIntSafe(t);
+        if(n !== null && String(n).length >= 3) years.push(n);
+        else words.push(t);
+      }
+
+      // heuristik:
+      // - första 1-2 ord -> namn-tokens
+      // - övriga ord -> kan hjälpa plats
+      const nameTokens = words.slice(0, 3); // max 3 för stabilitet
+      const placeTokens = words.slice(0, 6); // använda alla ord som plats-ledtråd
+
+      return { years, nameTokens, placeTokens };
+    }
+
+    // =====================================================
+    // Scoring för sortering I LISTAN (in-memory)
+    // - Målet: grovsortera 150 träffar så Top 10 blir rimlig
+    // =====================================================
+    function containsCI(hay, needle){
+      const h = normalize(hay);
+      const n = normalize(needle);
+      if(!h || !n) return false;
+      return h.includes(n);
+    }
+
+    function scoreCandidateForList(c, hints){
+      const why = [];
+      let score = 0;
+
+      // Namnmatch: +20 per token (max 60)
+      let tScore = 0;
+      for(const t of safeArray(hints.nameTokens)){
+        if(!t) continue;
+        if(containsCI(c.name, t)){
+          tScore += 20;
+          why.push("namn:" + t + " +20");
+          if(tScore >= 60) break;
+        }
+      }
+      score += Math.min(tScore, 60);
+
+      // Platsmatch (valfri): +25 om någon token matchar platsfältet
+      for(const pt of safeArray(hints.placeTokens)){
+        if(!pt) continue;
+        if(pt.length < 3) continue;
+        if(containsCI(c.place, pt)){
+          score += 25;
+          why.push("plats:" + pt + " +25");
+          break;
+        }
+      }
+
+      // År: +40 om birthYear matchar något år, +30 om deathYear matchar något år
+      const years = safeArray(hints.years);
+      if(years.length){
+        const by = Number.isFinite(Number(c.birthYear)) ? Math.trunc(Number(c.birthYear)) : null;
+        const dy = Number.isFinite(Number(c.deathYear)) ? Math.trunc(Number(c.deathYear)) : null;
+
+        if(by !== null && years.includes(by)){
+          score += 40;
+          why.push("födelseår +40");
+        }
+        if(dy !== null && years.includes(dy)){
+          score += 30;
+          why.push("dödsår +30");
+        }
+      }
+
+      // URL-signal: +10
+      if(c.url){
+        score += 10;
+        why.push("url +10");
+      }
+
+      return { score, why };
+    }
+
+    function sortByScore(items){
+      // Stabil sort: score desc, namn asc
+      return items.slice().sort((a,b) => {
+        if(b._score !== a._score) return b._score - a._score;
+        const an = normalize(a.name);
+        const bn = normalize(b.name);
+        if(an < bn) return -1;
+        if(an > bn) return 1;
+        return 0;
+      });
+    }
+
+    // =====================================================
+    // Render
+    // =====================================================
+    function renderList(items, hints){
       resultsEl.innerHTML = "";
-      const q = qEl.value.trim();
-      if(q.length < 2){
-        resultsEl.innerHTML =
-          "<li class='item'><div class='meta'>Skriv minst 2 tecken.</div></li>";
+      const arr = safeArray(items);
+
+      if(!arr.length){
+        showMessage("Inga träffar.");
+        setCount(0);
         return;
       }
 
-      if(!window.RAProviders){
-        resultsEl.innerHTML =
-          "<li class='item'><div class='meta'>RAProviders saknas.</div></li>";
-        return;
-      }
+      setCount(arr.length);
 
-      const provider = window.RAProviders.pickProvider("auto");
+      // Skapa score + sort
+      const scored = arr.map(c => {
+        const s = scoreCandidateForList(c, hints);
+        return Object.assign({}, c, { _score: s.score, _why: s.why });
+      });
 
-      let items = [];
-      try{
-        items = await provider.search(q);
-      }catch{
-        items = [];
-      }
+      const sorted = sortByScore(scored);
 
-      if(!items.length){
-        resultsEl.innerHTML =
-          "<li class='item'><div class='meta'>Inga träffar.</div></li>";
-        return;
-      }
-
-      for(const c of items){
+      // Visa Top 10 först (men rendera alla hämtade om du scrollar)
+      // (ingen ny UI-komponent, bara ordningen + liten meta-rad per kort)
+      for(const c of sorted){
         const li = document.createElement("li");
         li.className = "item";
+
+        const scoreLine =
+          "Sortscore: <span class='mono'>" + String(c._score) + "</span>" +
+          (c._why && c._why.length ? (" · " + escapeHtml(c._why.slice(0,3).join(" · "))) : "");
+
         li.innerHTML =
           "<h3>" + escapeHtml(c.name + candidateYears(c)) + "</h3>" +
           "<div class='meta'>Plats: " + escapeHtml(c.place || "—") + "</div>" +
-          "<div class='meta'>Källa: " + escapeHtml(c.source || "—") + "</div>";
+          "<div class='meta'>Källa: " + escapeHtml(c.source || "—") + "</div>" +
+          "<div class='meta'>" + scoreLine + "</div>";
 
         const actions = document.createElement("div");
         actions.className = "actions";
@@ -173,6 +348,74 @@
       }
     }
 
+    // =====================================================
+    // Search runner (fail-closed + demo fallback)
+    // =====================================================
+    async function runSearch(){
+      resultsEl.innerHTML = "";
+      setCount("—");
+
+      const q = qEl.value.trim();
+      if(q.length < 2){
+        showMessage("Skriv minst 2 tecken.");
+        setCount(0);
+        return;
+      }
+
+      if(!window.RAProviders){
+        showMessage("RAProviders saknas. Kontrollera att ./assets/js/ra-providers.js laddas.");
+        setCount(0);
+        return;
+      }
+
+      // tokens används för sortering/scoring här
+      const tokens = splitTokens(q);
+      const hints = inferHintsFromTokens(tokens);
+
+      // Primär provider: auto (proxy först)
+      const provider = window.RAProviders.pickProvider("auto");
+
+      searchBtn.disabled = true;
+      searchBtn.textContent = "Söker…";
+
+      let items = [];
+      let used = provider && provider.id ? provider.id : "auto";
+
+      try{
+        items = await provider.search(q);
+      }catch{
+        items = [];
+      }
+
+      // Fail-closed + demo fallback om upstream strular
+      if(!items.length){
+        try{
+          const demo = window.RAProviders.pickProvider("demo");
+          if(demo && demo.id !== used){
+            used = demo.id;
+            items = await demo.search(q);
+          }
+        }catch{
+          items = [];
+        }
+      }
+
+      searchBtn.disabled = false;
+      searchBtn.textContent = "Sök";
+
+      if(!items.length){
+        showMessage("Inga träffar (eller källa blockerades av CORS/timeout).");
+        setCount(0);
+        return;
+      }
+
+      // Render med sortering
+      renderList(items, hints);
+    }
+
+    // =====================================================
+    // Events
+    // =====================================================
     searchBtn.addEventListener("click", runSearch);
     qEl.addEventListener("keydown", e => {
       if(e.key === "Enter"){
@@ -180,6 +423,16 @@
         runSearch();
       }
     });
+
+    clearBtn.addEventListener("click", () => {
+      qEl.value = "";
+      resultsEl.innerHTML = "";
+      setCount("—");
+      qEl.focus();
+    });
+
+    // Init
+    setCount("—");
   </script>
 </body>
 </html>
