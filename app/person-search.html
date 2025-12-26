@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Sök historisk person – Släktkort</title>
-  <meta name="description" content="Sök historiska personer via öppna källor och öppna vald kandidat i Puzzle." />
+  <meta name="description" content="Sök historiska personer via öppna källor och öppna kandidatpool i Puzzle (in-memory, ingen lagring)." />
 
   <style>
     :root{ color-scheme: light; }
@@ -26,7 +26,7 @@
     .row{ display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
     input{
       flex:1;
-      min-width: 220px;
+      min-width: 240px;
       padding:10px;
       border-radius:12px;
       border:1px solid #bbb;
@@ -48,6 +48,29 @@
     }
     button:disabled{ opacity:.55; cursor:not-allowed; }
 
+    .badgeRow{
+      margin-top:10px;
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      align-items:center;
+      font-size:13px;
+      color:#555;
+    }
+    .badge{
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid #e6e8eb;
+      background:#fafafa;
+    }
+    .badge.ok{ background:#f5fff5; border-color:#cfe8cf; }
+    .badge.warn{ background:#fff9ee; border-color:#ffe1a6; }
+    .badge.err{ background:#fff2f2; border-color:#ffb3b3; }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+
     .list{
       margin-top:18px;
       list-style:none;
@@ -63,40 +86,42 @@
       background:#fff;
     }
     .item h3{ margin:0 0 4px; font-size:16px; }
-    .meta{ font-size:13px; color:#555; }
+    .meta{ font-size:13px; color:#555; margin:2px 0; }
     .actions{ margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; }
 
-    /* AO-API-04-ish beteende utan ny AO:
-       - Sortering/scoring sker här (in-memory)
-       - Ingen redesign, bara extra meta-rad */
-    .badgeRow{ margin-top:10px; font-size:13px; color:#555; }
-    .badge{
-      display:inline-block;
+    .hint{
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:12px;
       border:1px solid #e6e8eb;
       background:#fafafa;
-      padding:6px 10px;
-      border-radius:999px;
-      margin-right:8px;
+      font-size:13px;
+      color:#333;
     }
-    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
   </style>
 </head>
 
 <body>
   <header>
     <h1>Sök historisk person</h1>
-    <p class="muted">Sök i öppna källor och öppna vald kandidat i Puzzle.</p>
+    <p class="muted">Sök i öppna källor och öppna kandidatpool i Puzzle (in-memory, ingen lagring).</p>
 
-    <div class="badgeRow" aria-label="Info">
-      <span class="badge">Tips: använd <span class="mono">+</span> för tokens: <span class="mono">Erik+Leksand+1820</span></span>
-      <span class="badge" id="countBadge">Träffar: —</span>
+    <div class="badgeRow" aria-label="Status">
+      <span class="badge" id="providerBadge">Källa: <strong id="providerName">—</strong></span>
+      <span class="badge" id="countBadge">Träffar: <strong id="countNum">—</strong></span>
+      <span class="badge warn" id="capBadge" hidden>Max 150 visas – förfina din sökning</span>
+    </div>
+
+    <div class="hint">
+      Tips: använd <span class="mono">+</span> för tokens: <span class="mono">Erik+Leksand+1820</span>
     </div>
   </header>
 
   <div class="row">
-    <input id="q" placeholder="t.ex. Stina Nilsson eller Erik+Leksand+1820" autocomplete="off" />
-    <button id="searchBtn">Sök</button>
-    <button class="secondary" id="clearBtn" type="button">Rensa</button>
+    <input id="q" placeholder="t.ex. Erik+Leksand+1820" autocomplete="off" />
+    <button id="searchBtn" type="button">Sök</button>
+    <button id="openPoolBtn" class="secondary" type="button" disabled>Öppna Puzzle (pool)</button>
+    <button id="clearBtn" class="secondary" type="button">Rensa</button>
   </div>
 
   <ul id="results" class="list" aria-label="Sökresultat"></ul>
@@ -107,11 +132,25 @@
   <script>
     "use strict";
 
+    // =====================================================
+    // DOM
+    // =====================================================
     const qEl = document.getElementById("q");
     const searchBtn = document.getElementById("searchBtn");
+    const openPoolBtn = document.getElementById("openPoolBtn");
     const clearBtn = document.getElementById("clearBtn");
+
     const resultsEl = document.getElementById("results");
-    const countBadge = document.getElementById("countBadge");
+
+    const providerNameEl = document.getElementById("providerName");
+    const countNumEl = document.getElementById("countNum");
+    const capBadge = document.getElementById("capBadge");
+
+    // =====================================================
+    // STATE (in-memory only)
+    // =====================================================
+    let lastCandidates = [];     // senaste sökresultat (Candidate[])
+    let lastProviderId = "—";
 
     // =====================================================
     // Helpers
@@ -125,9 +164,9 @@
         .replaceAll("'","&#039;");
     }
 
-    function normalize(s){
-      return String(s || "").trim().toLowerCase();
-    }
+    function normalize(s){ return String(s||"").trim().toLowerCase(); }
+
+    function safeArray(v){ return Array.isArray(v) ? v : []; }
 
     function candidateYears(c){
       const by = Number.isFinite(Number(c.birthYear)) ? c.birthYear : "—";
@@ -136,250 +175,173 @@
       return " (" + by + "–" + dy + ")";
     }
 
+    function setProvider(id){
+      lastProviderId = id || "—";
+      providerNameEl.textContent = lastProviderId;
+    }
+
+    function setCount(n){
+      countNumEl.textContent = Number.isFinite(Number(n)) ? String(n) : "—";
+    }
+
+    function showCapWarning(show){
+      capBadge.hidden = !show;
+    }
+
+    function showMessage(text, kind){
+      resultsEl.innerHTML =
+        "<li class='item'>" +
+          "<div class='meta'>" + escapeHtml(text) + "</div>" +
+        "</li>";
+      setCount(kind === "empty" ? 0 : "—");
+    }
+
+    // URL-encode single candidate (fallback fortfarande användbar)
     function base64ToBase64Url(b64){
       return b64.replaceAll("+","-").replaceAll("/","_").replaceAll("=","");
     }
-
     function encodeCandidateForUrl(candidate){
-      // AO: ingen lagring, payload skickas via URL
       const json = JSON.stringify(candidate);
       const b64 = btoa(unescape(encodeURIComponent(json)));
       return base64ToBase64Url(b64);
     }
 
-    function openInPuzzle(candidate){
+    function openInPuzzleSingle(candidate){
       const payload = encodeCandidateForUrl(candidate);
       window.location.href =
         "./person-puzzle.html?candidate=" + encodeURIComponent(payload);
     }
 
-    function setCount(n){
-      countBadge.textContent = "Träffar: " + (Number.isFinite(Number(n)) ? String(n) : "—");
-    }
+    // =====================================================
+    // Pool -> Puzzle (postMessage)
+    // - Ingen lagring, allt in-memory
+    // - Fail-closed: om popup blockeras -> fallback tips
+    // =====================================================
+    function openPuzzleWithPool(candidates){
+      const items = safeArray(candidates).slice(0, 150); // policy: max 150
+      if(!items.length){
+        alert("Inga kandidater att skicka till Puzzle.");
+        return;
+      }
 
-    function showMessage(text){
-      resultsEl.innerHTML = "<li class='item'><div class='meta'>" + escapeHtml(text) + "</div></li>";
-    }
+      // Öppna Puzzle i ny flik (bäst för att behålla poolen i denna flik)
+      const w = window.open("./person-puzzle.html", "_blank", "noopener,noreferrer");
 
-    function safeArray(v){ return Array.isArray(v) ? v : []; }
+      if(!w){
+        alert("Popup blockerad. Tillåt popup för att öppna Puzzle i pool-läge.");
+        return;
+      }
 
-    function parseIntSafe(v){
-      const s = String(v || "").trim();
-      if(!s) return null;
-      const n = Number(s);
-      if(!Number.isFinite(n)) return null;
-      const i = Math.trunc(n);
-      if(i < 0 || i > 3000) return null;
-      return i;
+      // Skicka i chunkar för stabilitet
+      const CHUNK = 50;
+      const total = items.length;
+
+      function sendChunk(i){
+        const slice = items.slice(i, i + CHUNK);
+        try{
+          w.postMessage({
+            type: "PUZZLE_POOL",
+            items: slice,
+            total: total,
+            offset: i
+          }, "*");
+        }catch{}
+      }
+
+      // Skicka några gånger (race med laddning)
+      // 1) direkt, 2) efter 300ms, 3) efter 900ms
+      let offset = 0;
+
+      // Vi skickar ALLA chunkar vid varje försök, så Puzzle kan ta emot det som hinner fram.
+      function sendAll(){
+        for(let i=0; i<total; i+=CHUNK) sendChunk(i);
+      }
+
+      sendAll();
+      setTimeout(sendAll, 300);
+      setTimeout(sendAll, 900);
     }
 
     // =====================================================
-    // Query tokens (för sortering/scoring)
-    // - Vi stödjer: "erik + leksand + 1820"
-    // - Vi stödjer även bara mellanslag: "erik leksand 1820"
+    // Render list
     // =====================================================
-    function splitTokens(input){
-      const raw = String(input || "").trim();
-      if(!raw) return [];
-
-      // Bygg tokens från både '+' och whitespace, fail-closed
-      const parts = raw
-        .split("+")
-        .map(x => x.trim())
-        .filter(Boolean)
-        .flatMap(x => x.split(/\s+/).map(y => y.trim()).filter(Boolean));
-
-      // dedup, max 8 för stabilitet
-      const out = [];
-      for(const p of parts){
-        const k = normalize(p);
-        if(!k) continue;
-        if(out.includes(k)) continue;
-        out.push(k);
-        if(out.length >= 8) break;
-      }
-      return out;
-    }
-
-    function inferHintsFromTokens(tokens){
-      const years = [];
-      const words = [];
-
-      for(const t of (tokens || [])){
-        const n = parseIntSafe(t);
-        if(n !== null && String(n).length >= 3) years.push(n);
-        else words.push(t);
-      }
-
-      // heuristik:
-      // - första 1-2 ord -> namn-tokens
-      // - övriga ord -> kan hjälpa plats
-      const nameTokens = words.slice(0, 3); // max 3 för stabilitet
-      const placeTokens = words.slice(0, 6); // använda alla ord som plats-ledtråd
-
-      return { years, nameTokens, placeTokens };
-    }
-
-    // =====================================================
-    // Scoring för sortering I LISTAN (in-memory)
-    // - Målet: grovsortera 150 träffar så Top 10 blir rimlig
-    // =====================================================
-    function containsCI(hay, needle){
-      const h = normalize(hay);
-      const n = normalize(needle);
-      if(!h || !n) return false;
-      return h.includes(n);
-    }
-
-    function scoreCandidateForList(c, hints){
-      const why = [];
-      let score = 0;
-
-      // Namnmatch: +20 per token (max 60)
-      let tScore = 0;
-      for(const t of safeArray(hints.nameTokens)){
-        if(!t) continue;
-        if(containsCI(c.name, t)){
-          tScore += 20;
-          why.push("namn:" + t + " +20");
-          if(tScore >= 60) break;
-        }
-      }
-      score += Math.min(tScore, 60);
-
-      // Platsmatch (valfri): +25 om någon token matchar platsfältet
-      for(const pt of safeArray(hints.placeTokens)){
-        if(!pt) continue;
-        if(pt.length < 3) continue;
-        if(containsCI(c.place, pt)){
-          score += 25;
-          why.push("plats:" + pt + " +25");
-          break;
-        }
-      }
-
-      // År: +40 om birthYear matchar något år, +30 om deathYear matchar något år
-      const years = safeArray(hints.years);
-      if(years.length){
-        const by = Number.isFinite(Number(c.birthYear)) ? Math.trunc(Number(c.birthYear)) : null;
-        const dy = Number.isFinite(Number(c.deathYear)) ? Math.trunc(Number(c.deathYear)) : null;
-
-        if(by !== null && years.includes(by)){
-          score += 40;
-          why.push("födelseår +40");
-        }
-        if(dy !== null && years.includes(dy)){
-          score += 30;
-          why.push("dödsår +30");
-        }
-      }
-
-      // URL-signal: +10
-      if(c.url){
-        score += 10;
-        why.push("url +10");
-      }
-
-      return { score, why };
-    }
-
-    function sortByScore(items){
-      // Stabil sort: score desc, namn asc
-      return items.slice().sort((a,b) => {
-        if(b._score !== a._score) return b._score - a._score;
-        const an = normalize(a.name);
-        const bn = normalize(b.name);
-        if(an < bn) return -1;
-        if(an > bn) return 1;
-        return 0;
-      });
-    }
-
-    // =====================================================
-    // Render
-    // =====================================================
-    function renderList(items, hints){
+    function renderList(items){
       resultsEl.innerHTML = "";
       const arr = safeArray(items);
 
       if(!arr.length){
-        showMessage("Inga träffar.");
-        setCount(0);
+        showMessage("Inga träffar (eller källa blockerades av CORS/timeout).", "empty");
+        openPoolBtn.disabled = true;
         return;
       }
 
+      // max 150 visas (enligt provider limit)
       setCount(arr.length);
+      showCapWarning(arr.length >= 150);
 
-      // Skapa score + sort
-      const scored = arr.map(c => {
-        const s = scoreCandidateForList(c, hints);
-        return Object.assign({}, c, { _score: s.score, _why: s.why });
-      });
+      openPoolBtn.disabled = false;
 
-      const sorted = sortByScore(scored);
-
-      // Visa Top 10 först (men rendera alla hämtade om du scrollar)
-      // (ingen ny UI-komponent, bara ordningen + liten meta-rad per kort)
-      for(const c of sorted){
+      for(const c of arr){
         const li = document.createElement("li");
         li.className = "item";
-
-        const scoreLine =
-          "Sortscore: <span class='mono'>" + String(c._score) + "</span>" +
-          (c._why && c._why.length ? (" · " + escapeHtml(c._why.slice(0,3).join(" · "))) : "");
 
         li.innerHTML =
           "<h3>" + escapeHtml(c.name + candidateYears(c)) + "</h3>" +
           "<div class='meta'>Plats: " + escapeHtml(c.place || "—") + "</div>" +
           "<div class='meta'>Källa: " + escapeHtml(c.source || "—") + "</div>" +
-          "<div class='meta'>" + scoreLine + "</div>";
+          (c.url ? ("<div class='meta'>URL: <span class='mono'>" + escapeHtml(c.url) + "</span></div>") : "");
 
         const actions = document.createElement("div");
         actions.className = "actions";
 
-        const btn = document.createElement("button");
-        btn.className = "secondary";
-        btn.textContent = "Öppna i Puzzle";
-        btn.addEventListener("click", () => openInPuzzle(c));
+        const poolBtn = document.createElement("button");
+        poolBtn.className = "secondary";
+        poolBtn.textContent = "Öppna i Puzzle (pool)";
+        poolBtn.addEventListener("click", () => openPuzzleWithPool(lastCandidates));
 
-        actions.appendChild(btn);
+        const singleBtn = document.createElement("button");
+        singleBtn.className = "secondary";
+        singleBtn.textContent = "Öppna i Puzzle (1)";
+        singleBtn.addEventListener("click", () => openInPuzzleSingle(c));
+
+        actions.appendChild(poolBtn);
+        actions.appendChild(singleBtn);
+
         li.appendChild(actions);
         resultsEl.appendChild(li);
       }
     }
 
     // =====================================================
-    // Search runner (fail-closed + demo fallback)
+    // Search runner
     // =====================================================
     async function runSearch(){
-      resultsEl.innerHTML = "";
+      showCapWarning(false);
+      openPoolBtn.disabled = true;
+      setProvider("—");
       setCount("—");
+      resultsEl.innerHTML = "";
 
       const q = qEl.value.trim();
       if(q.length < 2){
-        showMessage("Skriv minst 2 tecken.");
-        setCount(0);
+        showMessage("Skriv minst 2 tecken.", "empty");
+        lastCandidates = [];
         return;
       }
 
       if(!window.RAProviders){
-        showMessage("RAProviders saknas. Kontrollera att ./assets/js/ra-providers.js laddas.");
-        setCount(0);
+        showMessage("RAProviders saknas. Kontrollera att ./assets/js/ra-providers.js laddas.", "empty");
+        lastCandidates = [];
         return;
       }
 
-      // tokens används för sortering/scoring här
-      const tokens = splitTokens(q);
-      const hints = inferHintsFromTokens(tokens);
-
-      // Primär provider: auto (proxy först)
       const provider = window.RAProviders.pickProvider("auto");
 
       searchBtn.disabled = true;
       searchBtn.textContent = "Söker…";
 
       let items = [];
-      let used = provider && provider.id ? provider.id : "auto";
+      let used = (provider && provider.id) ? provider.id : "auto";
 
       try{
         items = await provider.search(q);
@@ -387,14 +349,12 @@
         items = [];
       }
 
-      // Fail-closed + demo fallback om upstream strular
+      // demo fallback om upstream strular
       if(!items.length){
         try{
           const demo = window.RAProviders.pickProvider("demo");
-          if(demo && demo.id !== used){
-            used = demo.id;
-            items = await demo.search(q);
-          }
+          used = (demo && demo.id) ? demo.id : used;
+          items = await demo.search(q);
         }catch{
           items = [];
         }
@@ -403,14 +363,10 @@
       searchBtn.disabled = false;
       searchBtn.textContent = "Sök";
 
-      if(!items.length){
-        showMessage("Inga träffar (eller källa blockerades av CORS/timeout).");
-        setCount(0);
-        return;
-      }
+      setProvider(used);
 
-      // Render med sortering
-      renderList(items, hints);
+      lastCandidates = safeArray(items).slice(0, 150);
+      renderList(lastCandidates);
     }
 
     // =====================================================
@@ -424,14 +380,23 @@
       }
     });
 
+    openPoolBtn.addEventListener("click", () => {
+      openPuzzleWithPool(lastCandidates);
+    });
+
     clearBtn.addEventListener("click", () => {
       qEl.value = "";
-      resultsEl.innerHTML = "";
+      lastCandidates = [];
+      setProvider("—");
       setCount("—");
+      showCapWarning(false);
+      openPoolBtn.disabled = true;
+      resultsEl.innerHTML = "";
       qEl.focus();
     });
 
     // Init
+    setProvider("—");
     setCount("—");
   </script>
 </body>
