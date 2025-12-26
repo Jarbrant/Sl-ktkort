@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Person puzzle – Släktkort</title>
-  <meta name="description" content="Ring in rätt person bland kandidater. Poängsätt, eliminera, fråga källan igen, och importera vald person." />
+  <title>Person Puzzle – Släktkort</title>
+  <meta name="description" content="Förfina kandidat (scoring) och hämta pusselbitar (enrich) innan import till aktivt träd." />
 
   <style>
     :root{ color-scheme: light; }
@@ -18,8 +18,11 @@
       background: #fff;
       color: #111;
     }
-    a{ color: inherit; text-decoration: none; }
+    a{ color: inherit; text-decoration:none; }
     header{ display:block; margin-bottom:18px; }
+    h1{ margin:0 0 6px; font-size: 28px; }
+    .muted{ color:#555; margin:0; }
+
     .topbar{
       display:flex;
       flex-wrap:wrap;
@@ -35,16 +38,12 @@
       background:#fff;
       font:inherit;
       cursor:pointer;
-      text-decoration:none;
       user-select:none;
     }
     .btn.secondary{ border-color:#bbb; background:#fafafa; }
     .btn.primary{ background:#111; color:#fff; border-color:#111; }
     .btn:disabled, button:disabled{ opacity:.55; cursor:not-allowed; }
     .spacer{ flex:1 1 auto; }
-
-    h1{ margin:0 0 6px; font-size: 28px; }
-    .muted{ color:#555; margin:0; }
 
     .pillRow{
       display:flex;
@@ -68,9 +67,13 @@
     .pill.warn{ border-color:#ffe1a6; background:#fff9ee; }
     .pill.err{ border-color:#ffb3b3; background:#fff2f2; }
 
-    .grid{ display:grid; gap:14px; grid-template-columns: 1fr; }
+    .grid{
+      display:grid;
+      gap:14px;
+      grid-template-columns: 1fr;
+    }
     @media (min-width: 980px){
-      .grid{ grid-template-columns: 460px 1fr; }
+      .grid{ grid-template-columns: 430px 1fr; }
     }
 
     .card{
@@ -84,7 +87,7 @@
     .small{ margin:0 0 10px; color:#555; font-size: 13px; }
 
     label{ display:block; font-weight:800; margin: 10px 0 6px; }
-    input, textarea{
+    input, select, textarea{
       width:100%;
       box-sizing:border-box;
       padding: 10px;
@@ -93,14 +96,20 @@
       font: inherit;
       background:#fff;
     }
-    textarea{ min-height: 84px; resize: vertical; }
 
-    .row2{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    .row2{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    @media (max-width: 520px){
+      .row2{ grid-template-columns: 1fr; }
+    }
 
     .actions{
       display:flex;
       flex-wrap:wrap;
-      gap: 10px;
+      gap:10px;
       align-items:center;
       margin-top: 12px;
     }
@@ -124,7 +133,7 @@
       display:flex;
       flex-direction:column;
       gap:10px;
-      max-height: 560px;
+      max-height: 420px;
       overflow:auto;
       border-top: 1px solid #eee;
       padding-top: 10px;
@@ -137,42 +146,19 @@
       cursor:pointer;
     }
     .item:hover{ background:#fafafa; }
-    .item.sel{ outline:2px solid #111; }
-    .itemTitle{
-      font-weight:900;
-      margin:0 0 2px;
-      display:flex;
-      align-items:center;
-      gap:10px;
-      flex-wrap:wrap;
-    }
-    .badge{
-      display:inline-flex;
-      align-items:center;
-      padding: 3px 8px;
-      border-radius:999px;
-      border:1px solid #ddd;
-      background:#fafafa;
-      font-size:12px;
-      font-weight:900;
-      white-space:nowrap;
-    }
-    .badge.good{ border-color:#cfe8cf; background:#f5fff5; }
-    .badge.bad{ border-color:#ffb3b3; background:#fff2f2; }
+    .itemTitle{ font-weight:900; margin:0 0 2px; }
     .itemMeta{ margin:0; color:#555; font-size: 13px; }
 
-    code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
     .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    code{ background:#f4f4f4; padding:2px 6px; border-radius:6px; }
+    .rightNote{ font-size:12px; color:#555; }
   </style>
-
-  <!-- Providerlager -->
-  <script src="./assets/js/ra-providers.js?v=20251225c"></script>
 </head>
 
 <body>
   <header>
-    <h1>Person puzzle</h1>
-    <p class="muted">Ring in rätt person med pusselbitar och poäng. Import sker bara när du klickar Importera.</p>
+    <h1>Person Puzzle</h1>
+    <p class="muted">Förfina kandidat (poäng) och hämta pusselbitar (metadata) innan import.</p>
 
     <nav class="topbar" aria-label="Huvudmeny">
       <a class="btn secondary" href="../start.html">Start</a>
@@ -180,101 +166,121 @@
       <a class="btn secondary" href="./slaktkort.html">Personer</a>
       <a class="btn secondary" href="./create-relation.html">Relationer</a>
       <a class="btn secondary" href="./map.html">Karta</a>
+      <a class="btn secondary" href="./person-search.html">Sök historisk person</a>
       <span class="spacer"></span>
       <button class="btn secondary" id="logoutBtn" type="button">Logga ut</button>
     </nav>
   </header>
 
   <section class="pillRow" aria-label="Status">
-    <span id="pillTree" class="pill warn">Aktivt träd: <strong>—</strong></span>
-    <span id="pillCand" class="pill">Kandidater: <strong>0</strong></span>
-    <span id="pillSource" class="pill warn">Källa: <strong>—</strong></span>
-    <span id="pillVisible" class="pill">Visas: <strong>0</strong></span>
+    <span id="pillMode" class="pill warn">Läge: <strong>—</strong></span>
+    <span id="pillScore" class="pill">Top score: <strong>—</strong></span>
+    <span id="pillEnrich" class="pill">Pusselbitar: <strong>0</strong></span>
   </section>
 
   <div class="grid">
-    <section class="card" aria-label="Frågor och poäng">
-      <h2>Frågor</h2>
-      <p class="small">
-        Målet är att <strong>minska</strong> listan. Du kan dölja kandidater under en tröskel och fråga källan igen (ny sökning).
-      </p>
+    <section class="card" aria-label="Vald kandidat">
+      <h2>Vald kandidat</h2>
+      <p class="small">Det här är kandidaten du vill ringa in. Puzzle kan göra fler frågor och ge poäng.</p>
 
-      <div id="topMsg" class="liftBox warn" hidden></div>
-
-      <label for="place">Plats (pusselbit)</label>
-      <input id="place" placeholder="t.ex. Leksand, Falun, socken, län…" autocomplete="off"/>
-
-      <div class="row2">
-        <div>
-          <label for="birthMin">Födelseår (min)</label>
-          <input id="birthMin" inputmode="numeric" placeholder="t.ex. 1820" />
-        </div>
-        <div>
-          <label for="birthMax">Födelseår (max)</label>
-          <input id="birthMax" inputmode="numeric" placeholder="t.ex. 1825" />
-        </div>
-      </div>
-
-      <div class="row2">
-        <div>
-          <label for="deathMin">Dödsår (min)</label>
-          <input id="deathMin" inputmode="numeric" placeholder="t.ex. 1880" />
-        </div>
-        <div>
-          <label for="deathMax">Dödsår (max)</label>
-          <input id="deathMax" inputmode="numeric" placeholder="t.ex. 1895" />
-        </div>
-      </div>
-
-      <label for="clues">Pusselbitar (nyckelord – fri text)</label>
-      <textarea id="clues" placeholder="t.ex. 'smed', 'soldat', 'tidningsnotis', gårdsnamn…"></textarea>
-
-      <label for="minScore">Min score för att visas (döljer resten)</label>
-      <input id="minScore" inputmode="numeric" placeholder="t.ex. 5" />
+      <div id="candBox" class="liftBox warn" aria-live="polite">Ingen kandidat angiven.</div>
 
       <div class="actions">
-        <button class="btn primary" id="applyBtn" type="button">Poängsätt & sortera</button>
-        <button class="btn secondary" id="resetBtn" type="button">Nollställ frågor</button>
-        <button class="btn secondary" id="askBtn" type="button">Fråga källan igen</button>
         <button class="btn secondary" id="backBtn" type="button">Tillbaka</button>
       </div>
 
       <div class="liftBox" style="margin-top:10px;">
-        <strong>Fail-closed</strong><br/>
-        Saknas session eller aktivt träd → vi stoppar och skickar dig tillbaka.<br/>
-        Extern kandidatdata lagras endast i <code>sessionStorage</code>.
+        <strong>Policy</strong><br/>
+        Inga data sparas automatiskt från externa källor. Puzzle håller allt i minnet tills du importerar.
       </div>
     </section>
 
-    <section class="card" aria-label="Kandidater och import">
-      <h2>Kandidater</h2>
-      <p class="small">Välj kandidat. Högre score = bättre match med dina pusselbitar.</p>
+    <section class="card" aria-label="Förfina och pusselbitar">
+      <h2>Förfina</h2>
+      <p class="small">Du kan använda <span class="mono">+</span> för tokens: <span class="mono">Anders+Leksand+1820</span>.</p>
 
-      <div id="previewBox" class="liftBox" aria-live="polite">Välj en kandidat för att se detaljer här.</div>
+      <div id="topMsg" class="liftBox warn" hidden></div>
 
-      <div class="actions" style="margin-top:10px;">
+      <label for="plusQuery">Snabbfråga (tokens med +)</label>
+      <input id="plusQuery" placeholder="t.ex. Stina Nilsson+Leksand+1820" autocomplete="off" />
+
+      <div class="row2">
+        <div>
+          <label for="placeHint">Plats (valfritt)</label>
+          <input id="placeHint" placeholder="t.ex. Leksand" autocomplete="off" />
+        </div>
+        <div>
+          <label for="nameTokens">Namn-tokens (komma-separerat)</label>
+          <input id="nameTokens" placeholder="t.ex. Stina, Nilsson" autocomplete="off" />
+        </div>
+      </div>
+
+      <div class="row2">
+        <div>
+          <label for="birthYear">Födelseår (valfritt)</label>
+          <input id="birthYear" inputmode="numeric" placeholder="t.ex. 1820" />
+        </div>
+        <div>
+          <label for="birthRange">± år (range)</label>
+          <select id="birthRange">
+            <option value="0">0</option>
+            <option value="2">2</option>
+            <option value="5" selected>5</option>
+            <option value="10">10</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row2">
+        <div>
+          <label for="deathYear">Dödsår (valfritt)</label>
+          <input id="deathYear" inputmode="numeric" placeholder="t.ex. 1890" />
+        </div>
+        <div>
+          <label for="deathRange">± år (range)</label>
+          <select id="deathRange">
+            <option value="0">0</option>
+            <option value="2">2</option>
+            <option value="5" selected>5</option>
+            <option value="10">10</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" id="scoreBtn" type="button">Kör poängsättning</button>
+        <button class="btn secondary" id="enrichBtn" type="button">Hämta pusselbitar</button>
+        <span class="rightNote" id="runInfo">—</span>
+      </div>
+
+      <div class="actions" style="margin-top:6px;">
         <button class="btn primary" id="importBtn" type="button" disabled>Importera till Personer</button>
-        <button class="btn secondary" id="copyBtn" type="button" disabled>Kopiera som text</button>
-        <button class="btn secondary" id="dropBtn" type="button" disabled>Ta bort kandidat</button>
+        <button class="btn secondary" id="copyBtn" type="button" disabled>Kopiera sammanfattning</button>
       </div>
 
-      <ul id="candList" class="list" aria-label="Kandidater"></ul>
+      <h2 style="margin-top:16px;">Kandidater (poäng)</h2>
+      <p class="small">Just nu: endast vald kandidat poängsätts. Nästa AO kan lägga till “ny sökning från Puzzle”.</p>
+      <ul id="scoreList" class="list" aria-label="Poänglista"></ul>
 
-      <div class="liftBox" style="margin-top:10px;">
-        <strong>Teknik</strong><br/>
-        Bas-sökterm: <code id="ctxQ">—</code><br/>
-        API-query: <code id="ctxApiQ">—</code><br/>
-        Start-hints: <code id="ctxHints">—</code>
-      </div>
+      <h2 style="margin-top:16px;">Pusselbitar</h2>
+      <p class="small">Metadata/länkar från providers (IIIF/OAI stubs). Inga bilder.</p>
+      <ul id="bitsList" class="list" aria-label="Pusselbitar"></ul>
     </section>
   </div>
+
+  <!-- =====================================================
+       RA Providers (måste finnas i repot enligt AO-API-03)
+       Fil: app/assets/js/ra-providers.js
+       Exponerar: window.RAProviders (se integration nedan)
+       ===================================================== -->
+  <script src="./assets/js/ra-providers.js"></script>
 
   <script>
     "use strict";
 
-    /* ============================================================
-       AUTH GUARD
-       ============================================================ */
+    // =====================================================
+    // AUTH (samma demo-guard som övriga sidor)
+    // =====================================================
     (function authGuard(){
       try{
         if(sessionStorage.getItem("demo_auth") !== "1"){
@@ -283,76 +289,40 @@
       }catch{}
     })();
 
-    /* ============================================================
-       CORE STORAGE KEYS (LÅST)
-       ============================================================ */
-    const KEY_TREES  = "slakttradet_trees";
-    const KEY_ACTIVE = "slakttradet_active_tree_id";
-    const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
-
-    /* ============================================================
-       SESSION KEYS (måste matcha person-search.html)
-       ============================================================ */
-    const SS_CANDIDATES = "ra_session_candidates_v1";
-    const SS_CONTEXT    = "ra_session_context_v1";
-
-    /* ============================================================
-       UI refs
-       ============================================================ */
+    // =====================================================
+    // DOM
+    // =====================================================
     const logoutBtn = document.getElementById("logoutBtn");
     const backBtn = document.getElementById("backBtn");
 
-    const pillTree = document.getElementById("pillTree");
-    const pillCand = document.getElementById("pillCand");
-    const pillSource = document.getElementById("pillSource");
-    const pillVisible = document.getElementById("pillVisible");
+    const pillMode = document.getElementById("pillMode");
+    const pillScore = document.getElementById("pillScore");
+    const pillEnrich = document.getElementById("pillEnrich");
 
+    const candBox = document.getElementById("candBox");
     const topMsg = document.getElementById("topMsg");
 
-    const placeEl = document.getElementById("place");
-    const birthMinEl = document.getElementById("birthMin");
-    const birthMaxEl = document.getElementById("birthMax");
-    const deathMinEl = document.getElementById("deathMin");
-    const deathMaxEl = document.getElementById("deathMax");
-    const cluesEl = document.getElementById("clues");
-    const minScoreEl = document.getElementById("minScore");
+    const plusQueryEl = document.getElementById("plusQuery");
+    const placeHintEl = document.getElementById("placeHint");
+    const nameTokensEl = document.getElementById("nameTokens");
 
-    const applyBtn = document.getElementById("applyBtn");
-    const resetBtn = document.getElementById("resetBtn");
-    const askBtn = document.getElementById("askBtn");
+    const birthYearEl = document.getElementById("birthYear");
+    const birthRangeEl = document.getElementById("birthRange");
+    const deathYearEl = document.getElementById("deathYear");
+    const deathRangeEl = document.getElementById("deathRange");
 
-    const candList = document.getElementById("candList");
-    const previewBox = document.getElementById("previewBox");
-
+    const scoreBtn = document.getElementById("scoreBtn");
+    const enrichBtn = document.getElementById("enrichBtn");
     const importBtn = document.getElementById("importBtn");
     const copyBtn = document.getElementById("copyBtn");
-    const dropBtn = document.getElementById("dropBtn");
+    const runInfo = document.getElementById("runInfo");
 
-    const ctxQ = document.getElementById("ctxQ");
-    const ctxApiQ = document.getElementById("ctxApiQ");
-    const ctxHints = document.getElementById("ctxHints");
+    const scoreList = document.getElementById("scoreList");
+    const bitsList = document.getElementById("bitsList");
 
-    /* ============================================================
-       Helpers
-       ============================================================ */
-    function safeParse(raw, fallback){
-      try{ return JSON.parse(raw); }catch{ return fallback; }
-    }
-    function loadJsonLS(key, fallback){
-      const raw = localStorage.getItem(key);
-      return raw ? safeParse(raw, fallback) : fallback;
-    }
-    function saveJsonLS(key, value){
-      localStorage.setItem(key, JSON.stringify(value));
-    }
-    function loadJsonSS(key, fallback){
-      const raw = sessionStorage.getItem(key);
-      return raw ? safeParse(raw, fallback) : fallback;
-    }
-    function saveJsonSS(key, value){
-      sessionStorage.setItem(key, JSON.stringify(value));
-    }
-
+    // =====================================================
+    // Helpers
+    // =====================================================
     function escapeHtml(s){
       return String(s || "")
         .replaceAll("&","&amp;")
@@ -369,15 +339,15 @@
     }
     function clearTopMsg(){
       topMsg.hidden = true;
-      topMsg.innerHTML = "";
       topMsg.className = "liftBox";
+      topMsg.innerHTML = "";
     }
 
     function normalize(s){
       return String(s || "").trim().toLowerCase();
     }
 
-    function parseYear(v){
+    function parseIntSafe(v){
       const s = String(v || "").trim();
       if(!s) return null;
       const n = Number(s);
@@ -387,518 +357,608 @@
       return i;
     }
 
+    function clamp01(x){
+      const n = Number(x);
+      if(!Number.isFinite(n)) return 0;
+      if(n < 0) return 0;
+      if(n > 1) return 1;
+      return n;
+    }
+
+    // =====================================================
+    // Candidate payload (URL)
+    // - v1: ?candidate=<base64url-json>
+    // =====================================================
+    function base64UrlToBase64(s){
+      return String(s || "").replaceAll("-","+").replaceAll("_","/") + "===".slice((String(s||"").length + 3) % 4);
+    }
+
+    function readCandidateFromUrl(){
+      const u = new URL(window.location.href);
+      const raw = u.searchParams.get("candidate");
+      if(!raw) return null;
+
+      try{
+        const b64 = base64UrlToBase64(raw);
+        const json = atob(b64);
+        const obj = JSON.parse(json);
+
+        // minimal candidate validation
+        if(!obj || typeof obj !== "object") return null;
+        if(!obj.id || !obj.name) return null;
+
+        return {
+          id: String(obj.id),
+          name: String(obj.name),
+          birthYear: (obj.birthYear === null || obj.birthYear === undefined) ? null : Number(obj.birthYear),
+          deathYear: (obj.deathYear === null || obj.deathYear === undefined) ? null : Number(obj.deathYear),
+          place: String(obj.place || ""),
+          source: String(obj.source || ""),
+          url: String(obj.url || ""),
+          why: Array.isArray(obj.why) ? obj.why.map(x => String(x)) : []
+        };
+      }catch{
+        return null;
+      }
+    }
+
+    function candidateYears(c){
+      const by = Number.isFinite(Number(c.birthYear)) ? String(Math.trunc(Number(c.birthYear))) : "—";
+      const dy = Number.isFinite(Number(c.deathYear)) ? String(Math.trunc(Number(c.deathYear))) : "—";
+      if(by === "—" && dy === "—") return "";
+      return " (" + by + "–" + dy + ")";
+    }
+
+    function renderCandidate(c){
+      if(!c){
+        candBox.className = "liftBox err";
+        candBox.innerHTML = "⛔ Ingen kandidat angiven. Gå tillbaka till sök och välj en kandidat.";
+        importBtn.disabled = true;
+        copyBtn.disabled = true;
+        pillMode.className = "pill err";
+        pillMode.innerHTML = "Läge: <strong>Ingen kandidat</strong>";
+        return;
+      }
+
+      candBox.className = "liftBox ok";
+      candBox.innerHTML =
+        "<div><strong>" + escapeHtml(c.name + candidateYears(c)) + "</strong></div>" +
+        "<div class='small' style='margin-top:6px;'>" +
+          "Plats: <span class='mono'>" + escapeHtml(c.place || "—") + "</span><br/>" +
+          "Källa: <span class='mono'>" + escapeHtml(c.source || "—") + "</span><br/>" +
+          "URL: " + (c.url ? ("<span class='mono'>" + escapeHtml(c.url) + "</span>") : "<span class='mono'>—</span>") + "<br/>" +
+          "ID: <span class='mono'>" + escapeHtml(c.id) + "</span>" +
+        "</div>";
+
+      importBtn.disabled = false;
+      copyBtn.disabled = false;
+
+      pillMode.className = "pill ok";
+      pillMode.innerHTML = "Läge: <strong>Kandidat laddad</strong>";
+    }
+
+    // =====================================================
+    // Hints (frågor)
+    // =====================================================
+    function splitPlusTokens(s){
+      const raw = String(s || "").trim();
+      if(!raw) return [];
+      return raw.split("+").map(x => x.trim()).filter(Boolean);
+    }
+
+    function inferFromPlus(tokens){
+      // enkel heuristik: siffror 3-4 tecken => år
+      const years = [];
+      const words = [];
+
+      for(const t of tokens){
+        const n = parseIntSafe(t);
+        if(n !== null && String(n).length >= 3) years.push(n);
+        else words.push(t);
+      }
+
+      return { years, words };
+    }
+
+    function collectHints(candidate){
+      // tokens från kandidatens namn
+      const baseTokens = normalize(candidate?.name || "")
+        .split(/\s+/).map(x => x.trim()).filter(Boolean);
+
+      // tokens från användarens plusQuery
+      const plusTokens = splitPlusTokens(plusQueryEl.value);
+      const plusInf = inferFromPlus(plusTokens);
+
+      // namn-tokens från fält
+      const fieldTokens = String(nameTokensEl.value || "")
+        .split(",").map(x => x.trim()).filter(Boolean);
+
+      const tokens = []
+        .concat(baseTokens)
+        .concat(plusInf.words)
+        .concat(fieldTokens)
+        .map(x => normalize(x))
+        .filter(Boolean);
+
+      // dedup, max 6
+      const uniq = [];
+      for(const t of tokens){
+        if(!uniq.includes(t)) uniq.push(t);
+        if(uniq.length >= 6) break;
+      }
+
+      const place = String(placeHintEl.value || "").trim() || (plusTokens.find(x => x && !parseIntSafe(x) && x.length >= 3) || "");
+      const birthYear = parseIntSafe(birthYearEl.value) ?? (plusInf.years[0] ?? null);
+      const deathYear = parseIntSafe(deathYearEl.value) ?? (plusInf.years[1] ?? null);
+
+      const birthRange = Number(birthRangeEl.value || 0) || 0;
+      const deathRange = Number(deathRangeEl.value || 0) || 0;
+
+      return {
+        nameTokens: uniq,
+        place: String(place || "").trim(),
+        birthYear,
+        birthRange,
+        deathYear,
+        deathRange
+      };
+    }
+
+    function isEligibleForExternalCalls(candidate){
+      // fail-closed: måste ha grundnamn minst 2 token eller minst 3 tecken
+      const n = normalize(candidate?.name || "");
+      if(!n) return false;
+      if(n.replaceAll(" ", "").length < 3) return false;
+      return true;
+    }
+
+    // =====================================================
+    // Scoring (LÅST regler enligt AO-API-03)
+    // =====================================================
+    function containsCI(hay, needle){
+      const h = normalize(hay);
+      const n = normalize(needle);
+      if(!h || !n) return false;
+      return h.includes(n);
+    }
+
+    function yearInRange(candidateYear, targetYear, range){
+      if(targetYear === null || targetYear === undefined) return null; // ej tillämpbart
+      const cy = Number.isFinite(Number(candidateYear)) ? Math.trunc(Number(candidateYear)) : null;
+      if(cy === null) return false;
+      const r = Number(range || 0) || 0;
+      return Math.abs(cy - targetYear) <= r;
+    }
+
+    function scoreCandidate(candidate, hints, enrichBits){
+      const why = [];
+      let score = 0;
+
+      // Namn tokens: +20 per token (max 60)
+      let tokenScore = 0;
+      for(const t of (hints.nameTokens || [])){
+        if(!t) continue;
+        if(containsCI(candidate.name, t)){
+          tokenScore += 20;
+          why.push("Match: namn (“" + t + "”) (+20)");
+          if(tokenScore >= 60) break;
+        }
+      }
+      score += Math.min(tokenScore, 60);
+
+      // Plats: +30
+      if(hints.place && containsCI(candidate.place, hints.place)){
+        score += 30;
+        why.push("Match: plats (+30)");
+      }
+
+      // Födelseår: +40 (inom range)
+      const byOk = yearInRange(candidate.birthYear, hints.birthYear, hints.birthRange);
+      if(byOk === true){
+        score += 40;
+        why.push("Match: födelseår (+40)");
+      }
+
+      // Dödsår: +30 (inom range)
+      const dyOk = yearInRange(candidate.deathYear, hints.deathYear, hints.deathRange);
+      if(dyOk === true){
+        score += 30;
+        why.push("Match: dödsår (+30)");
+      }
+
+      // Har URL: +10
+      if(candidate.url){
+        score += 10;
+        why.push("Signal: har URL (+10)");
+      }
+
+      // Har EnrichBit confidence >= 0.6: +10
+      if(Array.isArray(enrichBits) && enrichBits.some(b => clamp01(b.confidence) >= 0.6)){
+        score += 10;
+        why.push("Signal: stark pusselbit (+10)");
+      }
+
+      return { score, why };
+    }
+
+    function renderScoreList(items){
+      scoreList.innerHTML = "";
+      if(!items || items.length === 0){
+        const li = document.createElement("li");
+        li.className = "item";
+        li.style.cursor = "default";
+        li.innerHTML = "<p class='itemTitle'>Ingen poänglista</p><p class='itemMeta'>Klicka “Kör poängsättning”.</p>";
+        scoreList.appendChild(li);
+        pillScore.innerHTML = "Top score: <strong>—</strong>";
+        return;
+      }
+
+      const top = items[0];
+      pillScore.innerHTML = "Top score: <strong>" + String(top.score) + "</strong>";
+
+      for(const it of items){
+        const li = document.createElement("li");
+        li.className = "item";
+        li.style.cursor = "default";
+        li.innerHTML =
+          "<p class='itemTitle'>" + escapeHtml(it.candidate.name + candidateYears(it.candidate)) + " — " + "<span class='mono'>" + String(it.score) + "p</span></p>" +
+          "<p class='itemMeta'>" +
+            (it.why && it.why.length ? escapeHtml(it.why.slice(0,4).join(" · ")) : "—") +
+          "</p>";
+        scoreList.appendChild(li);
+      }
+    }
+
+    // =====================================================
+    // Enrich pipeline (via RAProviders)
+    // =====================================================
+    let enrichBits = []; // in-memory only (policy)
+    function renderBits(bits){
+      bitsList.innerHTML = "";
+      const arr = Array.isArray(bits) ? bits : [];
+      pillEnrich.innerHTML = "Pusselbitar: <strong>" + String(arr.length) + "</strong>";
+
+      if(arr.length === 0){
+        const li = document.createElement("li");
+        li.className = "item";
+        li.style.cursor = "default";
+        li.innerHTML =
+          "<p class='itemTitle'>Inga pusselbitar</p>" +
+          "<p class='itemMeta'>Klicka “Hämta pusselbitar”. Om RA blockeras av CORS visas status men inget UI-fel.</p>";
+        bitsList.appendChild(li);
+        return;
+      }
+
+      for(const b of arr){
+        const li = document.createElement("li");
+        li.className = "item";
+        li.style.cursor = "default";
+
+        const conf = Math.round(clamp01(b.confidence) * 100);
+        const url = String(b.url || "");
+
+        li.innerHTML =
+          "<p class='itemTitle'>" + escapeHtml(b.title || "(pusselbit)") + "</p>" +
+          "<p class='itemMeta'>" +
+            "Provider: " + escapeHtml(b.providerId || "—") +
+            " · Typ: " + escapeHtml(b.type || "—") +
+            " · Conf: " + String(conf) + "%" +
+          "</p>" +
+          (url ? ("<p class='itemMeta'>URL: <span class='mono'>" + escapeHtml(url) + "</span></p>") : "");
+
+        bitsList.appendChild(li);
+      }
+    }
+
+    function dedupBits(bits){
+      const out = [];
+      const seen = new Set();
+      for(const b of (bits || [])){
+        const key = String(b.url || "") || (String(b.providerId || "") + "::" + String(b.title || ""));
+        if(!key) continue;
+        if(seen.has(key)) continue;
+        seen.add(key);
+        out.push(b);
+      }
+      return out;
+    }
+
+    async function enrichAll(candidate, hints){
+      // fail-closed
+      if(!candidate || !isEligibleForExternalCalls(candidate)){
+        showTopMsg("warn", "⚠️ För kort/ingen kandidat – inga externa anrop görs (fail-closed).");
+        return [];
+      }
+
+      // RAProviders måste finnas
+      const RA = window.RAProviders;
+      if(!RA || !RA.enrichProviders || !Array.isArray(RA.enrichProviders)){
+        showTopMsg("err", "⛔ RAProviders saknas. Kontrollera att ./assets/js/ra-providers.js laddas och exponerar enrichProviders.");
+        return [];
+      }
+
+      const bits = [];
+      for(const p of RA.enrichProviders){
+        try{
+          if(!p || typeof p.supports !== "function" || typeof p.enrich !== "function") continue;
+          if(!p.supports(candidate)) continue;
+
+          // skydd mot häng
+          const r = await p.enrich(candidate, hints);
+          if(Array.isArray(r) && r.length){
+            for(const b of r){
+              bits.push({
+                providerId: String(b.providerId || p.id || ""),
+                type: String(b.type || "note"),
+                title: String(b.title || ""),
+                confidence: clamp01(b.confidence),
+                fields: (b.fields && typeof b.fields === "object") ? b.fields : {},
+                url: String(b.url || "")
+              });
+            }
+          }
+        }catch(e){
+          // fail-closed: ignorera provider, fortsätt
+        }
+      }
+
+      return dedupBits(bits).slice(0, 30);
+    }
+
+    // =====================================================
+    // Import (skapa person i aktivt träd) – ingen ny key
+    // - använder samma keys som slaktkort.html:
+    //   KEY_ACTIVE + slakttradet_slaktkort_<treeId>
+    // =====================================================
+    const KEY_TREES  = "slakttradet_trees";
+    const KEY_ACTIVE = "slakttradet_active_tree_id";
+    const cardsKey = (treeId) => "slakttradet_slaktkort_" + String(treeId);
+
+    function safeParse(raw, fallback){
+      try{ return JSON.parse(raw); }catch{ return fallback; }
+    }
+    function loadJson(key, fallback){
+      const raw = localStorage.getItem(key);
+      return raw ? safeParse(raw, fallback) : fallback;
+    }
+    function saveJson(key, value){
+      localStorage.setItem(key, JSON.stringify(value));
+    }
     function activeTreeId(){
       return localStorage.getItem(KEY_ACTIVE) || "";
-    }
-    function getTrees(){
-      const arr = loadJsonLS(KEY_TREES, []);
-      return Array.isArray(arr) ? arr : [];
-    }
-    function activeTreeLabel(){
-      const id = activeTreeId();
-      if(!id) return "—";
-      const t = getTrees().find(x => String(x.id) === String(id));
-      return t ? (t.name || t.id) : id;
-    }
-
-    function refreshPills(visibleCount){
-      const t = activeTreeId();
-      const trees = getTrees();
-      const hasTrees = trees.length > 0;
-      const hasActive = !!t;
-
-      pillTree.className = "pill " + (hasActive ? "ok" : (hasTrees ? "warn" : "err"));
-      pillTree.innerHTML = "Aktivt träd: <strong>" + escapeHtml(hasActive ? activeTreeLabel() : "—") + "</strong>";
-
-      pillCand.innerHTML = "Kandidater: <strong>" + String(current.length) + "</strong>";
-
-      const src = (context && context.providerLabel) ? String(context.providerLabel) : "—";
-      pillSource.className = "pill " + (src === "—" ? "warn" : "ok");
-      pillSource.innerHTML = "Källa: <strong>" + escapeHtml(src) + "</strong>";
-
-      pillVisible.innerHTML = "Visas: <strong>" + String(visibleCount || 0) + "</strong>";
-    }
-
-    function yearsText(c){
-      const b = (c && c.birthYear != null) ? String(c.birthYear) : "—";
-      const d = (c && c.deathYear != null) ? String(c.deathYear) : "—";
-      if(b === "—" && d === "—") return "";
-      return " (" + b + "–" + d + ")";
-    }
-    function candTitle(c){
-      return (c && c.name ? String(c.name) : "(namn saknas)") + yearsText(c);
     }
 
     function newId(){
       return "p_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,7);
     }
 
-    /* ============================================================
-       Load session (fail-closed)
-       ============================================================ */
-    let context = loadJsonSS(SS_CONTEXT, null);
-    let base = loadJsonSS(SS_CANDIDATES, null);
-
-    if(!Array.isArray(base) || base.length === 0){
-      showTopMsg("err", "⛔ Inga kandidater i session. Gå tillbaka till sök och hämta ny lista. (Fail-closed)");
-      setTimeout(() => { window.location.href = "./person-search.html"; }, 700);
+    function splitName(name){
+      const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+      if(parts.length === 0) return { fornamn:"", efternamn:"" };
+      if(parts.length === 1) return { fornamn: parts[0], efternamn:"" };
+      return { fornamn: parts[0], efternamn: parts.slice(1).join(" ") };
     }
 
-    // Intern arbetslista (session-only)
-    let current = Array.isArray(base) ? base.slice() : [];
-    let selectedIndex = -1;
-
-    // Visningscache
-    let lastRendered = [];
-
-    // Pre-fill inputs från context (hints)
-    (function hydrateFromContext(){
-      const hints = (context && Array.isArray(context.hints)) ? context.hints.slice() : [];
-      const place = (context && context.place) ? String(context.place) : "";
-      const yMin = (context && typeof context.yearMin === "number") ? context.yearMin : null;
-      const yMax = (context && typeof context.yearMax === "number") ? context.yearMax : null;
-
-      if(place) placeEl.value = place;
-      if(yMin != null) birthMinEl.value = String(yMin);
-      if(yMax != null) birthMaxEl.value = String(yMax);
-
-      ctxQ.textContent = context && context.q ? String(context.q) : "—";
-      ctxApiQ.textContent = context && context.apiQuery ? String(context.apiQuery) : "—";
-      ctxHints.textContent = hints.length ? hints.join(" | ") : "—";
-
-      // Lägg in hints i clues också (så poängsystemet använder dem direkt)
-      if(hints.length){
-        const existing = String(cluesEl.value || "").trim();
-        const merged = (existing ? (existing + " ") : "") + hints.join(" ");
-        cluesEl.value = merged.trim();
-      }
-
-      // Förvalt minScore: visa typ de bättre
-      if(!String(minScoreEl.value || "").trim()){
-        minScoreEl.value = "0";
-      }
-    })();
-
-    /* ============================================================
-       Scoring (lokalt)
-       ============================================================ */
-    function scoreCandidate(c, f){
-      let score = 0;
-
-      const name = normalize(c.name);
-      const place = normalize(c.place);
-      const source = normalize(c.source);
-      const why = Array.isArray(c.why) ? c.why.map(normalize).join(" ") : "";
-
-      // Plats (stark)
-      if(f.place){
-        if(place.includes(f.place)) score += 25;
-        else score -= 6;
-      }
-
-      // Årintervall (mjuk)
-      const by = (typeof c.birthYear === "number") ? c.birthYear : null;
-      const dy = (typeof c.deathYear === "number") ? c.deathYear : null;
-
-      if(f.birthMin != null){
-        if(by == null) score -= 3;
-        else if(by >= f.birthMin) score += 8;
-        else score -= 9;
-      }
-      if(f.birthMax != null){
-        if(by == null) score -= 3;
-        else if(by <= f.birthMax) score += 8;
-        else score -= 9;
-      }
-
-      if(f.deathMin != null){
-        if(dy == null) score -= 2;
-        else if(dy >= f.deathMin) score += 6;
-        else score -= 7;
-      }
-      if(f.deathMax != null){
-        if(dy == null) score -= 2;
-        else if(dy <= f.deathMax) score += 6;
-        else score -= 7;
-      }
-
-      // Nyckelord (fri text) – lite aggressiv men enkel
-      for(const k of f.keywords){
-        const hit = name.includes(k) || place.includes(k) || source.includes(k) || why.includes(k);
-        score += hit ? 5 : -1;
-      }
-
-      return score;
-    }
-
-    function getFilters(){
-      const place = normalize(placeEl.value);
-
-      const birthMin = parseYear(birthMinEl.value);
-      const birthMax = parseYear(birthMaxEl.value);
-      const deathMin = parseYear(deathMinEl.value);
-      const deathMax = parseYear(deathMaxEl.value);
-
-      const clues = normalize(cluesEl.value);
-      const keywords = clues
-        ? clues.split(/[\s,.;:()]+/).map(x => x.trim()).filter(x => x.length >= 3).slice(0, 30)
-        : [];
-
-      const minScore = parseYear(minScoreEl.value);
-      return { place, birthMin, birthMax, deathMin, deathMax, keywords, minScore: (minScore == null ? 0 : minScore) };
-    }
-
-    function applyScoring(showMessage){
+    function importCandidate(candidate, hints, bits){
       clearTopMsg();
-      const f = getFilters();
-
-      // Score + sort
-      const scored = current.map(c => ({ c, score: scoreCandidate(c, f) }));
-      scored.sort((a,b) => (b.score - a.score));
-
-      // Filter for view (minScore)
-      const visible = scored.filter(x => x.score >= f.minScore);
-
-      // Spara renderad lista (för click-index)
-      lastRendered = visible;
-
-      renderList(visible);
-      refreshPills(visible.length);
-
-      // UX: om bara 1 kandidat återstår i visningen, markera det tydligt
-      if(visible.length === 1){
-        showTopMsg("ok", "✅ Endast 1 kandidat kvar över tröskeln. Kontrollera och importera om det är rätt.");
-      }else if(showMessage){
-        showTopMsg("ok", "✅ Poängsatt och sorterat. Visar " + visible.length + " kandidat(er) (minScore=" + f.minScore + ").");
-      }
-    }
-
-    /* ============================================================
-       Render
-       ============================================================ */
-    function setSelected(renderedIndex){
-      selectedIndex = renderedIndex;
-
-      const c = (renderedIndex >= 0 && renderedIndex < lastRendered.length) ? lastRendered[renderedIndex].c : null;
-
-      const items = candList.querySelectorAll(".item");
-      items.forEach((el, idx) => el.classList.toggle("sel", idx === renderedIndex));
-
-      if(!c){
-        previewBox.className = "liftBox";
-        previewBox.innerHTML = "Välj en kandidat för att se detaljer här.";
-        importBtn.disabled = true;
-        copyBtn.disabled = true;
-        dropBtn.disabled = true;
-        return;
-      }
-
-      previewBox.className = "liftBox ok";
-      previewBox.innerHTML =
-        "<div><strong>" + escapeHtml(candTitle(c)) + "</strong></div>" +
-        "<div class='small' style='margin-top:6px;'>" +
-          "Plats: <span class='mono'>" + escapeHtml(c.place || "—") + "</span><br/>" +
-          "Källa: <span class='mono'>" + escapeHtml(c.source || "—") + "</span><br/>" +
-          (c.url ? ("URL: <span class='mono'>" + escapeHtml(c.url) + "</span><br/>") : "") +
-          (Array.isArray(c.why) && c.why.length ? ("Varför: <span class='mono'>" + escapeHtml(c.why.join(" · ")) + "</span>") : "") +
-        "</div>";
-
-      importBtn.disabled = false;
-      copyBtn.disabled = false;
-      dropBtn.disabled = false;
-    }
-
-    function renderList(visible){
-      candList.innerHTML = "";
-
-      if(!visible.length){
-        const li = document.createElement("li");
-        li.className = "item";
-        li.style.cursor = "default";
-        li.innerHTML =
-          "<p class='itemTitle'>0 kandidater visas</p>" +
-          "<p class='itemMeta'>Sänk minScore eller nollställ frågor. Du kan också fråga källan igen.</p>";
-        candList.appendChild(li);
-        setSelected(-1);
-        return;
-      }
-
-      for(let i=0;i<visible.length;i++){
-        const c = visible[i].c;
-        const score = visible[i].score;
-
-        const li = document.createElement("li");
-        li.className = "item";
-
-        const badgeClass = score >= 0 ? "badge good" : "badge bad";
-
-        li.innerHTML =
-          "<p class='itemTitle'>" +
-            "<span class='" + badgeClass + "'>Score: " + String(score) + "</span>" +
-            escapeHtml(candTitle(c)) +
-          "</p>" +
-          "<p class='itemMeta'>" +
-            (c.place ? ("Plats: " + escapeHtml(c.place)) : "Plats: —") +
-            (c.source ? (" · Källa: " + escapeHtml(c.source)) : "") +
-          "</p>";
-
-        li.addEventListener("click", () => setSelected(i));
-        candList.appendChild(li);
-      }
-
-      setSelected(-1);
-    }
-
-    /* ============================================================
-       Ask source again (ny sökning på API-query från context)
-       - Fail-closed: om context saknas -> tillbaka till sök
-       ============================================================ */
-    async function askSourceAgain(){
-      clearTopMsg();
-
-      if(!(window.RAProviders && typeof window.RAProviders.pickProvider === "function")){
-        showTopMsg("err", "⛔ Providerlager saknas. Kontrollera ra-providers.js.");
-        return;
-      }
-
-      const apiQuery = (context && context.apiQuery) ? String(context.apiQuery).trim() : "";
-      if(!apiQuery){
-        showTopMsg("err", "⛔ Saknar apiQuery. Gå tillbaka och gör ett nytt sök. (Fail-closed)");
-        return;
-      }
-
-      askBtn.disabled = true;
-
-      try{
-        const provider = window.RAProviders.pickProvider("searchapi");
-        const raw = await provider.search(apiQuery);
-
-        // 0 träffar = 0 (ingen fallback här)
-        if(Array.isArray(raw) && raw.length === 0){
-          current = [];
-          base = [];
-          saveJsonSS(SS_CANDIDATES, []);
-          showTopMsg("warn", "⚠️ 0 träffar vid ny fråga: “" + apiQuery + "”. Gå tillbaka och ändra söket.");
-          applyScoring(false);
-          refreshPills(0);
-          return;
-        }
-
-        current = Array.isArray(raw) ? raw.slice(0, 80) : [];
-        base = current.slice();
-
-        // Uppdatera context label
-        context = Object.assign({}, (context || {}), {
-          providerId: "searchapi",
-          providerLabel: provider.label || "Riksarkivet"
-        });
-
-        saveJsonSS(SS_CANDIDATES, current);
-        saveJsonSS(SS_CONTEXT, context);
-
-        // Poängsätt direkt (med dina nuvarande frågor)
-        applyScoring(false);
-        showTopMsg("ok", "✅ Nytt svar från källan. Listan är uppdaterad i session (inte sparad).");
-
-      }catch(e){
-        const msg = (e && e.message) ? String(e.message) : String(e || "");
-        showTopMsg("warn", "⚠️ Kunde inte fråga källan igen: " + msg + " (fail-closed → behåller nuvarande lista).");
-      }finally{
-        askBtn.disabled = false;
-      }
-    }
-
-    /* ============================================================
-       Import (explicit action only)
-       - 110-årsspärr på birthYear (fail-closed)
-       - Respekterar core storage-keys/datamodell
-       ============================================================ */
-    function importSelected(){
-      clearTopMsg();
-
       const t = activeTreeId();
       if(!t){
-        showTopMsg("err", "⛔ Inget aktivt träd. Gå till Träd och välj aktivt träd innan import.");
+        showTopMsg("err", "⛔ Inget aktivt träd. Gå till Träd och välj ett aktivt träd innan import.");
+        return;
+      }
+      if(!candidate){
+        showTopMsg("err", "⛔ Ingen kandidat att importera.");
         return;
       }
 
-      if(!(selectedIndex >= 0 && selectedIndex < lastRendered.length)){
-        showTopMsg("warn", "⚠️ Välj en kandidat först.");
-        return;
-      }
-
-      const c = lastRendered[selectedIndex].c;
-
-      // 110-årsspärr (på födelseår om det finns)
-      const nowYear = new Date().getFullYear();
-      const cut = nowYear - 110;
-      if(typeof c.birthYear === "number" && Number.isFinite(c.birthYear) && c.birthYear > cut){
-        showTopMsg("err", "⛔ Spärr: födelseår " + String(c.birthYear) + " är för nytt (>" + String(cut) + "). Import stoppad.");
-        return;
-      }
-
-      // Split namn (enkel, fail-closed om tomt)
-      const full = String(c.name || "").trim();
-      if(!full){
-        showTopMsg("err", "⛔ Kan inte importera: namn saknas.");
-        return;
-      }
-      const parts = full.split(/\s+/).filter(Boolean);
-      const fornamn = parts.slice(0, Math.max(1, parts.length - 1)).join(" ");
-      const efternamn = (parts.length >= 2) ? parts.slice(-1).join(" ") : "";
-
-      const people = loadJsonLS(cardsKey(t), []);
+      const people = loadJson(cardsKey(t), []);
       const arr = Array.isArray(people) ? people : [];
 
       const id = newId();
+      const nm = splitName(candidate.name);
+
+      // Anteckning: kort, ingen rå dump av massdata
+      const noteParts = [];
+      if(candidate.source) noteParts.push("Källa: " + candidate.source);
+      if(candidate.url) noteParts.push("URL: " + candidate.url);
+      if(hints?.place) noteParts.push("Puzzle-hint plats: " + hints.place);
+      if(hints?.birthYear) noteParts.push("Puzzle-hint födelseår: " + String(hints.birthYear) + " ±" + String(hints.birthRange||0));
+      if(hints?.deathYear) noteParts.push("Puzzle-hint dödsår: " + String(hints.deathYear) + " ±" + String(hints.deathRange||0));
+
+      // Ta bara med “pusselbitar” som länkar (inga stora fields)
+      const linkBits = (Array.isArray(bits) ? bits : [])
+        .filter(b => b && b.url)
+        .slice(0, 5)
+        .map(b => (b.type + " (" + (b.providerId||"") + "): " + b.url));
+
+      if(linkBits.length){
+        noteParts.push("Pusselbitar: " + linkBits.join(" | "));
+      }
 
       const created = {
         id,
-        fornamn,
-        efternamn,
-        kon: "",
+        fornamn: String(nm.fornamn || "").trim(),
+        efternamn: String(nm.efternamn || "").trim(),
+        kon: "", // okänt här
         yrke: "",
-        fodelsear: (c.birthYear != null ? String(c.birthYear) : ""),
-        dodsar: (c.deathYear != null ? String(c.deathYear) : ""),
-        plats: String(c.place || "").trim(),
+        fodelsear: Number.isFinite(Number(candidate.birthYear)) ? String(Math.trunc(Number(candidate.birthYear))) : "",
+        dodsar: Number.isFinite(Number(candidate.deathYear)) ? String(Math.trunc(Number(candidate.deathYear))) : "",
+        plats: String(candidate.place || hints?.place || "").trim(),
         coords: null,
-        anteckning: [
-          "Importerad från extern källa (via person-puzzle).",
-          (context && context.providerLabel) ? ("Källa: " + context.providerLabel) : "",
-          c.source ? ("Source: " + c.source) : "",
-          c.url ? ("URL: " + c.url) : "",
-          (Array.isArray(c.why) && c.why.length) ? ("Varför: " + c.why.join(" · ")) : "",
-          (context && context.apiQuery) ? ("Sök: " + context.apiQuery) : ""
-        ].filter(Boolean).join("\n")
+        anteckning: ("Importerad från Puzzle. " + noteParts.join(" · ")).trim()
       };
 
+      // minimal validering (som i demo)
+      if(!created.fornamn || !created.efternamn){
+        showTopMsg("err", "⛔ Kan inte importera: saknar förnamn/efternamn. (Kandidaten hade inte ett normalt namnformat.)");
+        return;
+      }
+
       arr.push(created);
-      saveJsonLS(cardsKey(t), arr);
+      saveJson(cardsKey(t), arr);
 
-      // Dataminimering: rensa session efter import
-      try{
-        sessionStorage.removeItem(SS_CANDIDATES);
-        sessionStorage.removeItem(SS_CONTEXT);
-      }catch{}
-
-      // Öppna i Personer
       window.location.href = "./slaktkort.html#open=" + encodeURIComponent(id);
     }
 
-    async function copySelected(){
-      if(!(selectedIndex >= 0 && selectedIndex < lastRendered.length)) return;
+    async function copySummary(candidate, hints, bits){
+      if(!candidate) return;
 
-      const c = lastRendered[selectedIndex].c;
-      const b = (c.birthYear != null) ? String(c.birthYear) : "—";
-      const d = (c.deathYear != null) ? String(c.deathYear) : "—";
-
-      const text =
-        candTitle(c) + "\n" +
-        "Plats: " + (c.place || "—") + "\n" +
-        "Källa: " + (c.source || "—") + "\n" +
-        "Födelseår: " + b + " · Dödsår: " + d + "\n" +
-        (c.url ? ("URL: " + c.url + "\n") : "") +
-        (Array.isArray(c.why) && c.why.length ? ("Varför: " + c.why.join(" · ") + "\n") : "");
+      const lines = [];
+      lines.push(candidate.name + candidateYears(candidate));
+      if(candidate.place) lines.push("Plats: " + candidate.place);
+      if(candidate.source) lines.push("Källa: " + candidate.source);
+      if(candidate.url) lines.push("URL: " + candidate.url);
+      lines.push("");
+      lines.push("Hints:");
+      lines.push("- tokens: " + (hints?.nameTokens || []).join(", "));
+      lines.push("- plats: " + (hints?.place || "—"));
+      lines.push("- födelse: " + (hints?.birthYear ?? "—") + " ±" + (hints?.birthRange ?? 0));
+      lines.push("- död: " + (hints?.deathYear ?? "—") + " ±" + (hints?.deathRange ?? 0));
+      lines.push("");
+      lines.push("Pusselbitar:");
+      const b = Array.isArray(bits) ? bits : [];
+      if(!b.length) lines.push("- (inga)");
+      else{
+        for(const x of b.slice(0, 10)){
+          lines.push("- " + (x.type || "note") + " / " + (x.providerId || "—") + ": " + (x.title || "") + (x.url ? (" (" + x.url + ")") : ""));
+        }
+      }
 
       try{
-        await navigator.clipboard.writeText(text);
-        showTopMsg("ok", "✅ Kopierat till urklipp.");
+        await navigator.clipboard.writeText(lines.join("\n"));
+        showTopMsg("ok", "✅ Sammanfattning kopierad.");
       }catch{
         showTopMsg("warn", "⚠️ Kunde inte kopiera (webbläsaren blockerade).");
       }
     }
 
-    function dropSelected(){
+    // =====================================================
+    // Init
+    // =====================================================
+    const candidate = readCandidateFromUrl();
+    renderCandidate(candidate);
+    renderScoreList([]);
+    renderBits([]);
+
+    // prefill tokens från kandidat
+    if(candidate){
+      const base = String(candidate.name || "").trim();
+      plusQueryEl.value = base;
+      nameTokensEl.value = base.split(/\s+/).slice(0,2).join(", ");
+      placeHintEl.value = String(candidate.place || "");
+      if(Number.isFinite(Number(candidate.birthYear))) birthYearEl.value = String(Math.trunc(Number(candidate.birthYear)));
+      if(Number.isFinite(Number(candidate.deathYear))) deathYearEl.value = String(Math.trunc(Number(candidate.deathYear)));
+    }
+
+    function setRunInfo(s){
+      runInfo.textContent = s || "—";
+    }
+
+    scoreBtn.addEventListener("click", async () => {
       clearTopMsg();
-      if(!(selectedIndex >= 0 && selectedIndex < lastRendered.length)){
-        showTopMsg("warn", "⚠️ Välj en kandidat först.");
+      if(!candidate){
+        showTopMsg("err", "⛔ Ingen kandidat. Gå tillbaka och välj en kandidat.");
         return;
       }
 
-      const c = lastRendered[selectedIndex].c;
+      const hints = collectHints(candidate);
+      const items = [];
+      const sc = scoreCandidate(candidate, hints, enrichBits);
+      items.push({ candidate, score: sc.score, why: sc.why });
+      items.sort((a,b) => b.score - a.score);
 
-      // Ta bort från current (matcha på id/url/name)
-      current = current.filter(x => {
-        if(x === c) return false;
-        const sameId = x && c && x.id && c.id && String(x.id) === String(c.id);
-        const sameUrl = x && c && x.url && c.url && String(x.url) === String(c.url);
-        const sameName = x && c && x.name && c.name && String(x.name) === String(c.name);
-        return !(sameId || sameUrl || sameName);
-      });
+      renderScoreList(items);
+      setRunInfo("Poängsatt: " + new Date().toLocaleTimeString());
+      showTopMsg("ok", "✅ Poängsättning klar.");
+    });
 
-      saveJsonSS(SS_CANDIDATES, current);
+    enrichBtn.addEventListener("click", async () => {
+      clearTopMsg();
+      if(!candidate){
+        showTopMsg("err", "⛔ Ingen kandidat. Gå tillbaka och välj en kandidat.");
+        return;
+      }
 
-      applyScoring(false);
-      showTopMsg("ok", "✅ Kandidat borttagen (session-only).");
-    }
+      const hints = collectHints(candidate);
 
-    function resetQuestions(){
-      placeEl.value = "";
-      birthMinEl.value = "";
-      birthMaxEl.value = "";
-      deathMinEl.value = "";
-      deathMaxEl.value = "";
-      cluesEl.value = "";
-      minScoreEl.value = "0";
-      showTopMsg("ok", "✅ Frågor nollställda.");
-      applyScoring(false);
-    }
+      // fail-closed: om inget namn → inga anrop
+      if(!isEligibleForExternalCalls(candidate)){
+        showTopMsg("warn", "⚠️ För kort namn/kandidat → inga anrop (fail-closed).");
+        return;
+      }
 
-    function goBack(){
+      setRunInfo("Hämtar pusselbitar…");
+      const started = Date.now();
+
+      try{
+        const bits = await enrichAll(candidate, hints);
+
+        // alltid lägg till NOTE (om providers inte gjorde det)
+        if(!bits.some(x => String(x.type) === "note")){
+          bits.unshift({
+            providerId: "note",
+            type: "note",
+            title: "Puzzle körde enrich utan att spara data",
+            confidence: 1.0,
+            fields: { policy: "no-storage" },
+            url: ""
+          });
+        }
+
+        enrichBits = bits;
+        renderBits(enrichBits);
+
+        const ms = Date.now() - started;
+        setRunInfo("Klart (" + ms + " ms)");
+
+        if(bits.length <= 1){
+          showTopMsg("warn", "⚠️ Inga externa pusselbitar hittades eller RA blockerades (CORS/timeout) → fortsätter utan. (Inte ett UI-fel)");
+        }else{
+          showTopMsg("ok", "✅ Pusselbitar hämtade.");
+        }
+      }catch{
+        setRunInfo("Fel");
+        renderBits([]);
+        showTopMsg("warn", "⚠️ Källa blockerades (CORS/timeout) → inga pusselbitar. (Inte ett UI-fel)");
+      }
+    });
+
+    importBtn.addEventListener("click", () => {
+      const hints = candidate ? collectHints(candidate) : null;
+      importCandidate(candidate, hints, enrichBits);
+    });
+
+    copyBtn.addEventListener("click", async () => {
+      const hints = candidate ? collectHints(candidate) : null;
+      await copySummary(candidate, hints, enrichBits);
+    });
+
+    plusQueryEl.addEventListener("keydown", (e) => {
+      if(e.key === "Enter"){
+        e.preventDefault();
+        // snabb: kör scoring
+        scoreBtn.click();
+      }
+    });
+
+    backBtn.addEventListener("click", () => {
       window.location.href = "./person-search.html";
-    }
+    });
 
-    /* ============================================================
-       Events
-       ============================================================ */
     logoutBtn.addEventListener("click", () => {
       try{ sessionStorage.removeItem("demo_auth"); }catch{}
       window.location.href = "../index.html";
     });
 
-    backBtn.addEventListener("click", goBack);
+    // Status init
+    pillScore.innerHTML = "Top score: <strong>—</strong>";
+    pillEnrich.innerHTML = "Pusselbitar: <strong>0</strong>";
+    setRunInfo("Redo");
 
-    applyBtn.addEventListener("click", () => applyScoring(true));
-    resetBtn.addEventListener("click", resetQuestions);
-    askBtn.addEventListener("click", askSourceAgain);
-
-    importBtn.addEventListener("click", importSelected);
-    copyBtn.addEventListener("click", copySelected);
-    dropBtn.addEventListener("click", dropSelected);
-
-    // Enter = poängsätt (smidigt)
-    [placeEl, birthMinEl, birthMaxEl, deathMinEl, deathMaxEl, minScoreEl, cluesEl].forEach(el => {
-      el.addEventListener("keydown", (e) => {
-        if(e.key === "Enter" && el !== cluesEl){
-          e.preventDefault();
-          applyScoring(true);
-        }
-      });
-    });
-
-    /* ============================================================
-       Init
-       ============================================================ */
-    (function init(){
-      // Active tree check (fail-closed)
-      if(!activeTreeId()){
-        showTopMsg("err", "⛔ Inget aktivt träd valt. Gå till Träd och välj aktivt träd. (Fail-closed)");
-      }
-
-      // Start
-      applyScoring(false);
-
-      const q = (context && context.q) ? String(context.q) : "";
-      const apiQ = (context && context.apiQuery) ? String(context.apiQuery) : "";
-      const hints = (context && Array.isArray(context.hints)) ? context.hints : [];
-      if(q){
-        showTopMsg("warn", "ℹ️ Start: " + current.length + " kandidater från sök. Bas: “" + q + "”. API: “" + (apiQ || "—") + "”. " + (hints.length ? ("Hints: " + hints.join(" | ") + ".") : "Lägg till pusselbitar för bättre score."));
-      }else{
-        showTopMsg("warn", "ℹ️ Start: " + current.length + " kandidater. Poängsätt för att ringa in rätt person.");
-      }
-
-      try{ placeEl.focus(); }catch{}
-    })();
+    // Om kandidat saknas: tydligt
+    if(!candidate){
+      showTopMsg("err", "⛔ Ingen kandidat i URL. Puzzle kräver ?candidate=... från person-search.html.");
+    }
   </script>
 </body>
 </html>
