@@ -1,214 +1,127 @@
-app.post("/trees", authGuard, (req, res) => {
-  ...
-});
-// =====================================================
-// SLÄKTKORT (tree-scoped data)
-// -----------------------------------------------------
-// Viktiga principer:
-// - Släktkort är DATA, inte användarkonton
-// - Alla släktkort tillhör exakt ett träd (treeId)
-// - Åtkomst styrs via medlemskap i trädet
-// =====================================================
+/**
+ * Släktkort – Riksarkivet proxy (Cloudflare Worker)
+ * -------------------------------------------------
+ * Syfte:
+ * - Lösa CORS för GitHub Pages (Släktkort)
+ * - Fail-closed: tydliga felkoder, inga cachade svar
+ *
+ * Endpoints:
+ * - GET /health
+ * - GET /records?name=Karl&limit=50
+ *
+ * Policy:
+ * - Ingen persistent lagring (ingen KV/D1/R2)
+ * - Endast GET + OPTIONS (preflight)
+ */
 
+const RA_API_BASE = "https://data.riksarkivet.se/api";
+const DEFAULT_LIMIT = 50;
+const MAX_LIMIT = 200;
 
-// -----------------------------------------------------
-// Hjälpfunktion: kontrollera att användaren är medlem
-// i ett träd och hämta rollen (OWNER / EDITOR / VIEWER)
-// -----------------------------------------------------
-function ensureTreeMemberRole(db, userId, treeId) {
-  try {
-    const row = db.prepare(
-      "SELECT role FROM tree_members WHERE userId = ? AND treeId = ?"
-    ).get(userId, treeId);
-
-    // returnerar t.ex. "OWNER", "EDITOR", "VIEWER" eller null
-    return row?.role || null;
-  } catch {
-    // Vid DB-fel: behandla som ingen åtkomst
-    return null;
-  }
+function corsHeaders(origin) {
+  return {
+    "Access-Control-Allow-Origin": origin || "*",
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Accept",
+    "Access-Control-Max-Age": "86400",
+    "Cache-Control": "no-store",
+  };
 }
 
+function json(data, status = 200, origin = "*") {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      ...corsHeaders(origin),
+    },
+  });
+}
 
-// -----------------------------------------------------
-// GET /trees/:treeId/slaktkort
-// Hämtar alla släktkort i ett träd
-// -----------------------------------------------------
-app.get("/trees/:treeId/slaktkort", authGuard, (req, res) => {
-  const treeId = String(req.params.treeId || "").trim();
-  if (!treeId) {
-    return res.status(400).json({ error: "INVALID_TREE_ID" });
-  }
+function clampLimit(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return DEFAULT_LIMIT;
+  const i = Math.trunc(n);
+  if (i < 1) return 1;
+  if (i > MAX_LIMIT) return MAX_LIMIT;
+  return i;
+}
 
-  // Kräver att användaren är medlem i trädet
-  const role = ensureTreeMemberRole(db, req.user.id, treeId);
-  if (!role) {
-    return res.status(403).json({ error: "FORBIDDEN" });
-  }
+export default {
+  async fetch(request) {
+    const url = new URL(request.url);
+    const origin = request.headers.get("Origin") || "*";
 
-  try {
-    const rows = db.prepare(`
-      SELECT
-        id,
-        fornamn,
-        efternamn,
-        kon,
-        fodelsear,
-        dodsar,
-        plats,
-        lat,
-        lon,
-        anteckning,
-        createdAt
-      FROM slaktkort
-      WHERE treeId = ?
-      ORDER BY createdAt DESC
-    `).all(treeId);
+    // Preflight (CORS)
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: corsHeaders(origin) });
+    }
 
-    return res.json({ slaktkort: rows });
-  } catch {
-    return res.status(500).json({ error: "SLÄKTKORT_LIST_FAILED" });
-  }
-});
+    if (request.method !== "GET") {
+      return json({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405, origin);
+    }
 
+    // Health
+    if (url.pathname === "/health") {
+      return json(
+        { ok: true, service: "slaktkort-ra-proxy", version: "1.0.0" },
+        200,
+        origin
+      );
+    }
 
-// -----------------------------------------------------
-// POST /trees/:treeId/slaktkort
-// Skapar ett nytt släktkort i ett träd
-// -----------------------------------------------------
-app.post("/trees/:treeId/slaktkort", authGuard, (req, res) => {
-  const treeId = String(req.params.treeId || "").trim();
-  if (!treeId) {
-    return res.status(400).json({ error: "INVALID_TREE_ID" });
-  }
+    // Proxy: /records
+    if (url.pathname === "/records") {
+      const name = String(url.searchParams.get("name") || "").trim();
+      const limit = clampLimit(url.searchParams.get("limit"));
 
-  // Kräver minst EDITOR (OWNER är också OK)
-  const role = ensureTreeMemberRole(db, req.user.id, treeId);
-  if (!role) {
-    return res.status(403).json({ error: "FORBIDDEN" });
-  }
-  if (!["OWNER", "EDITOR"].includes(role)) {
-    return res.status(403).json({ error: "INSUFFICIENT_ROLE" });
-  }
+      if (name.length < 2) {
+        return json({ ok: false, error: "NAME_TOO_SHORT" }, 400, origin);
+      }
 
-  // -------- Läs in grunddata --------
-  const fornamn = String(req.body?.fornamn || "").trim();
-  const efternamn = String(req.body?.efternamn || "").trim();
-  const kon = String(req.body?.kon || "Okänt").trim();
+      const target = new URL(RA_API_BASE + "/records");
+      target.searchParams.set("name", name);
+      target.searchParams.set("limit", String(limit));
 
-  if (!fornamn || !efternamn) {
-    return res.status(400).json({ error: "NAME_REQUIRED" });
-  }
+      // Forwarda övriga query params (om du vill stödja fler senare)
+      for (const [k, v] of url.searchParams.entries()) {
+        if (k === "name" || k === "limit") continue;
+        target.searchParams.set(k, v);
+      }
 
-  // -------- Årtal (valfria) --------
-  const fodelsearRaw = req.body?.fodelsear;
-  const dodsarRaw = req.body?.dodsar;
+      let res;
+      try {
+        res = await fetch(target.toString(), {
+          headers: {
+            Accept: "application/json",
+            "User-Agent": "slaktkort-ra-proxy/1.0",
+          },
+        });
+      } catch {
+        return json({ ok: false, error: "UPSTREAM_FETCH_FAILED" }, 502, origin);
+      }
 
-  const fodelsear =
-    fodelsearRaw === null || fodelsearRaw === undefined || fodelsearRaw === ""
-      ? null
-      : Number(fodelsearRaw);
+      if (!res.ok) {
+        return json(
+          { ok: false, error: "UPSTREAM_HTTP_" + res.status },
+          502,
+          origin
+        );
+      }
 
-  const dodsar =
-    dodsarRaw === null || dodsarRaw === undefined || dodsarRaw === ""
-      ? null
-      : Number(dodsarRaw);
+      // Vi skickar vidare rå body (JSON) men med våra CORS headers
+      const body = await res.text();
 
-  if (fodelsear !== null && !Number.isInteger(fodelsear)) {
-    return res.status(400).json({ error: "INVALID_FODELSEAR" });
-  }
-  if (dodsar !== null && !Number.isInteger(dodsar)) {
-    return res.status(400).json({ error: "INVALID_DODSAR" });
-  }
+      return new Response(body, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          ...corsHeaders(origin),
+        },
+      });
+    }
 
-  // -------- Platsinformation --------
-  // plats = fri text (mänsklig tolkning)
-  // lat/lon = maskinell position (karta)
-  const plats = String(req.body?.plats || "").trim();
-
-  const lat =
-    req.body?.lat === null || req.body?.lat === undefined
-      ? null
-      : Number(req.body.lat);
-
-  const lon =
-    req.body?.lon === null || req.body?.lon === undefined
-      ? null
-      : Number(req.body.lon);
-
-  function numOrNull(n) {
-    if (n === null) return null;
-    if (!Number.isFinite(n)) return "__INVALID__";
-    return n;
-  }
-
-  const la = numOrNull(lat);
-  const lo = numOrNull(lon);
-
-  if (la === "__INVALID__" || lo === "__INVALID__") {
-    return res.status(400).json({ error: "INVALID_COORDS" });
-  }
-
-  const anteckning = String(req.body?.anteckning || "").trim();
-
-  // -------- Skapa och spara --------
-  const id = "p" + Date.now().toString().slice(-10);
-  const createdAt = new Date().toISOString();
-
-  try {
-    db.prepare(`
-      INSERT INTO slaktkort (
-        id,
-        treeId,
-        fornamn,
-        efternamn,
-        kon,
-        fodelsear,
-        dodsar,
-        plats,
-        lat,
-        lon,
-        anteckning,
-        createdAt
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      treeId,
-      fornamn,
-      efternamn,
-      kon,
-      fodelsear,
-      dodsar,
-      plats || null,
-      la,
-      lo,
-      anteckning || null,
-      createdAt
-    );
-
-    // Returnera det skapade släktkortet
-    const row = db.prepare(`
-      SELECT
-        id,
-        fornamn,
-        efternamn,
-        kon,
-        fodelsear,
-        dodsar,
-        plats,
-        lat,
-        lon,
-        anteckning,
-        createdAt
-      FROM slaktkort
-      WHERE id = ?
-    `).get(id);
-
-    return res.status(201).json({ slaktkort: row });
-  } catch {
-    return res.status(500).json({ error: "SLÄKTKORT_CREATE_FAILED" });
-  }
-});
-Add documented backend routes for släktkort scoped to tree,
-including role checks and lat/lon support.
+    // Not found
+    return json({ ok: false, error: "NOT_FOUND" }, 404, origin);
+  },
+};
