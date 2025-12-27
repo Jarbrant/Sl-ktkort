@@ -108,14 +108,16 @@
 
     <div class="badgeRow" aria-label="Status">
       <span class="badge">Källa: <strong id="providerName">—</strong></span>
-      <span class="badge">Träffar: <strong id="countNum">—</strong></span>
+      <span class="badge">Visas: <strong id="countNum">—</strong></span>
       <span class="badge warn" id="capBadge" hidden>Max 150 visas – förfina din sökning</span>
       <span class="badge" id="loadBadge">RAProviders: <strong id="loadState">—</strong></span>
+      <span class="badge" id="rawBadge">Råträffar: <strong id="rawNum">—</strong></span>
+      <span class="badge" id="yearBadge">Årfilter: <strong id="yearState">—</strong></span>
     </div>
 
     <div class="hint">
-      Tips: använd <span class="mono">+</span> som tokens (för sortering): <span class="mono">Erik+Leksand+1820</span><br/>
-      Viktigt: vi skickar inte <span class="mono">+</span> till RA – vi gör tokens i klienten (fail-closed).
+      Tips: använd <span class="mono">+</span> som tokens: <span class="mono">Erik+Leksand+1820</span><br/>
+      <strong>Ny regel:</strong> Om du anger år (t.ex. <span class="mono">1820</span>) så filtrerar vi hårt till år ±5 (fail-closed).
     </div>
   </header>
 
@@ -135,30 +137,34 @@
     "use strict";
 
     // =====================================================
-    // PATCH NOTES (BUGFIX / QA)
-    // - CAP-badge styrs av RAW COUNT (före trim), inte ranked.length.
-    // - Provider-guard: om auto-provider saknas/fel -> tydligt fel (fail-closed).
-    // - loadState uppdateras även vid runtime-fel (SAKNAS/ERROR).
-    // - Minimikrav: minst 3 tecken + nameQuery minst 3 (enligt tidigare lås).
-    // - Inga nya storage-keys. Ingen UX-redesign.
+    // PERSON-SEARCH.html (AO-API-03 kompatibel)
+    // - Tar emot "token query" med + (t.ex. Erik+Leksand+1820)
+    // - Skickar endast "nameQuery" (utan '+', utan år) till RA
+    // - Rankar klient-side (fail-closed)
+    // - NYTT: Om år anges -> hård filtrering till ±5 (fail-closed)
+    // - Pool skickas till Puzzle via postMessage (in-memory, ingen lagring)
     // =====================================================
 
+    // DOM
     const qEl = document.getElementById("q");
     const searchBtn = document.getElementById("searchBtn");
     const openPoolBtn = document.getElementById("openPoolBtn");
     const clearBtn = document.getElementById("clearBtn");
-
     const resultsEl = document.getElementById("results");
 
     const providerNameEl = document.getElementById("providerName");
     const countNumEl = document.getElementById("countNum");
+    const rawNumEl = document.getElementById("rawNum");
+    const yearStateEl = document.getElementById("yearState");
     const capBadge = document.getElementById("capBadge");
     const loadStateEl = document.getElementById("loadState");
 
+    // STATE (in-memory only)
     let lastCandidates = [];
     let lastProviderId = "—";
-    let lastRawCount = 0; // <-- RAW count från provider, innan rank/trim
+    let lastRawCount = 0;
 
+    // Helpers
     function escapeHtml(s){
       return String(s || "")
         .replaceAll("&","&amp;")
@@ -167,7 +173,6 @@
         .replaceAll('"',"&quot;")
         .replaceAll("'","&#039;");
     }
-
     function safeArray(v){ return Array.isArray(v) ? v : []; }
     function normalize(s){ return String(s||"").trim().toLowerCase(); }
 
@@ -182,26 +187,28 @@
       lastProviderId = id || "—";
       providerNameEl.textContent = lastProviderId;
     }
-
     function setCount(n){
       countNumEl.textContent = Number.isFinite(Number(n)) ? String(n) : "—";
     }
-
+    function setRawCount(n){
+      rawNumEl.textContent = Number.isFinite(Number(n)) ? String(n) : "—";
+    }
     function showCapWarning(show){
       capBadge.hidden = !show;
     }
-
     function setLoadState(text){
       loadStateEl.textContent = text || "—";
     }
+    function setYearState(text){
+      yearStateEl.textContent = text || "—";
+    }
 
     function showMessage(text, kind){
-      resultsEl.innerHTML =
-        "<li class='item'><div class='meta'>" + escapeHtml(text) + "</div></li>";
+      resultsEl.innerHTML = "<li class='item'><div class='meta'>" + escapeHtml(text) + "</div></li>";
       setCount(kind === "empty" ? 0 : "—");
     }
 
-    // ---------- Encode single candidate (fallback) ----------
+    // Encode single candidate (fallback)
     function base64ToBase64Url(b64){
       return b64.replaceAll("+","-").replaceAll("/","_").replaceAll("=","");
     }
@@ -215,7 +222,7 @@
       window.location.href = "./person-puzzle.html?candidate=" + encodeURIComponent(payload);
     }
 
-    // ---------- Pool -> Puzzle (postMessage, in-memory) ----------
+    // Pool -> Puzzle (postMessage, in-memory)
     function openPuzzleWithPool(candidates){
       const items = safeArray(candidates).slice(0, 150);
       if(!items.length){
@@ -240,18 +247,16 @@
         }
       }
 
-      // fail-soft: vissa browsers/blank-tabs behöver flera försök
       sendAll();
       setTimeout(sendAll, 300);
       setTimeout(sendAll, 900);
     }
 
-    // ---------- Token parsing + client-side ranking ----------
+    // Token parsing: "Erik+Leksand+1820" -> nameQuery:"Erik Leksand", tokens:["Erik","Leksand"], years:[1820]
     function parseTokens(raw){
       const s = String(raw||"").trim();
       if(!s) return { nameQuery:"", tokens:[], years:[] };
 
-      // split +, but do NOT send '+' to RA
       const parts = s.split("+").map(x => x.trim()).filter(Boolean);
 
       const years = [];
@@ -264,21 +269,19 @@
         else tokens.push(p);
       }
 
-      // nameQuery: tokens without years, joined by space (RA-friendly)
       const nameQuery = tokens.join(" ").replace(/\s+/g, " ").trim();
-
       return { nameQuery, tokens, years };
     }
 
     function scoreCandidateClient(c, parsed){
-      // enkel, deterministisk, fail-closed sortering
-      // (inte “sanningen”, bara ranking)
       let s = 0;
+
       const name = normalize(c.name);
       const place = normalize(c.place);
       const by = Number.isFinite(Number(c.birthYear)) ? Number(c.birthYear) : null;
       const dy = Number.isFinite(Number(c.deathYear)) ? Number(c.deathYear) : null;
 
+      // tokens (ord)
       for(const t of parsed.tokens){
         const tt = normalize(t);
         if(!tt) continue;
@@ -286,6 +289,7 @@
         else if(place.includes(tt)) s += 20;
       }
 
+      // year signals (inte filter här)
       for(const y of parsed.years){
         if(by !== null && Math.abs(by - y) <= 5) s += 25;
         if(dy !== null && Math.abs(dy - y) <= 5) s += 15;
@@ -293,6 +297,22 @@
 
       if(c.url) s += 5;
       return s;
+    }
+
+    // ✅ VIKTIGT: Hård årfiltrering om år angivet (fail-closed)
+    function applyYearFilter(arr, years){
+      if(!Array.isArray(years) || years.length === 0) return arr;
+      const y = years[0];
+      const RANGE = 5;
+
+      return safeArray(arr).filter(c => {
+        const by = Number.isFinite(Number(c.birthYear)) ? Number(c.birthYear) : null;
+        const dy = Number.isFinite(Number(c.deathYear)) ? Number(c.deathYear) : null;
+        if(by === null && dy === null) return false; // fail-closed: saknar år när årfilter är aktivt
+        if(by !== null && Math.abs(by - y) <= RANGE) return true;
+        if(dy !== null && Math.abs(dy - y) <= RANGE) return true;
+        return false;
+      });
     }
 
     function rankAndTrim(items, parsed){
@@ -303,10 +323,14 @@
         return [];
       }
 
-      const scored = arr.map(c => ({ c, s: scoreCandidateClient(c, parsed) }));
+      // 1) Årfilter (om angivet)
+      const filtered = applyYearFilter(arr, parsed.years);
+
+      // 2) Score + sort
+      const scored = filtered.map(c => ({ c, s: scoreCandidateClient(c, parsed) }));
       scored.sort((a,b) => b.s - a.s);
 
-      // behåll max 150
+      // 3) Max 150
       return scored.slice(0, 150).map(x => x.c);
     }
 
@@ -315,14 +339,14 @@
       const arr = safeArray(items);
 
       if(!arr.length){
-        showMessage("Inga träffar (eller källa blockerades av CORS/timeout).", "empty");
+        showMessage("Inga träffar (eller årfiltret gav 0). Försök utan år eller förfina med fler tokens.", "empty");
         openPoolBtn.disabled = true;
         return;
       }
 
       setCount(arr.length);
 
-      // ✅ CAP: visa varning om råa träffar nådde cap (eller över)
+      // CAP-varning baseras på råa träffar före trim
       showCapWarning(Number(lastRawCount) >= 150);
 
       openPoolBtn.disabled = false;
@@ -340,7 +364,6 @@
         const actions = document.createElement("div");
         actions.className = "actions";
 
-        // OBS: Behåller per-rad pool-knapp (ingen redesign). Vill du ta bort den gör vi separat AO.
         const poolBtn = document.createElement("button");
         poolBtn.className = "secondary";
         poolBtn.textContent = "Öppna i Puzzle (pool)";
@@ -359,64 +382,65 @@
       }
     }
 
-    function providerOk(p){
-      return !!p && typeof p.search === "function" && typeof p.id === "string" && p.id.length > 0;
-    }
-
     async function runSearch(){
       // reset UI
       showCapWarning(false);
       openPoolBtn.disabled = true;
       setProvider("—");
       setCount("—");
+      setRawCount("—");
+      setYearState("—");
       lastCandidates = [];
       lastRawCount = 0;
       resultsEl.innerHTML = "";
 
       const raw = qEl.value.trim();
 
-      // ✅ Minimikrav (lås): minst 3 tecken
+      // Minimikrav: minst 3 tecken
       if(raw.length < 3){
         showMessage("Skriv minst 3 tecken.", "empty");
         return;
       }
 
-      // ✅ RAProviders måste finnas
+      // RAProviders måste finnas
       if(!window.RAProviders || typeof window.RAProviders.pickProvider !== "function"){
         setLoadState("SAKNAS");
         showMessage("RAProviders saknas. Kontrollera att /app/assets/js/ra-providers.js finns och laddas.", "empty");
         return;
       }
 
-      // RAProviders finns -> OK (för stunden)
       setLoadState("OK");
 
       const parsed = parseTokens(raw);
-
-      // ✅ Viktigt: skicka RA-vänlig fråga utan '+'
       const qForProvider = parsed.nameQuery;
 
-      // ✅ fail-closed: kräver minst ett namn-token (min 3 tecken totalt i nameQuery)
+      // fail-closed: kräver minst ett namn-token
       if(!qForProvider || qForProvider.length < 3){
         showMessage("Skriv minst ett namn-token (t.ex. Erik+Leksand). År ensam räcker inte (fail-closed).", "empty");
         return;
       }
 
-      // Auto-provider
+      // Year badge
+      if(Array.isArray(parsed.years) && parsed.years.length){
+        setYearState(String(parsed.years[0]) + " ±5 (hård)");
+      }else{
+        setYearState("av");
+      }
+
+      // Auto provider
       let provider = null;
       try{
         provider = window.RAProviders.pickProvider("auto");
       }catch{
         provider = null;
       }
-
-      // ✅ Provider-guard
       if(!provider || typeof provider.search !== "function"){
         setLoadState("ERROR");
         showMessage("Ingen giltig provider hittades (auto). Kontrollera ra-providers.js (pickProvider/search).", "empty");
         return;
       }
 
+      // UI lock
       searchBtn.disabled = true;
       const prevText = searchBtn.textContent;
       searchBtn.textContent = "Söker…";
@@ -424,19 +448,19 @@
       let items = [];
       let used = provider.id || "auto";
 
-      // 1) Försök auto (RA/Worker)
+      // 1) Försök RA/Worker
       try{
         items = await provider.search(qForProvider);
       }catch{
         items = [];
       }
 
-      // 2) Fallback demo om tomt (enligt din spec)
+      // 2) Fallback demo om tomt
       if(!safeArray(items).length){
         try{
           const demo = window.RAProviders.pickProvider("demo");
           if(demo && typeof demo.search === "function"){
-            used = (demo && demo.id) ? demo.id : used;
+            used = demo.id || used;
             items = await demo.search(qForProvider);
           }
         }catch{
@@ -450,17 +474,18 @@
 
       setProvider(used);
 
-      // ✅ Spara rawCount före trim för korrekt cap-varning
+      // RAW count (före filter/sort/trim)
       lastRawCount = safeArray(items).length;
+      setRawCount(lastRawCount);
 
-      // ✅ Klient-sortering med tokens (+ år) och trim till max 150
+      // Rank + (ev) hård årfiltrering + trim
       const ranked = rankAndTrim(items, parsed);
 
       lastCandidates = ranked;
       renderList(lastCandidates);
     }
 
-    // EVENTS
+    // Events
     searchBtn.addEventListener("click", runSearch);
     qEl.addEventListener("keydown", e => {
       if(e.key === "Enter"){
@@ -477,10 +502,11 @@
       lastRawCount = 0;
       setProvider("—");
       setCount("—");
+      setRawCount("—");
+      setYearState("—");
       showCapWarning(false);
       openPoolBtn.disabled = true;
       resultsEl.innerHTML = "";
-      // återställ loadState baserat på aktuell runtime
       try{
         if(window.RAProviders && typeof window.RAProviders.pickProvider === "function"){
           setLoadState("OK");
@@ -493,7 +519,7 @@
       qEl.focus();
     });
 
-    // INIT
+    // Init
     (function init(){
       try{
         if(window.RAProviders && typeof window.RAProviders.pickProvider === "function"){
@@ -506,6 +532,8 @@
       }
       setProvider("—");
       setCount("—");
+      setRawCount("—");
+      setYearState("—");
     })();
   </script>
 </body>
