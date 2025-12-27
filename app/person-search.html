@@ -107,14 +107,15 @@
     <p class="muted">Sök i öppna källor och öppna kandidatpool i Puzzle (in-memory, ingen lagring).</p>
 
     <div class="badgeRow" aria-label="Status">
-      <span class="badge" id="providerBadge">Källa: <strong id="providerName">—</strong></span>
-      <span class="badge" id="countBadge">Träffar: <strong id="countNum">—</strong></span>
+      <span class="badge">Källa: <strong id="providerName">—</strong></span>
+      <span class="badge">Träffar: <strong id="countNum">—</strong></span>
       <span class="badge warn" id="capBadge" hidden>Max 150 visas – förfina din sökning</span>
       <span class="badge" id="loadBadge">RAProviders: <strong id="loadState">—</strong></span>
     </div>
 
     <div class="hint">
-      Tips: använd <span class="mono">+</span> för tokens: <span class="mono">Erik+Leksand+1820</span>
+      Tips: använd <span class="mono">+</span> som tokens (för sortering): <span class="mono">Erik+Leksand+1820</span><br/>
+      Viktigt: vi skickar inte <span class="mono">+</span> till RA – vi gör tokens i klienten (fail-closed).
     </div>
   </header>
 
@@ -128,15 +129,11 @@
   <ul id="results" class="list" aria-label="Sökresultat"></ul>
 
   <!-- RA Providers -->
-  <!-- OBS: denna sökväg kräver att filen ligger på /app/assets/js/ra-providers.js -->
   <script src="./assets/js/ra-providers.js"></script>
 
   <script>
     "use strict";
 
-    // =====================================================
-    // DOM
-    // =====================================================
     const qEl = document.getElementById("q");
     const searchBtn = document.getElementById("searchBtn");
     const openPoolBtn = document.getElementById("openPoolBtn");
@@ -147,18 +144,11 @@
     const providerNameEl = document.getElementById("providerName");
     const countNumEl = document.getElementById("countNum");
     const capBadge = document.getElementById("capBadge");
-
     const loadStateEl = document.getElementById("loadState");
 
-    // =====================================================
-    // STATE (in-memory only)
-    // =====================================================
     let lastCandidates = [];
     let lastProviderId = "—";
 
-    // =====================================================
-    // Helpers
-    // =====================================================
     function escapeHtml(s){
       return String(s || "")
         .replaceAll("&","&amp;")
@@ -169,6 +159,7 @@
     }
 
     function safeArray(v){ return Array.isArray(v) ? v : []; }
+    function normalize(s){ return String(s||"").trim().toLowerCase(); }
 
     function candidateYears(c){
       const by = Number.isFinite(Number(c.birthYear)) ? c.birthYear : "—";
@@ -196,13 +187,11 @@
 
     function showMessage(text, kind){
       resultsEl.innerHTML =
-        "<li class='item'>" +
-          "<div class='meta'>" + escapeHtml(text) + "</div>" +
-        "</li>";
+        "<li class='item'><div class='meta'>" + escapeHtml(text) + "</div></li>";
       setCount(kind === "empty" ? 0 : "—");
     }
 
-    // URL-encode single candidate (fallback)
+    // ---------- Encode single candidate (fallback) ----------
     function base64ToBase64Url(b64){
       return b64.replaceAll("+","-").replaceAll("/","_").replaceAll("=","");
     }
@@ -211,25 +200,18 @@
       const b64 = btoa(unescape(encodeURIComponent(json)));
       return base64ToBase64Url(b64);
     }
-
     function openInPuzzleSingle(candidate){
       const payload = encodeCandidateForUrl(candidate);
-      window.location.href =
-        "./person-puzzle.html?candidate=" + encodeURIComponent(payload);
+      window.location.href = "./person-puzzle.html?candidate=" + encodeURIComponent(payload);
     }
 
-    // =====================================================
-    // Pool -> Puzzle (postMessage)
-    // - Ingen lagring, allt in-memory
-    // - Fail-closed: om popup blockeras -> tydligt fel
-    // =====================================================
+    // ---------- Pool -> Puzzle (postMessage, in-memory) ----------
     function openPuzzleWithPool(candidates){
       const items = safeArray(candidates).slice(0, 150);
       if(!items.length){
         alert("Inga kandidater att skicka till Puzzle.");
         return;
       }
-
       const w = window.open("./person-puzzle.html", "_blank", "noopener,noreferrer");
       if(!w){
         alert("Popup blockerad. Tillåt popup för att öppna Puzzle i pool-läge.");
@@ -239,31 +221,84 @@
       const CHUNK = 50;
       const total = items.length;
 
-      function sendChunk(i){
-        const slice = items.slice(i, i + CHUNK);
-        try{
-          w.postMessage({
-            type: "PUZZLE_POOL",
-            items: slice,
-            total: total,
-            offset: i
-          }, "*");
-        }catch{}
-      }
-
       function sendAll(){
-        for(let i=0; i<total; i+=CHUNK) sendChunk(i);
+        for(let i=0; i<total; i+=CHUNK){
+          const slice = items.slice(i, i + CHUNK);
+          try{
+            w.postMessage({ type:"PUZZLE_POOL", items: slice, total, offset: i }, "*");
+          }catch{}
+        }
       }
 
-      // Skicka flera gånger (race med laddning)
       sendAll();
       setTimeout(sendAll, 300);
       setTimeout(sendAll, 900);
     }
 
-    // =====================================================
-    // Render list
-    // =====================================================
+    // ---------- Token parsing + client-side ranking ----------
+    function parseTokens(raw){
+      const s = String(raw||"").trim();
+      if(!s) return { nameQuery:"", tokens:[], years:[] };
+
+      // split +, but do NOT send '+' to RA
+      const parts = s.split("+").map(x => x.trim()).filter(Boolean);
+
+      const years = [];
+      const tokens = [];
+
+      for(const p of parts){
+        const n = Number(p);
+        const isYear = Number.isFinite(n) && String(Math.trunc(n)).length >= 3 && n > 500 && n < 2500;
+        if(isYear) years.push(Math.trunc(n));
+        else tokens.push(p);
+      }
+
+      // nameQuery: tokens without years, joined by space (RA-friendly)
+      const nameQuery = tokens.join(" ").replace(/\s+/g, " ").trim();
+
+      return { nameQuery, tokens, years };
+    }
+
+    function scoreCandidateClient(c, parsed){
+      // enkel, deterministisk, fail-closed sortering
+      // (inte “sanningen”, bara ranking)
+      let s = 0;
+      const name = normalize(c.name);
+      const place = normalize(c.place);
+      const by = Number.isFinite(Number(c.birthYear)) ? Number(c.birthYear) : null;
+      const dy = Number.isFinite(Number(c.deathYear)) ? Number(c.deathYear) : null;
+
+      for(const t of parsed.tokens){
+        const tt = normalize(t);
+        if(!tt) continue;
+        if(name.includes(tt)) s += 30;
+        else if(place.includes(tt)) s += 20;
+      }
+
+      for(const y of parsed.years){
+        if(by !== null && Math.abs(by - y) <= 5) s += 25;
+        if(dy !== null && Math.abs(dy - y) <= 5) s += 15;
+      }
+
+      if(c.url) s += 5;
+      return s;
+    }
+
+    function rankAndTrim(items, parsed){
+      const arr = safeArray(items);
+
+      // om användaren bara skrev år (ex "1820") -> nameQuery tom -> fail-closed
+      if(!parsed.nameQuery || parsed.nameQuery.length < 2){
+        return [];
+      }
+
+      const scored = arr.map(c => ({ c, s: scoreCandidateClient(c, parsed) }));
+      scored.sort((a,b) => b.s - a.s);
+
+      // behåll max 150
+      return scored.slice(0, 150).map(x => x.c);
+    }
+
     function renderList(items){
       resultsEl.innerHTML = "";
       const arr = safeArray(items);
@@ -276,7 +311,6 @@
 
       setCount(arr.length);
       showCapWarning(arr.length >= 150);
-
       openPoolBtn.disabled = false;
 
       for(const c of arr){
@@ -310,9 +344,6 @@
       }
     }
 
-    // =====================================================
-    // Search runner
-    // =====================================================
     async function runSearch(){
       showCapWarning(false);
       openPoolBtn.disabled = true;
@@ -320,8 +351,8 @@
       setCount("—");
       resultsEl.innerHTML = "";
 
-      const q = qEl.value.trim();
-      if(q.length < 2){
+      const raw = qEl.value.trim();
+      if(raw.length < 2){
         showMessage("Skriv minst 2 tecken.", "empty");
         lastCandidates = [];
         return;
@@ -333,26 +364,38 @@
         return;
       }
 
+      const parsed = parseTokens(raw);
+
+      // ✅ Viktigt: skicka RA-vänlig fråga utan '+'
+      const qForProvider = parsed.nameQuery;
+
+      if(!qForProvider || qForProvider.length < 2){
+        showMessage("Skriv minst ett namn-token (t.ex. Erik+Leksand). År ensam räcker inte (fail-closed).", "empty");
+        lastCandidates = [];
+        return;
+      }
+
       const provider = window.RAProviders.pickProvider("auto");
+      const usedAuto = (provider && provider.id) ? provider.id : "auto";
 
       searchBtn.disabled = true;
       searchBtn.textContent = "Söker…";
 
       let items = [];
-      let used = (provider && provider.id) ? provider.id : "auto";
+      let used = usedAuto;
 
       try{
-        items = await provider.search(q);
+        items = await provider.search(qForProvider);
       }catch{
         items = [];
       }
 
-      // demo fallback om upstream strular
+      // demo fallback (använd också qForProvider)
       if(!items.length){
         try{
           const demo = window.RAProviders.pickProvider("demo");
           used = (demo && demo.id) ? demo.id : used;
-          items = await demo.search(q);
+          items = await demo.search(qForProvider);
         }catch{
           items = [];
         }
@@ -363,13 +406,13 @@
 
       setProvider(used);
 
-      lastCandidates = safeArray(items).slice(0, 150);
+      // ✅ Klient-sortering med tokens (+ år)
+      const ranked = rankAndTrim(items, parsed);
+
+      lastCandidates = ranked;
       renderList(lastCandidates);
     }
 
-    // =====================================================
-    // Events
-    // =====================================================
     searchBtn.addEventListener("click", runSearch);
     qEl.addEventListener("keydown", e => {
       if(e.key === "Enter"){
@@ -378,9 +421,7 @@
       }
     });
 
-    openPoolBtn.addEventListener("click", () => {
-      openPuzzleWithPool(lastCandidates);
-    });
+    openPoolBtn.addEventListener("click", () => openPuzzleWithPool(lastCandidates));
 
     clearBtn.addEventListener("click", () => {
       qEl.value = "";
@@ -393,7 +434,6 @@
       qEl.focus();
     });
 
-    // Init: visa direkt om RAProviders laddats
     (function init(){
       try{
         if(window.RAProviders && typeof window.RAProviders.pickProvider === "function"){
