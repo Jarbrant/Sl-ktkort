@@ -110,6 +110,7 @@
       <span class="badge" id="providerBadge">Källa: <strong id="providerName">—</strong></span>
       <span class="badge" id="countBadge">Träffar: <strong id="countNum">—</strong></span>
       <span class="badge warn" id="capBadge" hidden>Max 150 visas – förfina din sökning</span>
+      <span class="badge" id="loadBadge">RAProviders: <strong id="loadState">—</strong></span>
     </div>
 
     <div class="hint">
@@ -127,6 +128,7 @@
   <ul id="results" class="list" aria-label="Sökresultat"></ul>
 
   <!-- RA Providers -->
+  <!-- OBS: denna sökväg kräver att filen ligger på /app/assets/js/ra-providers.js -->
   <script src="./assets/js/ra-providers.js"></script>
 
   <script>
@@ -146,10 +148,12 @@
     const countNumEl = document.getElementById("countNum");
     const capBadge = document.getElementById("capBadge");
 
+    const loadStateEl = document.getElementById("loadState");
+
     // =====================================================
     // STATE (in-memory only)
     // =====================================================
-    let lastCandidates = [];     // senaste sökresultat (Candidate[])
+    let lastCandidates = [];
     let lastProviderId = "—";
 
     // =====================================================
@@ -163,8 +167,6 @@
         .replaceAll('"',"&quot;")
         .replaceAll("'","&#039;");
     }
-
-    function normalize(s){ return String(s||"").trim().toLowerCase(); }
 
     function safeArray(v){ return Array.isArray(v) ? v : []; }
 
@@ -188,6 +190,10 @@
       capBadge.hidden = !show;
     }
 
+    function setLoadState(text){
+      loadStateEl.textContent = text || "—";
+    }
+
     function showMessage(text, kind){
       resultsEl.innerHTML =
         "<li class='item'>" +
@@ -196,7 +202,7 @@
       setCount(kind === "empty" ? 0 : "—");
     }
 
-    // URL-encode single candidate (fallback fortfarande användbar)
+    // URL-encode single candidate (fallback)
     function base64ToBase64Url(b64){
       return b64.replaceAll("+","-").replaceAll("/","_").replaceAll("=","");
     }
@@ -215,24 +221,21 @@
     // =====================================================
     // Pool -> Puzzle (postMessage)
     // - Ingen lagring, allt in-memory
-    // - Fail-closed: om popup blockeras -> fallback tips
+    // - Fail-closed: om popup blockeras -> tydligt fel
     // =====================================================
     function openPuzzleWithPool(candidates){
-      const items = safeArray(candidates).slice(0, 150); // policy: max 150
+      const items = safeArray(candidates).slice(0, 150);
       if(!items.length){
         alert("Inga kandidater att skicka till Puzzle.");
         return;
       }
 
-      // Öppna Puzzle i ny flik (bäst för att behålla poolen i denna flik)
       const w = window.open("./person-puzzle.html", "_blank", "noopener,noreferrer");
-
       if(!w){
         alert("Popup blockerad. Tillåt popup för att öppna Puzzle i pool-läge.");
         return;
       }
 
-      // Skicka i chunkar för stabilitet
       const CHUNK = 50;
       const total = items.length;
 
@@ -248,15 +251,11 @@
         }catch{}
       }
 
-      // Skicka några gånger (race med laddning)
-      // 1) direkt, 2) efter 300ms, 3) efter 900ms
-      let offset = 0;
-
-      // Vi skickar ALLA chunkar vid varje försök, så Puzzle kan ta emot det som hinner fram.
       function sendAll(){
         for(let i=0; i<total; i+=CHUNK) sendChunk(i);
       }
 
+      // Skicka flera gånger (race med laddning)
       sendAll();
       setTimeout(sendAll, 300);
       setTimeout(sendAll, 900);
@@ -275,7 +274,6 @@
         return;
       }
 
-      // max 150 visas (enligt provider limit)
       setCount(arr.length);
       showCapWarning(arr.length >= 150);
 
@@ -286,7 +284,7 @@
         li.className = "item";
 
         li.innerHTML =
-          "<h3>" + escapeHtml(c.name + candidateYears(c)) + "</h3>" +
+          "<h3>" + escapeHtml((c.name || "(namn saknas)") + candidateYears(c)) + "</h3>" +
           "<div class='meta'>Plats: " + escapeHtml(c.place || "—") + "</div>" +
           "<div class='meta'>Källa: " + escapeHtml(c.source || "—") + "</div>" +
           (c.url ? ("<div class='meta'>URL: <span class='mono'>" + escapeHtml(c.url) + "</span></div>") : "");
@@ -310,6 +308,7 @@
         li.appendChild(actions);
         resultsEl.appendChild(li);
       }
+    }
 
     // =====================================================
     // Search runner
@@ -328,8 +327,8 @@
         return;
       }
 
-      if(!window.RAProviders){
-        showMessage("RAProviders saknas. Kontrollera att ./assets/js/ra-providers.js laddas.", "empty");
+      if(!window.RAProviders || typeof window.RAProviders.pickProvider !== "function"){
+        showMessage("RAProviders saknas. Kontrollera att /app/assets/js/ra-providers.js finns och laddas.", "empty");
         lastCandidates = [];
         return;
       }
@@ -357,7 +356,8 @@
         }catch{
           items = [];
         }
-      
+      }
+
       searchBtn.disabled = false;
       searchBtn.textContent = "Sök";
 
@@ -393,9 +393,20 @@
       qEl.focus();
     });
 
-    // Init
-    setProvider("—");
-    setCount("—");
+    // Init: visa direkt om RAProviders laddats
+    (function init(){
+      try{
+        if(window.RAProviders && typeof window.RAProviders.pickProvider === "function"){
+          setLoadState("OK");
+        }else{
+          setLoadState("SAKNAS");
+        }
+      }catch{
+        setLoadState("SAKNAS");
+      }
+      setProvider("—");
+      setCount("—");
+    })();
   </script>
 </body>
 </html>
