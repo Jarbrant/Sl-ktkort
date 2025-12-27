@@ -1,7 +1,7 @@
 /* ============================================================
    ra-providers.js
    ------------------------------------------------------------
-   Släktkort – Riksarkivet Providerlager (AO-API-03 PATCH v4.1)
+   Släktkort – Riksarkivet Providerlager (AO-API-03 PATCH v4)
    ------------------------------------------------------------
    Ansvar:
    - All extern datainhämtning (Riksarkivet m.fl.)
@@ -9,16 +9,15 @@
    - Fail-closed + demo-fallback
    - Ingen persistent lagring av extern persondata
    ------------------------------------------------------------
+   Används av:
+   - person-search.html
+   - person-puzzle.html
+   ------------------------------------------------------------
    AO-API-03:
    - Limit = 150 (max 150)
-   - Stöd för RA Worker-format: { totalHits, hits, offset, items: [...] }
-   - Filtrerar bort icke-personer (byggnader, ritningar, recordsets)
+   - Stöd för RA Worker-format: { totalHits, hits, offset, items:[...] }
    - Exponerar window.RAProviders.enrichProviders (IIIF/OAI stubs)
-   - Inga nya storage-keys, ingen datamodell ändras
-   ------------------------------------------------------------
-   Viktig princip:
-   - Hellre 0 träffar än fel typ (fail-closed)
-   - Men vi gör person-detektionen robust så att “riktiga personer” inte faller bort
+   - Filtrerar fram PERSON-träffar (agent/person) + försiktig fallback
    ============================================================ */
 
 (function () {
@@ -27,12 +26,13 @@
   /* ============================================================
      KONFIGURATION (LÅST)
      ============================================================ */
+
   const PROXY_BASE = "https://slaktkort01234.andersmenyit.workers.dev";
   const FETCH_TIMEOUT = 8000;
 
+  // AO-API-03: 150
   const DEFAULT_LIMIT = 150;
   const MAX_LIMIT = 150;
-  const MIN_QUERY_LEN = 3;
 
   /* ============================================================
      HJÄLPFUNKTIONER
@@ -78,14 +78,8 @@
     return String(v);
   }
 
-  function makeTmpId() {
-    try {
-      if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
-    } catch {}
-    return "tmp_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
-  }
-
   function parseDateRangeFromMetadataDate(dateStr) {
+    // ex: "1661 - 1704", "1704", "1704-1705", etc
     const s = pickText(dateStr);
     if (!s) return { birthYear: null, deathYear: null };
 
@@ -129,122 +123,48 @@
     return "";
   }
 
-  /* ============================================================
-     PERSON-FILTER (ROBUST, men fail-closed)
-     ============================================================ */
+  function looksLikePersonName(text) {
+    // Väldigt försiktig: vi vill inte tolka byggnader/ritningar som person
+    const s = String(text || "").trim();
+    if (!s) return false;
 
-  // Negativa signaler (vill aldrig släppa igenom)
-  const NEGATIVE_TYPE_TOKENS = [
-    "recordset", "record set", "record", "arkiv", "series",
-    "place", "ort", "socken",
-    "building", "byggnad",
-    "drawing", "ritning", "skiss", "fasad", "plan",
-    "map", "karta",
-    "photograph", "foto", "bild"
-  ];
+    const low = s.toLowerCase();
 
-  function collectTypeTokens(r) {
-    // Samla alla typfält vi kan hitta (RA kan variera)
-    const bag = [];
+    // vanliga ord som ofta betyder icke-person (fail-closed)
+    const bad = [
+      "kapell", "kyrka", "kyrkvallen", "ritning", "skiss", "plan", "fasad", "sektion",
+      "byggnad", "byggnader", "inventering", "rapport", "handling", "förslag", "karta"
+    ];
+    for (const b of bad) {
+      if (low.includes(b)) return false;
+    }
 
-    // direkta typfält
-    bag.push(r && r.objectType);
-    bag.push(r && r.type);
-    bag.push(r && r["@type"]);
-    bag.push(r && r.recordType);
-    bag.push(r && r.entityType);
-    bag.push(r && r.kind);
-    bag.push(r && r.class);
+    // Personer i RA kan ofta se ut som: "Efternamn, Förnamn"
+    if (s.includes(",") && s.split(",")[0].trim().length >= 2) return true;
 
-    // metadata
-    bag.push(r && r.metadata && (r.metadata.objectType || r.metadata.type || r.metadata["@type"] || r.metadata.entityType || r.metadata.recordType));
-
-    // ibland ligger "type" i _links/rel eller liknande (sällsynt) – vi ignorerar för säkerhet
-
-    const merged = bag
-      .flatMap(v => Array.isArray(v) ? v : [v])
-      .map(v => normalize(pickText(v)))
-      .filter(Boolean);
-
-    // dedupe
-    return Array.from(new Set(merged));
-  }
-
-  function hasNegativeType(typeTokens) {
-    if (!typeTokens.length) return false;
-    return typeTokens.some(t => NEGATIVE_TYPE_TOKENS.some(bad => t.includes(bad)));
-  }
-
-  function isLikelyPersonItem(r) {
-    // Fail-closed: utan tydlig person-signal släpper vi inte igenom
-    const typeTokens = collectTypeTokens(r);
-
-    // Om vi tydligt ser att det är fel typ -> blockera
-    if (hasNegativeType(typeTokens)) return false;
-
-    // Positiva signaler: “agent” + “person” någonstans
-    const joined = typeTokens.join(" | ");
-    const hasAgent = joined.includes("agent");
-    const hasPerson = joined.includes("person");
-
-    // Klassisk “objectType=Agent + type=Person”
-    const ot = normalize(pickText(r && r.objectType));
-    const tp = normalize(pickText(r && r.type));
-    if (ot === "agent" && (tp === "person" || tp.includes("person"))) return true;
-
-    // Robust fallback: om typeTokens innehåller både agent och person
-    if (hasAgent && hasPerson) return true;
+    // Annars: minst 2 ord och minst en bokstav i varje
+    const parts = s.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2 && parts.length <= 4) {
+      // inga konstiga tecken som ofta finns i titlar
+      if (/[<>]/.test(s)) return false;
+      return true;
+    }
 
     return false;
   }
 
-  function extractBestPersonName(r) {
-    // Prioritera fält som typiskt är personnamn (undvik title/caption om det är arkiv-titel)
-    const candidates = [
-      r && r.displayName,
-      r && r.name,
-      r && r.personName,
-      r && r.agentName,
-      r && r.metadata && (r.metadata.name || r.metadata.personName || r.metadata.agentName || r.metadata.displayName),
-      // fallback
-      r && r.caption,
-      r && r.title,
-      r && r.label,
-      r && r.metadata && r.metadata.title
-    ];
+  function isPersonItem(r) {
+    const objType = normalize(r?.objectType || r?.object_type || "");
+    const type = normalize(r?.type || r?.["@type"] || r?.metadata?.type || "");
+    const caption = pickText(r?.caption || r?.name || r?.title || r?.label || r?.metadata?.title || "");
 
-    return String(pickText(candidates.filter(Boolean)) || "").trim();
-  }
+    // Primär: tydliga personobjekt
+    if (objType === "agent" && type === "person") return true;
+    if (type === "person") return true;
 
-  function looksLikePersonName(s) {
-    // Fail-closed men inte onödigt hård: vi vill hellre släppa namn än byggnadstitlar
-    const t = String(s || "").trim();
-    if (!t) return false;
-    if (t.length < 2) return false;
-    if (t.length > 80) return false;
-
-    // Måste innehålla bokstäver
-    if (!/[A-Za-zÅÄÖåäö]/.test(t)) return false;
-
-    // Typiska arkiv/byggnadstitlar har ofta kolon
-    if (t.includes(":")) return false;
-
-    // Stopplista på uppenbara bygg/ritningsord (sv + en)
-    const low = normalize(t);
-    const badWords = [
-      "kapell", "kyrka", "kyrkogård", "församling",
-      "ritning", "skiss", "fasad", "plan", "byggnad",
-      "s:t", "st.", // ofta i bygg/platstitlar
-      "inventering", "förteckning", "serie", "volym"
-    ];
-    if (badWords.some(w => low.includes(w))) return false;
-
-    // RA-personer kommer ofta som "Efternamn, Förnamn"
-    if (t.includes(",")) return true;
-
-    // Annars tillåt 1–3 ord (Larsson / Anna Maria / Per Olof Larsson)
-    const parts = t.split(/\s+/).filter(Boolean);
-    if (parts.length >= 1 && parts.length <= 4) return true;
+    // Sekundär (försiktig): om RA inte flaggar typ men caption ser ut som person
+    // OBS: detta ska bara användas om vi i svaret inte hittar några “riktiga” person-objekt.
+    if (looksLikePersonName(caption)) return "FALLBACK_PERSONLIKE";
 
     return false;
   }
@@ -252,6 +172,7 @@
   /* ============================================================
      CANDIDATE-FORMAT (LÅST KONTRAKT)
      ============================================================ */
+
   function makeCandidate(o) {
     return {
       id: String(o.id || ""),
@@ -266,8 +187,9 @@
   }
 
   /* ============================================================
-     DEMO PROVIDER
+     DEMO PROVIDER (ALLTID TILLGÄNGLIG)
      ============================================================ */
+
   const DEMO_DATA = [
     { id: "d1", name: "Karl Johansson", birthYear: 1872, deathYear: 1939, place: "Falun" },
     { id: "d2", name: "Anna Persdotter", birthYear: 1878, deathYear: 1951, place: "Leksand" },
@@ -280,27 +202,30 @@
     label: "Demo (offline)",
     async search(query) {
       const q = normalize(query);
-      if (q.length < MIN_QUERY_LEN) return [];
+      if (q.length < 2) return [];
       return DEMO_DATA
         .filter(p => normalize(p.name).includes(q) || normalize(p.place).includes(q))
-        .slice(0, MAX_LIMIT)
-        .map(p => makeCandidate({ ...p, source: "Demo", why: ["Demo-post"] }));
+        .map(p =>
+          makeCandidate({
+            ...p,
+            source: "Demo",
+            why: ["Demo-post"]
+          })
+        );
     }
   };
 
   /* ============================================================
-     RIKSARKIVET – VIA WORKER
+     RIKSARKIVET – VIA WORKER (CORS)
      ============================================================ */
+
   const SearchApiProvider = {
     id: "searchapi",
     label: "Riksarkivet (via proxy)",
 
     async search(query) {
-      const qRaw = String(query || "").trim();
-      if (qRaw.length < MIN_QUERY_LEN) return [];
-
-      // Säker sanering: om '+' ändå kommer in -> ersätt med mellanslag
-      const q = qRaw.replace(/\+/g, " ").replace(/\s+/g, " ").trim();
+      const q = String(query || "").trim();
+      if (q.length < 2) return [];
 
       const limit = clampInt(DEFAULT_LIMIT, 1, MAX_LIMIT, DEFAULT_LIMIT);
       const url = PROXY_BASE + "/records?name=" + encodeURIComponent(q) + "&limit=" + String(limit);
@@ -323,60 +248,66 @@
         throw new Error("BAD_JSON");
       }
 
-      // RA worker-format: items är listan
-      const rawItems = (json && (json.items || json.records || json.data || json.results)) || [];
-      if (!Array.isArray(rawItems) || rawItems.length === 0) return [];
+      const itemsAll = safeArray(json.items || json.records || json.data || json.results || []);
+      if (!itemsAll.length) return [];
 
-      // 1) Filtrera till sannolika PERSON-items
-      const personItems = rawItems.filter(isLikelyPersonItem);
-      if (!personItems.length) return []; // fail-closed
+      // 1) Primär filtrering: riktiga personobjekt
+      const primary = [];
+      const fallbackCandidates = [];
 
-      // 2) Mappa till Candidate
-      const out = [];
-      for (const r of personItems) {
-        if (out.length >= limit) break;
+      for (const r of itemsAll) {
+        const flag = isPersonItem(r);
+        if (flag === true) primary.push(r);
+        else if (flag === "FALLBACK_PERSONLIKE") fallbackCandidates.push(r);
+      }
 
-        const id = pickText(r && (r.id || r.identifier)) || makeTmpId();
+      // 2) Fail-closed men praktisk: om 0 “riktiga” personer hittas,
+      //    använd den försiktiga fallbacken (person-lik caption) i stället för tom lista.
+      const chosen = primary.length ? primary : fallbackCandidates;
 
-        const name = extractBestPersonName(r);
-        if (!looksLikePersonName(name)) continue; // extra skydd
+      // 3) Mappa till Candidate
+      return chosen.slice(0, limit).map((r) => {
+        const id = pickText(r.id || r.identifier) || (
+          (typeof crypto !== "undefined" && crypto.randomUUID)
+            ? crypto.randomUUID()
+            : ("tmp_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8))
+        );
+
+        const name =
+          pickText(r.caption || r.name || r.title || r.label || (r.metadata && r.metadata.title)) ||
+          "(namn saknas)";
 
         const mdDate = r && r.metadata ? r.metadata.date : "";
         const years = parseDateRangeFromMetadataDate(mdDate);
 
-        // plats saknas ofta i Agent-träffar -> tomt (fail-closed)
-        const place = pickText(
-          (r && (r.place || r.location)) ||
-          (r && r.metadata && (r.metadata.place || r.metadata.location || r.metadata.ort)) ||
-          ""
-        ) || "";
+        const place =
+          pickText(r.place || r.location || (r.metadata && (r.metadata.place || r.metadata.location || r.metadata.ort))) ||
+          "";
 
         const urlOut = extractUrlFromLinks(r && (r._links || r.links)) || "";
 
-        out.push(
-          makeCandidate({
-            id,
-            name,
-            birthYear: years.birthYear,
-            deathYear: years.deathYear,
-            place,
-            source: "Riksarkivet",
-            url: urlOut,
-            why: [
-              "Match via namn (Person/Agent)",
-              mdDate ? ("Datum: " + pickText(mdDate)) : ""
-            ].filter(Boolean)
-          })
-        );
-      }
-
-      return out.slice(0, limit);
+        return makeCandidate({
+          id,
+          name,
+          birthYear: years.birthYear,
+          deathYear: years.deathYear,
+          place,
+          source: "Riksarkivet",
+          url: urlOut,
+          why: [
+            primary.length ? "Person (RA Agent/Person)" : "Person-lik träff (fallback)",
+            mdDate ? ("Datum: " + pickText(mdDate)) : ""
+          ].filter(Boolean)
+        });
+      });
     }
   };
 
   /* ============================================================
-     ENRICH PROVIDERS (AO-API-03) – stubs
+     ENRICH PROVIDERS (AO-API-03)
+     - stubs: metadata/länkar endast
      ============================================================ */
+
   const enrichProviders = [
     {
       id: "iiif_stub",
@@ -384,7 +315,7 @@
       supports(candidate) {
         return Boolean(candidate && safeUrl(candidate.url));
       },
-      async enrich(candidate) {
+      async enrich(candidate /*, hints */) {
         try {
           const u = safeUrl(candidate.url);
           if (!u) return [];
@@ -418,6 +349,7 @@
   /* ============================================================
      PROVIDER-REGISTRY
      ============================================================ */
+
   const REGISTRY = new Map();
   REGISTRY.set(DemoProvider.id, DemoProvider);
   REGISTRY.set(SearchApiProvider.id, SearchApiProvider);
@@ -425,6 +357,7 @@
   /* ============================================================
      PUBLIKT API (window.RAProviders)
      ============================================================ */
+
   function listProviders() {
     return Array.from(REGISTRY.values()).map(p => ({ id: p.id, label: p.label }));
   }
@@ -432,6 +365,7 @@
   function pickProvider(preferred = "auto") {
     if (preferred === "demo") return DemoProvider;
     if (preferred === "searchapi") return SearchApiProvider;
+    // auto = RA först, annars demo
     return SearchApiProvider || DemoProvider;
   }
 
