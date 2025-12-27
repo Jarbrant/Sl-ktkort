@@ -1,7 +1,7 @@
 /* ============================================================
    ra-providers.js
    ------------------------------------------------------------
-   Släktkort – Riksarkivet Providerlager (AO-API-03 PATCH v2)
+   Släktkort – Riksarkivet Providerlager (AO-API-03 PATCH v3)
    ------------------------------------------------------------
    Ansvar:
    - All extern datainhämtning (Riksarkivet m.fl.)
@@ -14,8 +14,10 @@
    - person-puzzle.html
    ------------------------------------------------------------
    AO-API-03:
-   - Limit utökas till 150 (max 150 visas)
-   - Stöd för RA Worker-format: { totalHits, hits: [...] }
+   - Limit utökas till 150 (max 150)
+   - Stöd för RA Worker-format där:
+       - hits = antal (number)
+       - items = lista med träffar (array)
    - Exponerar window.RAProviders.enrichProviders (IIIF/OAI stubs)
    - Inga nya storage-keys, ingen datamodell ändras
    ============================================================ */
@@ -27,13 +29,10 @@
      KONFIGURATION (LÅST)
      ============================================================ */
 
-  // ✅ Cloudflare Worker (CORS-brygga)
   const PROXY_BASE = "https://slaktkort01234.andersmenyit.workers.dev";
-
-  // Timeout för nätverksanrop (ms)
   const FETCH_TIMEOUT = 8000;
 
-  // Resultatgränser (AO-API-03: 150)
+  // AO-API-03: 150
   const DEFAULT_LIMIT = 150;
   const MAX_LIMIT = 150;
 
@@ -68,84 +67,75 @@
     return u;
   }
 
-  // Robust text plockare: hanterar string/array/object/nestade former
   function pickText(v) {
     if (v == null) return "";
     if (typeof v === "string") return v.trim();
     if (typeof v === "number") return String(v);
     if (Array.isArray(v)) return v.map(pickText).filter(Boolean).join(" ").trim();
     if (typeof v === "object") {
-      // Vanliga fält i olika API:er
       return pickText(
-        v.text ?? v.value ?? v.label ?? v.title ?? v.name ?? v.displayName ?? v.content ?? ""
+        v.text ?? v.value ?? v.label ?? v.title ?? v.name ?? v.caption ?? v.displayName ?? v.content ?? ""
       );
     }
     return String(v);
   }
 
-  // Försök hitta ett år (4 siffror) i en text/objekt
-  function extractYear(v) {
+  function firstYearFromText(v) {
     const s = pickText(v);
     if (!s) return null;
-    const m = s.match(/\b(1[0-9]{3}|20[0-9]{2})\b/); // 1000–2099 (fail-safe)
+    const m = s.match(/\b(1[0-9]{3}|20[0-9]{2})\b/);
     if (!m) return null;
     const y = Number(m[1]);
-    if (!Number.isFinite(y)) return null;
-    return y;
+    return Number.isFinite(y) ? y : null;
   }
 
-  // Försök bygga en “rimlig” länk om url saknas
-  function extractUrl(hit) {
-    // vanliga: url / uri / link / href
-    const direct = safeUrl(pickText(hit && (hit.url ?? hit.uri ?? hit.link ?? hit.href)));
-    if (direct) return direct;
+  function parseDateRangeFromMetadataDate(dateStr) {
+    // ex: "1661 - 1704" eller "1704" etc
+    const s = pickText(dateStr);
+    if (!s) return { birthYear: null, deathYear: null };
 
-    // Ibland finns “id” som kan användas för att länka till sök-portalen
-    const id = pickText(hit && (hit.id ?? hit.identifier ?? hit.recordId ?? hit.ref));
-    // fail-closed: om vi inte är säkra på korrekt portal-URL, returnera tomt
-    // (du kan senare mappa till rätt portal-URL när du vet exakt)
-    if (!id) return "";
+    const years = s.match(/\b(1[0-9]{3}|20[0-9]{2})\b/g) || [];
+    const a = years.length >= 1 ? Number(years[0]) : null;
+    const b = years.length >= 2 ? Number(years[1]) : null;
+
+    return {
+      birthYear: Number.isFinite(a) ? a : null,
+      deathYear: Number.isFinite(b) ? b : null
+    };
+  }
+
+  function extractUrlFromLinks(links) {
+    // RA brukar ha _links med olika nycklar. Vi försöker några vanliga.
+    if (!links || typeof links !== "object") return "";
+
+    // om det finns ett direkt href någonstans
+    const tryKeys = ["html", "self", "alternate", "record", "ui", "web"];
+    for (const k of tryKeys) {
+      const node = links[k];
+      if (!node) continue;
+
+      // node kan vara { href: "..." } eller array
+      if (typeof node === "object" && node.href) {
+        const u = safeUrl(node.href);
+        if (u) return u;
+      }
+      if (Array.isArray(node)) {
+        for (const it of node) {
+          const u = safeUrl(it && it.href);
+          if (u) return u;
+        }
+      }
+    }
+
+    // sista chans: leta första href i objektet
+    for (const key of Object.keys(links)) {
+      const node = links[key];
+      if (node && typeof node === "object" && node.href) {
+        const u = safeUrl(node.href);
+        if (u) return u;
+      }
+    }
     return "";
-  }
-
-  function extractPlace(hit) {
-    // flera varianter
-    return (
-      pickText(hit && (hit.place ?? hit.location ?? hit.placeName ?? hit.ort ?? hit.city ?? hit.socken)) ||
-      ""
-    );
-  }
-
-  function extractName(hit) {
-    // Riksarkivet “hits” kan ha title/label, ibland name finns inte
-    const n =
-      pickText(hit && (hit.name ?? hit.title ?? hit.label ?? hit.displayName ?? hit.heading ?? hit.caption)) ||
-      "";
-    return n || "(namn saknas)";
-  }
-
-  function extractId(hit) {
-    const id = pickText(hit && (hit.id ?? hit.identifier ?? hit.recordId ?? hit.ref));
-    if (id) return id;
-
-    // fallback id om saknas (fail-closed: bara intern temporär)
-    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
-    return "tmp_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
-  }
-
-  function extractBirthDeath(hit) {
-    // Vanliga varianter:
-    // birthYear/deathYear, fromTime/toTime, dateFrom/dateTo, years, etc.
-    const by =
-      extractYear(hit && (hit.birthYear ?? hit.birth ?? hit.fodelsear ?? hit.fromTime ?? hit.dateFrom ?? hit.from)) ??
-      null;
-
-    const dy =
-      extractYear(hit && (hit.deathYear ?? hit.death ?? hit.dodsar ?? hit.toTime ?? hit.dateTo ?? hit.to)) ??
-      null;
-
-    // Fail-safe: om båda saknas, returnera null/null
-    return { birthYear: by, deathYear: dy };
   }
 
   /* ============================================================
@@ -166,7 +156,7 @@
   }
 
   /* ============================================================
-     DEMO PROVIDER (ALLTID TILLGÄNGLIG)
+     DEMO PROVIDER
      ============================================================ */
 
   const DEMO_DATA = [
@@ -188,7 +178,6 @@
           makeCandidate({
             ...p,
             source: "Demo",
-            url: "",
             why: ["Demo-post"]
           })
         );
@@ -196,9 +185,15 @@
   };
 
   /* ============================================================
-     RIKSARKIVET – SÖK-API VIA CLOUDFLARE WORKER
-     - Din worker: /records?name=Erik&limit=5
-     - Svar (ex): { totalHits: 17219, hits: [...] }
+     RIKSARKIVET – VIA WORKER
+     - payload exempel (som du visade):
+       {
+         totalHits: 17219,
+         hits: 5,
+         offset: 0,
+         facets: [...],
+         items: [ ... ]
+       }
      ============================================================ */
 
   const SearchApiProvider = {
@@ -210,18 +205,12 @@
       if (q.length < 2) return [];
 
       const limit = clampInt(DEFAULT_LIMIT, 1, MAX_LIMIT, DEFAULT_LIMIT);
-      const url =
-        PROXY_BASE +
-        "/records?name=" +
-        encodeURIComponent(q) +
-        "&limit=" +
-        String(limit);
+      const url = PROXY_BASE + "/records?name=" + encodeURIComponent(q) + "&limit=" + String(limit);
 
       let res;
       try {
         res = await abortableFetch(url);
       } catch {
-        // fail-closed: bubbla fel så UI kan visa “källa blockerad”
         throw new Error("NETWORK_OR_TIMEOUT");
       }
 
@@ -236,37 +225,52 @@
         throw new Error("BAD_JSON");
       }
 
-      // ✅ Viktigt: ditt format använder "hits"
-      const records = safeArray(json.hits || json.records || json.items || json.data || []);
+      // ✅ Viktigt: items är listan
+      const items = safeArray(json.items || json.records || json.data || json.results || []);
+      if (!items.length) return [];
 
-      // Fail-closed: om records inte är array -> []
-      if (!Array.isArray(records)) return [];
+      return items.slice(0, limit).map((r) => {
+        const id = pickText(r.id || r.identifier) || (
+          (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() :
+          ("tmp_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8))
+        );
 
-      return records.slice(0, limit).map(r => {
-        const years = extractBirthDeath(r);
-        const candidate = makeCandidate({
-          id: extractId(r),
-          name: extractName(r),
+        const name =
+          pickText(r.caption || r.name || r.title || r.label || (r.metadata && r.metadata.title)) ||
+          "(namn saknas)";
+
+        // datum/år ligger ofta i metadata.date
+        const mdDate = r && r.metadata ? r.metadata.date : "";
+        const years = parseDateRangeFromMetadataDate(mdDate);
+
+        // plats: finns ofta inte här → lämna tomt (fail-closed)
+        const place =
+          pickText(r.place || r.location || (r.metadata && (r.metadata.place || r.metadata.location || r.metadata.ort))) ||
+          "";
+
+        // url: försök från _links
+        const urlOut = extractUrlFromLinks(r && (r._links || r.links)) || "";
+
+        return makeCandidate({
+          id,
+          name,
           birthYear: years.birthYear,
           deathYear: years.deathYear,
-          place: extractPlace(r),
+          place,
           source: "Riksarkivet",
-          url: extractUrl(r),
-          why: ["Match via namn"]
+          url: urlOut,
+          why: [
+            "Match via namn",
+            mdDate ? ("Datum: " + pickText(mdDate)) : ""
+          ].filter(Boolean)
         });
-
-        // Fail-safe: om vi inte ens fick namn -> minimalt
-        if (!candidate.name) candidate.name = "(namn saknas)";
-        return candidate;
       });
     }
   };
 
   /* ============================================================
      ENRICH PROVIDERS (AO-API-03)
-     - IIIF / OAI stubs: metadata/länkar endast
-     - Ingen bildrendering, ingen lagring
-     - Fail-closed: fel -> []
+     - stubs: metadata/länkar endast
      ============================================================ */
 
   const enrichProviders = [
@@ -274,7 +278,6 @@
       id: "iiif_stub",
       label: "IIIF (stub)",
       supports(candidate) {
-        // Vi kräver en URL (om RA senare ger en IIIF-länk kan vi använda den direkt)
         return Boolean(candidate && safeUrl(candidate.url));
       },
       async enrich(candidate /*, hints */) {
@@ -302,8 +305,7 @@
       supports(candidate) {
         return Boolean(candidate && String(candidate.id || "").trim());
       },
-      async enrich(/* candidate, hints */) {
-        // Stub: korrekt OAI identifier kräver mappning mot RA:s OAI-tjänst
+      async enrich() {
         return [];
       }
     }
@@ -328,7 +330,6 @@
   function pickProvider(preferred = "auto") {
     if (preferred === "demo") return DemoProvider;
     if (preferred === "searchapi") return SearchApiProvider;
-    // auto = proxy först, annars demo
     return SearchApiProvider || DemoProvider;
   }
 
