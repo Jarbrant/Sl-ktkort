@@ -134,6 +134,15 @@
   <script>
     "use strict";
 
+    // =====================================================
+    // PATCH NOTES (BUGFIX / QA)
+    // - CAP-badge styrs av RAW COUNT (före trim), inte ranked.length.
+    // - Provider-guard: om auto-provider saknas/fel -> tydligt fel (fail-closed).
+    // - loadState uppdateras även vid runtime-fel (SAKNAS/ERROR).
+    // - Minimikrav: minst 3 tecken + nameQuery minst 3 (enligt tidigare lås).
+    // - Inga nya storage-keys. Ingen UX-redesign.
+    // =====================================================
+
     const qEl = document.getElementById("q");
     const searchBtn = document.getElementById("searchBtn");
     const openPoolBtn = document.getElementById("openPoolBtn");
@@ -148,6 +157,7 @@
 
     let lastCandidates = [];
     let lastProviderId = "—";
+    let lastRawCount = 0; // <-- RAW count från provider, innan rank/trim
 
     function escapeHtml(s){
       return String(s || "")
@@ -230,6 +240,7 @@
         }
       }
 
+      // fail-soft: vissa browsers/blank-tabs behöver flera försök
       sendAll();
       setTimeout(sendAll, 300);
       setTimeout(sendAll, 900);
@@ -287,8 +298,8 @@
     function rankAndTrim(items, parsed){
       const arr = safeArray(items);
 
-      // om användaren bara skrev år (ex "1820") -> nameQuery tom -> fail-closed
-      if(!parsed.nameQuery || parsed.nameQuery.length < 2){
+      // fail-closed: kräver en riktig nameQuery (inte bara år)
+      if(!parsed.nameQuery || parsed.nameQuery.length < 3){
         return [];
       }
 
@@ -310,7 +321,10 @@
       }
 
       setCount(arr.length);
-      showCapWarning(arr.length >= 150);
+
+      // ✅ CAP: visa varning om råa träffar nådde cap (eller över)
+      showCapWarning(Number(lastRawCount) >= 150);
+
       openPoolBtn.disabled = false;
 
       for(const c of arr){
@@ -326,6 +340,7 @@
         const actions = document.createElement("div");
         actions.className = "actions";
 
+        // OBS: Behåller per-rad pool-knapp (ingen redesign). Vill du ta bort den gör vi separat AO.
         const poolBtn = document.createElement("button");
         poolBtn.className = "secondary";
         poolBtn.textContent = "Öppna i Puzzle (pool)";
@@ -344,75 +359,108 @@
       }
     }
 
+    function providerOk(p){
+      return !!p && typeof p.search === "function" && typeof p.id === "string" && p.id.length > 0;
+    }
+
     async function runSearch(){
+      // reset UI
       showCapWarning(false);
       openPoolBtn.disabled = true;
       setProvider("—");
       setCount("—");
+      lastCandidates = [];
+      lastRawCount = 0;
       resultsEl.innerHTML = "";
 
       const raw = qEl.value.trim();
-      if(raw.length < 2){
-        showMessage("Skriv minst 2 tecken.", "empty");
-        lastCandidates = [];
+
+      // ✅ Minimikrav (lås): minst 3 tecken
+      if(raw.length < 3){
+        showMessage("Skriv minst 3 tecken.", "empty");
         return;
       }
 
+      // ✅ RAProviders måste finnas
       if(!window.RAProviders || typeof window.RAProviders.pickProvider !== "function"){
+        setLoadState("SAKNAS");
         showMessage("RAProviders saknas. Kontrollera att /app/assets/js/ra-providers.js finns och laddas.", "empty");
-        lastCandidates = [];
         return;
       }
+
+      // RAProviders finns -> OK (för stunden)
+      setLoadState("OK");
 
       const parsed = parseTokens(raw);
 
       // ✅ Viktigt: skicka RA-vänlig fråga utan '+'
       const qForProvider = parsed.nameQuery;
 
-      if(!qForProvider || qForProvider.length < 2){
+      // ✅ fail-closed: kräver minst ett namn-token (min 3 tecken totalt i nameQuery)
+      if(!qForProvider || qForProvider.length < 3){
         showMessage("Skriv minst ett namn-token (t.ex. Erik+Leksand). År ensam räcker inte (fail-closed).", "empty");
-        lastCandidates = [];
         return;
       }
 
-      const provider = window.RAProviders.pickProvider("auto");
-      const usedAuto = (provider && provider.id) ? provider.id : "auto";
+      // Auto-provider
+      let provider = null;
+      try{
+        provider = window.RAProviders.pickProvider("auto");
+      }catch{
+        provider = null;
+      }
+
+      // ✅ Provider-guard
+      if(!provider || typeof provider.search !== "function"){
+        setLoadState("ERROR");
+        showMessage("Ingen giltig provider hittades (auto). Kontrollera ra-providers.js (pickProvider/search).", "empty");
+        return;
+      }
 
       searchBtn.disabled = true;
+      const prevText = searchBtn.textContent;
       searchBtn.textContent = "Söker…";
 
       let items = [];
-      let used = usedAuto;
+      let used = provider.id || "auto";
 
+      // 1) Försök auto (RA/Worker)
       try{
         items = await provider.search(qForProvider);
       }catch{
         items = [];
       }
 
-      // demo fallback (använd också qForProvider)
-      if(!items.length){
+      // 2) Fallback demo om tomt (enligt din spec)
+      if(!safeArray(items).length){
         try{
           const demo = window.RAProviders.pickProvider("demo");
-          used = (demo && demo.id) ? demo.id : used;
-          items = await demo.search(qForProvider);
+          if(demo && typeof demo.search === "function"){
+            used = (demo && demo.id) ? demo.id : used;
+            items = await demo.search(qForProvider);
+          }
         }catch{
           items = [];
         }
       }
 
+      // restore UI
       searchBtn.disabled = false;
-      searchBtn.textContent = "Sök";
+      searchBtn.textContent = prevText || "Sök";
 
       setProvider(used);
 
-      // ✅ Klient-sortering med tokens (+ år)
+      // ✅ Spara rawCount före trim för korrekt cap-varning
+      lastRawCount = safeArray(items).length;
+
+      // ✅ Klient-sortering med tokens (+ år) och trim till max 150
       const ranked = rankAndTrim(items, parsed);
 
       lastCandidates = ranked;
       renderList(lastCandidates);
     }
 
+    // EVENTS
     searchBtn.addEventListener("click", runSearch);
     qEl.addEventListener("keydown", e => {
       if(e.key === "Enter"){
@@ -426,14 +474,26 @@
     clearBtn.addEventListener("click", () => {
       qEl.value = "";
       lastCandidates = [];
+      lastRawCount = 0;
       setProvider("—");
       setCount("—");
       showCapWarning(false);
       openPoolBtn.disabled = true;
       resultsEl.innerHTML = "";
+      // återställ loadState baserat på aktuell runtime
+      try{
+        if(window.RAProviders && typeof window.RAProviders.pickProvider === "function"){
+          setLoadState("OK");
+        }else{
+          setLoadState("SAKNAS");
+        }
+      }catch{
+        setLoadState("SAKNAS");
+      }
       qEl.focus();
     });
 
+    // INIT
     (function init(){
       try{
         if(window.RAProviders && typeof window.RAProviders.pickProvider === "function"){
