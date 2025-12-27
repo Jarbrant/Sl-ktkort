@@ -66,9 +66,7 @@
       border:1px solid #e6e8eb;
       background:#fafafa;
     }
-    .badge.ok{ background:#f5fff5; border-color:#cfe8cf; }
     .badge.warn{ background:#fff9ee; border-color:#ffe1a6; }
-    .badge.err{ background:#fff2f2; border-color:#ffb3b3; }
     .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
 
     .list{
@@ -98,18 +96,6 @@
       font-size:13px;
       color:#333;
     }
-
-    /* ✅ NYTT: separat meddelanderuta utanför <ul> (så tom lista aldrig får <li>) */
-    .msgBox{
-      margin-top:18px;
-      padding:12px;
-      border-radius:14px;
-      border:1px solid #eee;
-      background:#fafafa;
-      color:#333;
-      font-size:13px;
-    }
-    .msgBox[hidden]{ display:none; }
   </style>
 </head>
 
@@ -122,14 +108,11 @@
       <span class="badge">Källa: <strong id="providerName">—</strong></span>
       <span class="badge">Visas: <strong id="countNum">—</strong></span>
       <span class="badge warn" id="capBadge" hidden>Max 150 visas – förfina din sökning</span>
-      <span class="badge" id="loadBadge">RAProviders: <strong id="loadState">—</strong></span>
-      <span class="badge" id="rawBadge">Råträffar: <strong id="rawNum">—</strong></span>
-      <span class="badge" id="yearBadge">Årfilter: <strong id="yearState">—</strong></span>
     </div>
 
     <div class="hint">
       Tips: använd <span class="mono">+</span> som tokens: <span class="mono">Erik+Leksand+1820</span><br/>
-      <strong>Ny regel:</strong> Om du anger år (t.ex. <span class="mono">1820</span>) så filtrerar vi hårt till år ±5 (fail-closed).
+      År används för filtrering/ranking i klienten (inte skickas som <span class="mono">+</span> till RA).
     </div>
   </header>
 
@@ -140,9 +123,6 @@
     <button id="clearBtn" class="secondary" type="button">Rensa</button>
   </div>
 
-  <!-- ✅ NYTT: meddelande-yta (renderar text, inte <li>) -->
-  <div id="msg" class="msgBox" hidden></div>
-
   <ul id="results" class="list" aria-label="Sökresultat"></ul>
 
   <!-- RA Providers -->
@@ -151,36 +131,20 @@
   <script>
     "use strict";
 
-    // =====================================================
-    // PERSON-SEARCH.html (AO-API-03 kompatibel)
-    // - Tar emot "token query" med + (t.ex. Erik+Leksand+1820)
-    // - Skickar endast "nameQuery" (utan '+', utan år) till RA
-    // - Rankar klient-side (fail-closed)
-    // - Om år anges -> hård filtrering till ±5 (fail-closed)
-    // - Pool skickas till Puzzle via postMessage (in-memory, ingen lagring)
-    // =====================================================
-
-    // DOM
     const qEl = document.getElementById("q");
     const searchBtn = document.getElementById("searchBtn");
     const openPoolBtn = document.getElementById("openPoolBtn");
     const clearBtn = document.getElementById("clearBtn");
-    const resultsEl = document.getElementById("results");
-    const msgEl = document.getElementById("msg");
 
+    const resultsEl = document.getElementById("results");
     const providerNameEl = document.getElementById("providerName");
     const countNumEl = document.getElementById("countNum");
-    const rawNumEl = document.getElementById("rawNum");
-    const yearStateEl = document.getElementById("yearState");
     const capBadge = document.getElementById("capBadge");
-    const loadStateEl = document.getElementById("loadState");
 
-    // STATE (in-memory only)
+    // in-memory only
     let lastCandidates = [];
     let lastProviderId = "—";
-    let lastRawCount = 0;
 
-    // Helpers
     function escapeHtml(s){
       return String(s || "")
         .replaceAll("&","&amp;")
@@ -189,6 +153,7 @@
         .replaceAll('"',"&quot;")
         .replaceAll("'","&#039;");
     }
+
     function safeArray(v){ return Array.isArray(v) ? v : []; }
     function normalize(s){ return String(s||"").trim().toLowerCase(); }
 
@@ -206,34 +171,18 @@
     function setCount(n){
       countNumEl.textContent = Number.isFinite(Number(n)) ? String(n) : "—";
     }
-    function setRawCount(n){
-      rawNumEl.textContent = Number.isFinite(Number(n)) ? String(n) : "—";
-    }
     function showCapWarning(show){
       capBadge.hidden = !show;
     }
-    function setLoadState(text){
-      loadStateEl.textContent = text || "—";
-    }
-    function setYearState(text){
-      yearStateEl.textContent = text || "—";
-    }
 
-    // ✅ NYTT: Fail-closed UI-message UTAN <li>
-    function hideMessage(){
-      msgEl.hidden = true;
-      msgEl.textContent = "";
-    }
     function showMessage(text){
-      // enligt spec: tomt läge ska visa meddelande, inte lista
-      resultsEl.innerHTML = "";
-      msgEl.hidden = false;
-      msgEl.textContent = String(text || "");
+      resultsEl.innerHTML = "<li class='item'><div class='meta'>" + escapeHtml(text) + "</div></li>";
       setCount(0);
       openPoolBtn.disabled = true;
+      lastCandidates = [];
     }
 
-    // Encode single candidate (fallback)
+    // ---------- Encode single candidate (fallback) ----------
     function base64ToBase64Url(b64){
       return b64.replaceAll("+","-").replaceAll("/","_").replaceAll("=","");
     }
@@ -247,7 +196,7 @@
       window.location.href = "./person-puzzle.html?candidate=" + encodeURIComponent(payload);
     }
 
-    // Pool -> Puzzle (postMessage, in-memory)
+    // ---------- Pool -> Puzzle (postMessage, in-memory) ----------
     function openPuzzleWithPool(candidates){
       const items = safeArray(candidates).slice(0, 150);
       if(!items.length){
@@ -277,7 +226,7 @@
       setTimeout(sendAll, 900);
     }
 
-    // Token parsing: "Erik+Leksand+1820" -> nameQuery:"Erik Leksand", tokens:["Erik","Leksand"], years:[1820]
+    // ---------- Token parsing ( + ) ----------
     function parseTokens(raw){
       const s = String(raw||"").trim();
       if(!s) return { nameQuery:"", tokens:[], years:[] };
@@ -298,9 +247,14 @@
       return { nameQuery, tokens, years };
     }
 
+    // ---------- Client filter + ranking ----------
+    function yearClose(y, target, range){
+      if(y == null) return false;
+      return Math.abs(Number(y) - target) <= range;
+    }
+
     function scoreCandidateClient(c, parsed){
       let s = 0;
-
       const name = normalize(c.name);
       const place = normalize(c.place);
       const by = Number.isFinite(Number(c.birthYear)) ? Number(c.birthYear) : null;
@@ -313,91 +267,67 @@
         else if(place.includes(tt)) s += 20;
       }
 
-      for(const y of parsed.years){
-        if(by !== null && Math.abs(by - y) <= 5) s += 25;
-        if(dy !== null && Math.abs(dy - y) <= 5) s += 15;
+      // år = bara signal. Om år finns men kandidat saknar år → liten minus (för att sortera ner)
+      if(parsed.years.length){
+        if(by == null && dy == null) s -= 5;
+        for(const y of parsed.years){
+          if(yearClose(by, y, 5)) s += 25;
+          if(yearClose(dy, y, 5)) s += 15;
+        }
       }
 
       if(c.url) s += 5;
       return s;
     }
 
-    // Hård årfiltrering om år angivet (fail-closed)
-    function applyYearFilter(arr, years){
-      if(!Array.isArray(years) || years.length === 0) return arr;
-      const y = years[0];
-      const RANGE = 5;
-
-      return safeArray(arr).filter(c => {
-        const by = Number.isFinite(Number(c.birthYear)) ? Number(c.birthYear) : null;
-        const dy = Number.isFinite(Number(c.deathYear)) ? Number(c.deathYear) : null;
-        if(by === null && dy === null) return false; // fail-closed: saknar år när årfilter är aktivt
-        if(by !== null && Math.abs(by - y) <= RANGE) return true;
-        if(dy !== null && Math.abs(dy - y) <= RANGE) return true;
-        return false;
-      });
-    }
-
-    function rankAndTrim(items, parsed){
+    function filterAndRank(items, parsed){
       const arr = safeArray(items);
 
-      // fail-closed: kräver en riktig nameQuery (inte bara år)
-      if(!parsed.nameQuery || parsed.nameQuery.length < 3){
-        return [];
-      }
+      // fail-closed: kräver minst 3 tecken i nameQuery (inte bara år)
+      if(!parsed.nameQuery || parsed.nameQuery.length < 3) return [];
 
-      const filtered = applyYearFilter(arr, parsed.years);
-
-      const scored = filtered.map(c => ({ c, s: scoreCandidateClient(c, parsed) }));
+      // Om användaren gav år: filtrera inte bort allt, men prioritera kandidater med år nära.
+      // (Vi behåller även kandidater utan år, men de hamnar längre ned via score)
+      const scored = arr.map(c => ({ c, s: scoreCandidateClient(c, parsed) }));
       scored.sort((a,b) => b.s - a.s);
 
-      return scored.slice(0, 150).map(x => x.c);
+      // dedup (id först, annars name+years)
+      const out = [];
+      const seen = new Set();
+      for(const x of scored){
+        const c = x.c;
+        const key = String(c.id || "") || (normalize(c.name) + "|" + String(c.birthYear||"") + "|" + String(c.deathYear||""));
+        if(!key) continue;
+        if(seen.has(key)) continue;
+        seen.add(key);
+        out.push(c);
+        if(out.length >= 150) break;
+      }
+      return out;
     }
 
-    // =====================================================
-    // ✅ RENDER (DUM / VISUELL / INGA BESLUT)
-    // - 1 <li> per kandidat
-    // - 0 <li> om tom lista (visar msg istället)
-    // - Visar INTE skräp utan namn (fail-closed: om ogiltigt -> msg)
-    // - Om input har objekt men inget renderas -> msg (tydligt)
-    // =====================================================
     function renderList(items){
-      hideMessage();
       resultsEl.innerHTML = "";
-
       const arr = safeArray(items);
 
-      // Tom lista -> inget <li>, bara meddelande (enligt spec)
       if(!arr.length){
-        showMessage("Inga träffar (eller årfiltret gav 0). Försök utan år eller förfina med fler tokens.");
+        showMessage("Inga träffar (eller källa blockerades av CORS/timeout).");
         return;
       }
 
-      // Fail-closed: om någon kandidat saknar giltigt namn, avbryt rendering och visa fel
-      // (För att undvika “skräpresultat” utan namn.)
-      for(const c of arr){
-        const nm = String(c && c.name || "").trim();
-        if(!nm){
-          showMessage("Inga träffar (eller årfiltret gav 0). Försök utan år eller förfina med fler tokens.");
-          return;
-        }
-      }
-
-      // Visas-count + cap-varning baseras på råa träffar före trim
       setCount(arr.length);
-      showCapWarning(Number(lastRawCount) >= 150);
-      openPoolBtn.disabled = false;
+      showCapWarning(arr.length >= 150);
 
-      let rendered = 0;
+      openPoolBtn.disabled = false;
 
       for(const c of arr){
         const li = document.createElement("li");
         li.className = "item";
 
         li.innerHTML =
-          "<h3>" + escapeHtml(c.name + candidateYears(c)) + "</h3>" +
-          (c.place ? ("<div class='meta'>Plats: " + escapeHtml(c.place) + "</div>") : "") +
-          (c.source ? ("<div class='meta'>Källa: " + escapeHtml(c.source) + "</div>") : "") +
+          "<h3>" + escapeHtml((c.name || "(namn saknas)") + candidateYears(c)) + "</h3>" +
+          "<div class='meta'>Plats: " + escapeHtml(c.place || "—") + "</div>" +
+          "<div class='meta'>Källa: " + escapeHtml(c.source || "—") + "</div>" +
           (c.url ? ("<div class='meta'>URL: <span class='mono'>" + escapeHtml(c.url) + "</span></div>") : "");
 
         const actions = document.createElement("div");
@@ -418,42 +348,27 @@
 
         li.appendChild(actions);
         resultsEl.appendChild(li);
-        rendered++;
-      }
-
-      // Spec: om input har objekt men <ul> renderas tom -> visa tydligt fel
-      if(rendered === 0){
-        showMessage("Inga träffar (eller årfiltret gav 0). Försök utan år eller förfina sökningen.");
       }
     }
 
     async function runSearch(){
-      // reset UI
-      hideMessage();
       showCapWarning(false);
       openPoolBtn.disabled = true;
       setProvider("—");
       setCount("—");
-      setRawCount("—");
-      setYearState("—");
-      lastCandidates = [];
-      lastRawCount = 0;
       resultsEl.innerHTML = "";
+      lastCandidates = [];
 
       const raw = qEl.value.trim();
-
       if(raw.length < 3){
         showMessage("Skriv minst 3 tecken.");
         return;
       }
 
       if(!window.RAProviders || typeof window.RAProviders.pickProvider !== "function"){
-        setLoadState("SAKNAS");
-        showMessage("RAProviders saknas. Kontrollera att /app/assets/js/ra-providers.js finns och laddas.");
+        showMessage("RAProviders saknas. Kontrollera att ./assets/js/ra-providers.js finns och laddas.");
         return;
       }
-
-      setLoadState("OK");
 
       const parsed = parseTokens(raw);
       const qForProvider = parsed.nameQuery;
@@ -463,21 +378,10 @@
         return;
       }
 
-      if(Array.isArray(parsed.years) && parsed.years.length){
-        setYearState(String(parsed.years[0]) + " ±5 (hård)");
-      }else{
-        setYearState("av");
-      }
-
       let provider = null;
-      try{
-        provider = window.RAProviders.pickProvider("auto");
-      }catch{
-        provider = null;
-      }
+      try{ provider = window.RAProviders.pickProvider("auto"); }catch{ provider = null; }
       if(!provider || typeof provider.search !== "function"){
-        setLoadState("ERROR");
-        showMessage("Ingen giltig provider hittades (auto). Kontrollera ra-providers.js (pickProvider/search).");
+        showMessage("Ingen giltig provider hittades (auto). Kontrollera ra-providers.js.");
         return;
       }
 
@@ -494,6 +398,7 @@
         items = [];
       }
 
+      // demo fallback om upstream strular
       if(!safeArray(items).length){
         try{
           const demo = window.RAProviders.pickProvider("demo");
@@ -511,16 +416,13 @@
 
       setProvider(used);
 
-      lastRawCount = safeArray(items).length;
-      setRawCount(lastRawCount);
+      // klient-filter + ranking (tokens + år)
+      const ranked = filterAndRank(items, parsed);
 
-      const ranked = rankAndTrim(items, parsed);
       lastCandidates = ranked;
-
       renderList(lastCandidates);
     }
 
-    // Events
     searchBtn.addEventListener("click", runSearch);
     qEl.addEventListener("keydown", e => {
       if(e.key === "Enter"){
@@ -534,46 +436,17 @@
     clearBtn.addEventListener("click", () => {
       qEl.value = "";
       lastCandidates = [];
-      lastRawCount = 0;
       setProvider("—");
       setCount("—");
-      setRawCount("—");
-      setYearState("—");
       showCapWarning(false);
       openPoolBtn.disabled = true;
       resultsEl.innerHTML = "";
-      hideMessage();
-
-      try{
-        if(window.RAProviders && typeof window.RAProviders.pickProvider === "function"){
-          setLoadState("OK");
-        }else{
-          setLoadState("SAKNAS");
-        }
-      }catch{
-        setLoadState("SAKNAS");
-      }
-
       qEl.focus();
     });
 
-    // Init
-    (function init(){
-      try{
-        if(window.RAProviders && typeof window.RAProviders.pickProvider === "function"){
-          setLoadState("OK");
-        }else{
-          setLoadState("SAKNAS");
-        }
-      }catch{
-        setLoadState("SAKNAS");
-      }
-      setProvider("—");
-      setCount("—");
-      setRawCount("—");
-      setYearState("—");
-      hideMessage();
-    })();
+    // init
+    setProvider("—");
+    setCount("—");
   </script>
 </body>
 </html>
